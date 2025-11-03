@@ -39,26 +39,32 @@ pip install -r requirements.txt
 
 ### 4. Environment Configuration
 
-Copy `.env` and update database credentials:
-```bash
-cp .env .env.local  # Optional: create local config
-```
-
-Edit `.env` with your database settings:
+Create a `.env` file with your database settings:
 ```env
 DB_HOST=localhost
-DB_USER=your_username
-DB_PASSWORD=your_password
+DB_USER=root
+DB_PASSWORD=your_secure_password
 DB_NAME=scoreboard
 DB_PORT=3306
+JWT_SECRET_KEY=your_jwt_secret_key_here
+DEBUG=True
 ```
+
+**⚠️ Security Note:** Never commit `.env` files to version control. The `.gitignore` file excludes them automatically.
 
 ### 5. Database Setup
 
-Run the SQL schema to create tables:
-```bash
-mysql -u your_username -p < database_schema.sql
+1. **Create the database:**
+```sql
+CREATE DATABASE scoreboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
+
+2. **Run the schema file:**
+```bash
+mysql -u your_username -p scoreboard < database_schema.sql
+```
+
+This will create all necessary tables and insert sample data for sports and score types.
 
 ### 6. Run the Application
 
