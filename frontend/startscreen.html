@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamScore - Nieuwe Sessie</title>
+    <link rel="stylesheet" href="css/startscreen.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧩 TeamScore</h1>
+            <p>Digitaal scorebord voor teambuildings</p>
+        </header>
+
+        <main class="main-content">
+            <div class="session-setup">
+                <h2>Nieuwe Sessie Aanmaken</h2>
+
+                <form id="session-form" class="setup-form">
+                    <div class="form-group">
+                        <label for="session-name">Sessie Naam:</label>
+                        <input type="text" id="session-name" placeholder="bijv. Team Building Dag 2025" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="game-type">Speltype:</label>
+                        <select id="game-type">
+                            <option value="custom">Aangepast</option>
+                            <option value="quiz">Quiz Modus</option>
+                            <option value="sport_challenge">Sport Challenge</option>
+                            <option value="random_bonus">Random Bonus</option>
+                            <option value="elimination">Elimination Mode</option>
+                            <option value="team_vs_time">Team vs Time</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-teams">Maximum Aantal Teams:</label>
+                        <input type="number" id="max-teams" value="6" min="2" max="20">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="total-rounds">Aantal Rondes:</label>
+                        <input type="number" id="total-rounds" value="1" min="1" max="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="time-limit">Tijdslimiet per Ronde (minuten, optioneel):</label>
+                        <input type="number" id="time-limit" placeholder="Laat leeg voor geen limiet" min="1">
+                    </div>
+
+                    <button type="submit" class="create-btn">Sessie Aanmaken</button>
+                </form>
+            </div>
+
+            <div class="active-session" id="active-session" style="display: none;">
+                <h2>Actieve Sessie</h2>
+                <div id="active-session-info"></div>
+                <div class="session-actions">
+                    <button id="continue-session" class="continue-btn">Doorgaan met Sessie</button>
+                    <button id="end-session" class="end-btn">Sessie Beëindigen</button>
+                </div>
+            </div>
+
+            <div class="recent-sessions" id="recent-sessions">
+                <h2>Recente Sessies</h2>
+                <div id="sessions-list">Laden...</div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 TeamScore - Digitaal Scorebord voor Teambuildings</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/startscreen.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamScore - Score Input</title>
+    <link rel="stylesheet" href="css/scoreinput.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧩 TeamScore - Score Input</h1>
+            <div class="session-info">
+                <span id="session-name">Sessie laden...</span>
+                <span id="round-info">Ronde 1/1</span>
+                <span id="timer">--:--</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="leaderboard-section">
+                <h2>Leaderboard</h2>
+                <div class="leaderboard" id="leaderboard">
+                    <!-- Leaderboard will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="score-input-section">
+                <h2>Score Aanpassen</h2>
+
+                <div class="score-form">
+                    <div class="form-group">
+                        <label for="team-select">Selecteer Team:</label>
+                        <select id="team-select">
+                            <option value="">Kies een team...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="points-input">Punten:</label>
+                        <div class="points-controls">
+                            <button id="subtract-btn" class="points-btn subtract">-</button>
+                            <input type="number" id="points-input" value="1" min="1" max="100">
+                            <button id="add-btn" class="points-btn add">+</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reason-input">Reden (optioneel):</label>
+                        <input type="text" id="reason-input" placeholder="bijv. Quiz vraag correct, Bonus punten..." maxlength="200">
+                    </div>
+
+                    <button id="submit-score-btn" class="submit-btn">Score Toevoegen</button>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Snelle Acties</h3>
+                    <div class="quick-buttons">
+                        <button class="quick-btn bonus" onclick="scoreInput.addQuickScore('Bonus +5', 5)">+5 Bonus</button>
+                        <button class="quick-btn penalty" onclick="scoreInput.addQuickScore('Penalty -2', -2)">-2 Penalty</button>
+                        <button class="quick-btn correct" onclick="scoreInput.addQuickScore('Correct Answer +1', 1)">+1 Correct</button>
+                        <button class="quick-btn wrong" onclick="scoreInput.addQuickScore('Wrong Answer -1', -1)">-1 Wrong</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-scores-section">
+                <h2>Recente Scores</h2>
+                <div class="recent-scores" id="recent-scores">
+                    <!-- Recent scores will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="session-controls">
+                <button id="pause-session-btn" class="control-btn pause">Pauze</button>
+                <button id="next-round-btn" class="control-btn next">Volgende Ronde</button>
+                <button id="end-session-btn" class="control-btn end">Sessie Beëindigen</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Score Animation Overlay -->
+    <div class="score-animation" id="score-animation">
+        <div class="animation-content">
+            <div class="team-icon" id="anim-team-icon">👥</div>
+            <div class="score-change" id="anim-score-change">+5</div>
+            <div class="team-name" id="anim-team-name">Team Naam</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/scoreinput.js"></script>
+</body>
+</html>

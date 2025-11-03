@@ -1,0 +1,403 @@
+/* Team Setup Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #ffffff; /* 60% white background */
+    color: #333333; /* Dark grey text */
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: #e0e0e0; /* 30% grey background */
+    border-radius: 15px;
+    border: 2px solid #cccccc; /* Light grey border */
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: #333333; /* Dark grey text */
+}
+
+.session-info {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    font-size: 1.1rem;
+    color: #666666; /* Medium grey text */
+}
+
+/* Main Content */
+.main-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+}
+
+/* Teams Section */
+.teams-section {
+    background: #e0e0e0; /* 30% grey background */
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #cccccc; /* Light grey border */
+}
+
+.teams-section h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333333; /* Dark grey text */
+    font-size: 1.8rem;
+}
+
+/* Add Team Form */
+.add-team-form {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 15px;
+    margin-bottom: 30px;
+    align-items: end;
+}
+
+.add-team-form input,
+.add-team-form select {
+    padding: 12px;
+    border: 2px solid #cccccc; /* Light grey border */
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #ffffff; /* White background */
+    color: #333333; /* Dark grey text */
+}
+
+.add-team-form input:focus,
+.add-team-form select:focus {
+    outline: none;
+    border-color: #b8860b; /* Dark goldenrod - 10% primary color */
+    box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1);
+}
+
+.add-btn {
+    padding: 12px 20px;
+    background: #b8860b; /* Dark goldenrod - 10% primary color */
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-btn:hover {
+    background: #a0780a; /* Darker goldenrod on hover */
+    transform: translateY(-2px);
+}
+
+/* Teams Grid */
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.team-card {
+    background: #ffffff; /* White background */
+    border: 2px solid #cccccc; /* Light grey border */
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.team-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    display: block;
+}
+
+.team-name {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333333; /* Dark grey text */
+}
+
+.team-color-indicator {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 2px solid #cccccc;
+    margin-bottom: 15px;
+}
+
+.team-score {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #b8860b; /* Dark goldenrod - 10% primary color */
+    margin-bottom: 15px;
+}
+
+.team-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.edit-btn,
+.delete-btn {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.edit-btn {
+    background: #cccccc; /* Light grey background */
+    color: #333333; /* Dark grey text */
+}
+
+.edit-btn:hover {
+    background: #aaaaaa; /* Medium grey on hover */
+}
+
+.delete-btn {
+    background: #ff6b6b;
+    color: #ffffff;
+}
+
+.delete-btn:hover {
+    background: #ff5252;
+}
+
+/* Actions Section */
+.actions-section {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.start-btn,
+.back-btn {
+    padding: 15px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.start-btn {
+    background: #b8860b; /* Dark goldenrod - 10% primary color */
+    color: #ffffff;
+}
+
+.start-btn:hover {
+    background: #a0780a; /* Darker goldenrod on hover */
+    transform: translateY(-2px);
+}
+
+.back-btn {
+    background: #cccccc; /* Light grey background */
+    color: #333333; /* Dark grey text */
+}
+
+.back-btn:hover {
+    background: #aaaaaa; /* Medium grey on hover */
+}
+
+/* Session Summary */
+.session-summary {
+    background: #e0e0e0; /* 30% grey background */
+    padding: 25px;
+    border-radius: 12px;
+    border: 2px solid #cccccc; /* Light grey border */
+}
+
+.session-summary h3 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333333; /* Dark grey text */
+}
+
+#session-summary p {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    color: #666666; /* Medium grey text */
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: #ffffff; /* White background */
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #cccccc; /* Light grey border */
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal-content h3 {
+    margin-bottom: 20px;
+    color: #333333; /* Dark grey text */
+}
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333333; /* Dark grey text */
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #cccccc; /* Light grey border */
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #ffffff; /* White background */
+    color: #333333; /* Dark grey text */
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #b8860b; /* Dark goldenrod - 10% primary color */
+    box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.save-btn,
+.cancel-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.save-btn {
+    background: #b8860b; /* Dark goldenrod - 10% primary color */
+    color: #ffffff;
+}
+
+.save-btn:hover {
+    background: #a0780a; /* Darker goldenrod on hover */
+}
+
+.cancel-btn {
+    background: #cccccc; /* Light grey background */
+    color: #333333; /* Dark grey text */
+}
+
+.cancel-btn:hover {
+    background: #aaaaaa; /* Medium grey on hover */
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    color: #666666; /* Medium grey text */
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+
+    .header h1 {
+        font-size: 2rem;
+    }
+
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .add-team-form {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .teams-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+    }
+
+    .team-card {
+        padding: 15px;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .modal-content {
+        padding: 20px;
+    }
+}

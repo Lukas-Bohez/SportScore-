@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoreboard Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>TeamScore Beheer</h1>
+            <nav class="admin-nav">
+                <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
+                <button class="nav-btn" onclick="showSection('sessions')">Sessies</button>
+                <button class="nav-btn" onclick="showSection('teams')">Teams</button>
+                <button class="nav-btn" onclick="showSection('scores')">Scores</button>
+            </nav>
+        </header>
+
+        <main class="admin-main">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="admin-section active">
+                <h2>Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <h3>Lopende Wedstrijd</h3>
+                        <div id="current-game">Geen actieve wedstrijd</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Recente Scores</h3>
+                        <div id="recent-scores">Laden...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sessions Section -->
+            <section id="sessions" class="admin-section">
+                <h2>Sessies Beheren</h2>
+                <div class="form-container">
+                    <form id="session-form" class="admin-form">
+                        <input type="hidden" id="session-id">
+                        <div class="form-group">
+                            <label for="session-name">Sessie Naam:</label>
+                            <input type="text" id="session-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="session-game-type">Spel Type:</label>
+                            <select id="session-game-type" required>
+                                <option value="custom">Custom</option>
+                                <option value="quiz">Quiz</option>
+                                <option value="sport_challenge">Sport Challenge</option>
+                                <option value="random_bonus">Random Bonus</option>
+                                <option value="elimination">Elimination</option>
+                                <option value="team_vs_time">Team vs Time</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="session-max-teams">Max Teams:</label>
+                            <input type="number" id="session-max-teams" value="10" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="session-time-limit">Tijd Limiet (seconden):</label>
+                            <input type="number" id="session-time-limit" placeholder="Geen limiet">
+                        </div>
+                        <button type="submit" class="btn-primary">Opslaan</button>
+                        <button type="button" onclick="resetSessionForm()" class="btn-secondary">Annuleren</button>
+                    </form>
+                </div>
+                <div class="data-table">
+                    <table id="sessions-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Naam</th>
+                                <th>Spel Type</th>
+                                <th>Status</th>
+                                <th>Aangemaakt</th>
+                                <th>Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Sessions will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Teams Section -->
+            <section id="teams" class="admin-section">
+                <h2>Teams Beheren</h2>
+                <div class="form-container">
+                    <form id="team-form" class="admin-form">
+                        <input type="hidden" id="team-id">
+                        <div class="form-group">
+                            <label for="team-session-id">Sessie:</label>
+                            <select id="team-session-id" required>
+                                <!-- Sessions will be populated by JavaScript -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="team-name">Team Naam:</label>
+                            <input type="text" id="team-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="team-color">Kleur:</label>
+                            <input type="color" id="team-color" value="#007bff">
+                        </div>
+                        <div class="form-group">
+                            <label for="team-icon">Icoon:</label>
+                            <select id="team-icon">
+                                <option value="🏆">🏆 Trophy</option>
+                                <option value="⚽">⚽ Ball</option>
+                                <option value="🎯">🎯 Target</option>
+                                <option value="🚀">🚀 Rocket</option>
+                                <option value="🔥">🔥 Fire</option>
+                                <option value="💎">💎 Diamond</option>
+                                <option value="🌟">🌟 Star</option>
+                                <option value="🦁">🦁 Lion</option>
+                                <option value="🐺">🐺 Wolf</option>
+                                <option value="🦅">🦅 Eagle</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">Opslaan</button>
+                        <button type="button" onclick="resetTeamForm()" class="btn-secondary">Annuleren</button>
+                    </form>
+                </div>
+                <div class="data-table">
+                    <table id="teams-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Sessie</th>
+                                <th>Naam</th>
+                                <th>Kleur</th>
+                                <th>Icoon</th>
+                                <th>Score</th>
+                                <th>Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Teams will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+
+
+            <!-- Scores Section -->
+            <section id="scores" class="admin-section">
+                <h2>Scores Beheren</h2>
+                <div class="form-container">
+                    <form id="score-form" class="admin-form">
+                        <div class="form-group">
+                            <label for="score-session">Sessie:</label>
+                            <select id="score-session" required>
+                                <!-- Sessions will be populated by JavaScript -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="score-team">Team:</label>
+                            <select id="score-team" required>
+                                <!-- Teams will be populated based on selected session -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="score-type">Score Type:</label>
+                            <select id="score-type" required>
+                                <option value="points">Punten</option>
+                                <option value="bonus">Bonus</option>
+                                <option value="penalty">Penalty</option>
+                                <option value="time_bonus">Tijd Bonus</option>
+                                <option value="achievement">Prestatie</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="score-value">Waarde:</label>
+                            <input type="number" id="score-value" step="0.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="score-description">Beschrijving:</label>
+                            <input type="text" id="score-description" placeholder="Optioneel">
+                        </div>
+                        <button type="submit" class="btn-primary">Score Toevoegen</button>
+                        <button type="button" onclick="resetScoreForm()" class="btn-secondary">Reset</button>
+                    </form>
+                </div>
+                <div class="data-table">
+                    <table id="scores-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Sessie</th>
+                                <th>Team</th>
+                                <th>Type</th>
+                                <th>Waarde</th>
+                                <th>Beschrijving</th>
+                                <th>Tijdstip</th>
+                                <th>Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Scores will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+
+        </main>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
