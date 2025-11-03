@@ -101,8 +101,14 @@ class LeaderboardView {
     // Calculate team scores
     const teamScores = this.calculateTeamScores();
 
+    // Filter out eliminated teams if game type is elimination
+    let filteredTeams = teamScores;
+    if (this.sessionData && this.sessionData.game_type === 'elimination') {
+      filteredTeams = teamScores.filter((team) => !team.is_eliminated);
+    }
+
     // Sort by score descending
-    const sortedTeams = teamScores.sort((a, b) => b.score - a.score);
+    const sortedTeams = filteredTeams.sort((a, b) => b.score - a.score);
 
     if (sortedTeams.length === 0) {
       this.leaderboard.innerHTML = '<div class="no-data">Geen teams gevonden voor deze sessie.</div>';
@@ -140,7 +146,7 @@ class LeaderboardView {
   }
 
   createLeaderboardItem(team, position) {
-    const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🏅';
+    const medal = position === 2 ? '🥈' : position === 3 ? '🥉' : '🏅';
 
     return `
       <div class="leaderboard-item ${team.is_eliminated ? 'eliminated' : ''}" style="border-left-color: ${team.color || '#333'}">

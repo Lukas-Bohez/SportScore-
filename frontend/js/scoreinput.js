@@ -191,7 +191,7 @@ class ScoreInput {
     const leaderboardHtml = leaderboard
       .map(
         (team, index) => `
-      <div class="leaderboard-item ${index === 0 ? 'leader' : ''}">
+      <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
         <div class="rank">#${index + 1}</div>
         <div class="team-info">
           <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
@@ -210,8 +210,8 @@ class ScoreInput {
     try {
       const response = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
       const scores = response.scores || [];
-      // Show last 10 scores
-      this.recentScoresData = scores.slice(-10).reverse();
+      // Show most recent 10 scores (newest first)
+      this.recentScoresData = scores.slice(0, 10);
       this.displayRecentScores();
     } catch (error) {
       api.handleError(error, 'loading recent scores');
@@ -254,6 +254,12 @@ class ScoreInput {
     this.pointsInput.value = currentValue;
   }
 
+  selectTeam(teamId) {
+    this.teamSelect.value = teamId;
+    // Optional: Add visual feedback or focus the points input
+    this.pointsInput.focus();
+  }
+
   async submitScore() {
     const teamId = parseInt(this.teamSelect.value);
     const points = parseInt(this.pointsInput.value);
@@ -291,8 +297,12 @@ class ScoreInput {
 
       // Reload data
       this.loadLeaderboard();
-      this.loadRecentScores();
       this.loadTeams(); // Refresh team scores
+
+      // Load recent scores with a small delay to ensure the score is saved
+      setTimeout(() => {
+        this.loadRecentScores();
+      }, 500);
     } catch (error) {
       api.handleError(error, 'submitting score');
       alert('Fout bij het toevoegen van de score.');
@@ -306,7 +316,7 @@ class ScoreInput {
       return;
     }
 
-    this.pointsInput.value = Math.abs(points);
+    this.pointsInput.value = points;
     this.reasonInput.value = reason;
     this.submitScore();
   }

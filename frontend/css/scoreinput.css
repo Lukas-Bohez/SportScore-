@@ -143,10 +143,7 @@ h2::after {
     transform: translateX(5px);
 }
 
-.leaderboard-item.leader {
-    background: linear-gradient(135deg, #ffd700, #ffed4e);
-    border-left: 5px solid #f39c12;
-}
+
 
 .rank {
     width: 50px;

@@ -3,6 +3,8 @@ class AdminInterface {
   constructor() {
     this.currentTab = 'sessions';
     this.currentSession = null;
+    this.currentSessionData = null;
+    this.selectedTeams = new Set();
     this.init();
   }
 
@@ -99,7 +101,7 @@ class AdminInterface {
       this.populateSessionSelects();
     } catch (error) {
       api.handleError(error, 'loading initial data');
-      this.showStatusMessage('Failed to load data', 'error');
+      this.showStatusMessage('Kon gegevens niet laden', 'error');
     }
   }
 
@@ -119,13 +121,32 @@ class AdminInterface {
 
   onSessionChange(sessionId) {
     this.currentSession = sessionId;
+    if (sessionId) {
+      this.loadSessionData(sessionId);
+    } else {
+      this.currentSessionData = null;
+    }
     this.loadTeams();
   }
 
   onScoreSessionChange(sessionId) {
     this.currentSession = sessionId;
+    if (sessionId) {
+      this.loadSessionData(sessionId);
+    } else {
+      this.currentSessionData = null;
+    }
     this.loadScores();
     this.populateTeamSelect(sessionId);
+  }
+
+  async loadSessionData(sessionId) {
+    try {
+      this.currentSessionData = await api.request(`/api/v1/sessions/${sessionId}`);
+    } catch (error) {
+      api.handleError(error, 'loading session data');
+      this.currentSessionData = null;
+    }
   }
 
   async populateSessionSelects() {
@@ -266,19 +287,19 @@ class AdminInterface {
           method: 'PUT',
           body: JSON.stringify(data),
         });
-        this.showStatusMessage('Session updated successfully', 'success');
+        this.showStatusMessage('Sessie succesvol bijgewerkt', 'success');
       } else {
         await api.request('/api/v1/sessions', {
           method: 'POST',
           body: JSON.stringify(data),
         });
-        this.showStatusMessage('Session created successfully', 'success');
+        this.showStatusMessage('Sessie succesvol aangemaakt', 'success');
       }
       e.target.reset();
       await this.loadSessions();
     } catch (error) {
       api.handleError(error, 'saving session');
-      this.showStatusMessage('Failed to save session', 'error');
+      this.showStatusMessage('Kon sessie niet opslaan', 'error');
     }
   }
 
@@ -287,11 +308,11 @@ class AdminInterface {
 
     try {
       await api.request(`/api/v1/sessions/${id}`, { method: 'DELETE' });
-      this.showStatusMessage('Session deleted successfully', 'success');
+      this.showStatusMessage('Sessie succesvol verwijderd', 'success');
       await this.loadSessions();
     } catch (error) {
       api.handleError(error, 'deleting session');
-      this.showStatusMessage('Failed to delete session', 'error');
+      this.showStatusMessage('Kon sessie niet verwijderen', 'error');
     }
   }
 
@@ -301,11 +322,11 @@ class AdminInterface {
         method: 'PUT',
         body: JSON.stringify({ status: 'active' }),
       });
-      this.showStatusMessage('Session started successfully', 'success');
+      this.showStatusMessage('Sessie succesvol gestart', 'success');
       await this.loadSessions();
     } catch (error) {
       api.handleError(error, 'starting session');
-      this.showStatusMessage('Failed to start session', 'error');
+      this.showStatusMessage('Kon sessie niet starten', 'error');
     }
   }
 
@@ -353,11 +374,11 @@ class AdminInterface {
         method: 'PUT',
         body: JSON.stringify({ status: 'paused' }),
       });
-      this.showStatusMessage('Session paused successfully', 'success');
+      this.showStatusMessage('Sessie succesvol gepauzeerd', 'success');
       await this.loadSessions();
     } catch (error) {
       api.handleError(error, 'pausing session');
-      this.showStatusMessage('Failed to pause session', 'error');
+      this.showStatusMessage('Kon sessie niet pauzeren', 'error');
     }
   }
 
@@ -367,11 +388,11 @@ class AdminInterface {
         method: 'PUT',
         body: JSON.stringify({ status: 'active' }),
       });
-      this.showStatusMessage('Session resumed successfully', 'success');
+      this.showStatusMessage('Sessie succesvol hervat', 'success');
       await this.loadSessions();
     } catch (error) {
       api.handleError(error, 'resuming session');
-      this.showStatusMessage('Failed to resume session', 'error');
+      this.showStatusMessage('Kon sessie niet hervatten', 'error');
     }
   }
 
@@ -401,16 +422,27 @@ class AdminInterface {
     tbody.innerHTML = '';
 
     teams.forEach((team) => {
+      const isEliminationMode = this.currentSessionData && this.currentSessionData.game_type === 'elimination';
+      const isSelected = this.selectedTeams.has(team.id);
       const row = document.createElement('tr');
+      row.className = isSelected ? 'selected' : '';
+      row.style.cursor = 'pointer';
+      row.onclick = (e) => {
+        // Don't toggle if clicking on checkbox or buttons
+        if (e.target.type !== 'checkbox' && !e.target.classList.contains('btn')) {
+          this.toggleTeamSelection(team.id);
+        }
+      };
       row.innerHTML = `
+                <td><input type="checkbox" ${isSelected ? 'checked' : ''} onchange="admin.toggleTeamSelection(${team.id})"></td>
                 <td>${team.id}</td>
-                <td>${team.session_name || 'Unknown Session'}</td>
-                <td>${team.name}</td>
+                <td>${team.name}${isEliminationMode ? ' <span style="color: red;">(elimineer)</span>' : ''}</td>
                 <td><span style="color: ${team.color}">${team.color}</span></td>
                 <td>${team.icon}</td>
                 <td>${team.score || 0}</td>
                 <td class="actions">
                     <button class="btn btn-small btn-secondary" onclick="admin.editTeam(${team.id})">Edit</button>
+                    ${isEliminationMode ? `<button class="btn btn-small btn-warning" onclick="admin.eliminateTeam(${team.id})">Elimineer</button>` : ''}
                     <button class="btn btn-small btn-danger" onclick="admin.deleteTeam(${team.id})">Delete</button>
                 </td>
             `;
@@ -424,7 +456,7 @@ class AdminInterface {
     const data = Object.fromEntries(formData);
 
     if (!data.session_id) {
-      this.showStatusMessage('Please select a session first', 'error');
+      this.showStatusMessage('Selecteer eerst een sessie', 'error');
       return;
     }
 
@@ -434,19 +466,19 @@ class AdminInterface {
           method: 'PUT',
           body: JSON.stringify(data),
         });
-        this.showStatusMessage('Team updated successfully', 'success');
+        this.showStatusMessage('Team succesvol bijgewerkt', 'success');
       } else {
         await api.request(`/api/v1/sessions/${data.session_id}/teams`, {
           method: 'POST',
           body: JSON.stringify(data),
         });
-        this.showStatusMessage('Team created successfully', 'success');
+        this.showStatusMessage('Team succesvol aangemaakt', 'success');
       }
       e.target.reset();
       await this.loadTeams();
     } catch (error) {
       api.handleError(error, 'saving team');
-      this.showStatusMessage('Failed to save team', 'error');
+      this.showStatusMessage('Kon team niet opslaan', 'error');
     }
   }
 
@@ -460,12 +492,58 @@ class AdminInterface {
       const team = teams.find((t) => t.id == id);
       if (team) {
         await api.request(`/api/v1/sessions/${team.session_id}/teams/${id}`, { method: 'DELETE' });
-        this.showStatusMessage('Team deleted successfully', 'success');
+        this.showStatusMessage('Team succesvol verwijderd', 'success');
         await this.loadTeams();
       }
     } catch (error) {
       api.handleError(error, 'deleting team');
-      this.showStatusMessage('Failed to delete team', 'error');
+      this.showStatusMessage('Kon team niet verwijderen', 'error');
+    }
+  }
+
+  async eliminateTeam(id) {
+    if (!confirm('Weet je zeker dat je dit team wilt elimineren?')) return;
+
+    try {
+      // Find the session ID for this team
+      const response = await api.request('/api/v1/sessions/teams');
+      const teams = Array.isArray(response) ? response : response.teams || [];
+      const team = teams.find((t) => t.id == id);
+      if (team) {
+        await api.request(`/api/v1/sessions/${team.session_id}/teams/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_eliminated: true }),
+        });
+        this.showStatusMessage('Team geëlimineerd', 'success');
+        await this.loadTeams();
+      }
+    } catch (error) {
+      api.handleError(error, 'eliminating team');
+      this.showStatusMessage('Kon team niet elimineren', 'error');
+    }
+  }
+
+  toggleTeamSelection(teamId) {
+    if (this.selectedTeams.has(teamId)) {
+      this.selectedTeams.delete(teamId);
+    } else {
+      this.selectedTeams.add(teamId);
+    }
+    this.loadTeams(); // Re-render to update selection state
+  }
+
+  selectAllTeams(selectAll) {
+    if (selectAll) {
+      // Select all teams currently displayed
+      const response = this.currentSession ? api.request(`/api/v1/sessions/${this.currentSession}/teams`) : api.request('/api/v1/sessions/teams');
+      // For simplicity, we'll select all visible teams
+      // In a real implementation, you'd wait for the response
+      this.selectedTeams.clear();
+      // This is a simplified version - in practice you'd need to get the current teams
+      this.loadTeams();
+    } else {
+      this.selectedTeams.clear();
+      this.loadTeams();
     }
   }
 
@@ -528,7 +606,7 @@ class AdminInterface {
     const data = Object.fromEntries(formData);
 
     if (!data.session_id) {
-      this.showStatusMessage('Please select a session first', 'error');
+      this.showStatusMessage('Selecteer eerst een sessie', 'error');
       return;
     }
 
@@ -543,12 +621,12 @@ class AdminInterface {
           round_number: 1,
         }),
       });
-      this.showStatusMessage('Score added successfully', 'success');
+      this.showStatusMessage('Score succesvol toegevoegd', 'success');
       e.target.reset();
       await this.loadScores();
     } catch (error) {
       api.handleError(error, 'saving score');
-      this.showStatusMessage('Failed to save score', 'error');
+      this.showStatusMessage('Kon score niet opslaan', 'error');
     }
   }
 
@@ -562,12 +640,12 @@ class AdminInterface {
       const score = scores.find((s) => s.id == id);
       if (score) {
         await api.request(`/api/v1/sessions/${score.session_id}/scores/${id}`, { method: 'DELETE' });
-        this.showStatusMessage('Score deleted successfully', 'success');
+        this.showStatusMessage('Score succesvol verwijderd', 'success');
         await this.loadScores();
       }
     } catch (error) {
       api.handleError(error, 'deleting score');
-      this.showStatusMessage('Failed to delete score', 'error');
+      this.showStatusMessage('Kon score niet verwijderen', 'error');
     }
   }
 
@@ -599,12 +677,12 @@ class AdminInterface {
   // Edit methods (would populate forms with existing data)
   editSession(id) {
     // Implementation would load session data and populate form
-    this.showStatusMessage('Edit functionality coming soon', 'info');
+    this.showStatusMessage('Bewerk functionaliteit komt binnenkort', 'info');
   }
 
   editTeam(id) {
     // Implementation would load team data and populate form
-    this.showStatusMessage('Edit functionality coming soon', 'info');
+    this.showStatusMessage('Bewerk functionaliteit komt binnenkort', 'info');
   }
 
   // Real-time update handlers

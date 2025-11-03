@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeamScore - Score Input</title>
+    <title>TeamScore - Score Invoer</title>
     <link rel="stylesheet" href="css/scoreinput.css">
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🧩 TeamScore - Score Input</h1>
+            <h1>🧩 TeamScore - Score Invoer</h1>
             <div class="session-info">
                 <span id="session-name">Sessie laden...</span>
                 <span id="round-info">Ronde 1/1</span>
@@ -19,7 +19,7 @@
 
         <main class="main-content">
             <div class="leaderboard-section">
-                <h2>Leaderboard</h2>
+                <h2>Scorebord</h2>
                 <div class="leaderboard" id="leaderboard">
                     <!-- Leaderboard will be populated by JavaScript -->
                 </div>
@@ -58,8 +58,8 @@
                     <div class="quick-buttons">
                         <button class="quick-btn bonus" onclick="scoreInput.addQuickScore('Bonus +5', 5)">+5 Bonus</button>
                         <button class="quick-btn penalty" onclick="scoreInput.addQuickScore('Penalty -2', -2)">-2 Penalty</button>
-                        <button class="quick-btn correct" onclick="scoreInput.addQuickScore('Correct Answer +1', 1)">+1 Correct</button>
-                        <button class="quick-btn wrong" onclick="scoreInput.addQuickScore('Wrong Answer -1', -1)">-1 Wrong</button>
+                        <button class="quick-btn correct" onclick="scoreInput.addQuickScore('Juist Antwoord +1', 1)">+1 Juist</button>
+                        <button class="quick-btn wrong" onclick="scoreInput.addQuickScore('Verkeerd Antwoord -1', -1)">-1 Verkeerd</button>
                     </div>
 
                     <div class="custom-quick-actions" id="custom-quick-actions">

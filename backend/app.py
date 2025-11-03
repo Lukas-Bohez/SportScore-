@@ -61,7 +61,7 @@ app = FastAPI(title="Scoreboard Backend", version="1.0.0")
 # CORS middleware - allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Allow specific origins
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
@@ -79,7 +79,7 @@ app.add_middleware(SlowAPIMiddleware)
 # Socket.IO and FastAPI add the header you'll get duplicated values like
 # 'http://localhost:3000, *' which browsers reject.
 sio = socketio.AsyncServer(
-    cors_allowed_origins=None,  # Disable Socket.IO CORS handling
+    cors_allowed_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Allow specific origins for Socket.IO
     async_mode='asgi',
     logger=False
 )
@@ -540,6 +540,13 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
 
     # Update team score
     SessionTeamRepository.update_team_score(score.team_id, score.points)
+
+    # Check if team should be eliminated (only for elimination mode)
+    session = SessionRepository.get_session_by_id(session_id)
+    if session and session['game_type'] == 'elimination':
+        team = SessionTeamRepository.get_team_by_id(score.team_id)
+        if team and team['score'] + score.points < 0:
+            SessionTeamRepository.update_team(score.team_id, is_eliminated=True)
 
     # Create score record
     score_id = SessionScoreRepository.create_score(

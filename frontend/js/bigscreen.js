@@ -281,6 +281,11 @@ class BigScreenDisplay {
       return;
     }
 
+    // Filter eliminated teams in elimination mode
+    if (this.currentSession && this.currentSession.game_mode === 'elimination') {
+      leaderboard = leaderboard.filter((team) => !team.is_eliminated);
+    }
+
     // Sort leaderboard by score descending
     leaderboard.sort((a, b) => b.score - a.score);
 
