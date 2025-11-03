@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Scoreboard Backend - Cross-platform run script
-Works on both Windows and Linux
+Automatically activates virtual environment and runs the application
 """
 
 import os
@@ -10,63 +10,66 @@ import subprocess
 import platform
 
 def main():
-    """Run the scoreboard backend"""
+    """Run the scoreboard backend with auto-activated virtual environment"""
     print("🚀 Starting Scoreboard Backend...")
 
-    # Determine the virtual environment activation command
+    # Change to the script directory to ensure relative paths work correctly
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+
+    # Determine the virtual environment paths
     system = platform.system().lower()
 
     if system == "windows":
-        activate_cmd = "venv\\Scripts\\activate"
-        python_cmd = "python"
+        venv_python = os.path.join(script_dir, "venv", "Scripts", "python.exe")
+        venv_pip = os.path.join(script_dir, "venv", "Scripts", "pip.exe")
     else:  # Linux, macOS
-        activate_cmd = "source venv/bin/activate"
-        python_cmd = "python"
+        venv_python = os.path.join(script_dir, "venv", "bin", "python")
+        venv_pip = os.path.join(script_dir, "venv", "bin", "pip")
 
     # Check if virtual environment exists
-    venv_path = "venv/Scripts/activate" if system == "windows" else "venv/bin/activate"
-    if not os.path.exists(venv_path):
-        print("❌ Virtual environment not found. Please run setup first:")
-        if system == "windows":
-            print("   python -m venv venv")
-            print("   venv\\Scripts\\activate")
-            print("   pip install -r requirements.txt")
-        else:
-            print("   python3 -m venv venv")
-            print("   source venv/bin/activate")
-            print("   pip install -r requirements.txt")
-        return 1
+    if not os.path.exists(venv_python):
+        print("❌ Virtual environment not found. Creating one...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "venv", "venv"])
+            print("✅ Virtual environment created")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to create virtual environment: {e}")
+            return 1
+
+        # Install requirements
+        print("📦 Installing requirements...")
+        try:
+            subprocess.check_call([venv_pip, "install", "-r", "requirements.txt"])
+            print("✅ Requirements installed")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to install requirements: {e}")
+            return 1
 
     # Check if requirements are installed
     try:
-        import fastapi
-        import uvicorn
-        import socketio
-    except ImportError:
-        print("❌ Dependencies not installed. Please install requirements:")
-        print("   pip install -r requirements.txt")
+        result = subprocess.run([venv_python, "-c", "import fastapi, uvicorn, socketio"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("📦 Installing missing requirements...")
+            subprocess.check_call([venv_pip, "install", "-r", "requirements.txt"])
+            print("✅ Requirements installed")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to check/install requirements: {e}")
         return 1
 
-    # Run the application
+    # Run the application using the virtual environment's Python
     print("✅ Starting server on http://0.0.0.0:8000")
     print("📚 API documentation: http://localhost:8000/docs")
     print("🔌 Socket.IO endpoint: ws://localhost:8000/socket.io")
     print("Press Ctrl+C to stop")
 
     try:
-        # Import and run the app
-        from app import app
-        uvicorn.run(
-            "app:app",
-            host="0.0.0.0",
-            port=8000,
-            reload=True,
-            log_level="info"
-        )
+        # Run the app using the virtual environment's Python
+        subprocess.run([venv_python, "app.py"])
     except KeyboardInterrupt:
         print("\n👋 Server stopped")
         return 0
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
         print(f"❌ Error starting server: {e}")
         return 1
 
