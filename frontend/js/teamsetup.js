@@ -34,6 +34,7 @@ class TeamSetup {
     this.teamsGrid = document.getElementById('teams-grid');
     this.startSessionBtn = document.getElementById('start-session-btn');
     this.backBtn = document.getElementById('back-btn');
+    this.deleteSessionBtn = document.getElementById('delete-session-btn');
     this.teamsCount = document.getElementById('teams-count');
     this.maxTeams = document.getElementById('max-teams');
     this.gameType = document.getElementById('game-type');
@@ -54,6 +55,7 @@ class TeamSetup {
     this.backBtn.addEventListener('click', () => {
       window.location.href = 'startscreen.html';
     });
+    this.deleteSessionBtn.addEventListener('click', () => this.deleteSession());
 
     // Modal events
     this.saveTeamBtn.addEventListener('click', () => this.saveTeamEdit());
@@ -265,6 +267,21 @@ class TeamSetup {
     } catch (error) {
       api.handleError(error, 'starting session');
       alert('Fout bij het starten van de sessie.');
+    }
+  }
+
+  async deleteSession() {
+    if (!confirm(`Weet je zeker dat je de sessie "${this.session.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/v1/sessions/${this.sessionId}`);
+      alert('Sessie succesvol verwijderd.');
+      window.location.href = 'startscreen.html';
+    } catch (error) {
+      api.handleError(error, 'deleting session');
+      alert('Fout bij het verwijderen van de sessie.');
     }
   }
 

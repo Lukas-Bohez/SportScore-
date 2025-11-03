@@ -21,20 +21,20 @@
                 <h2>Teams Beheren</h2>
 
                 <div class="add-team-form">
-                    <input type="text" id="team-name" placeholder="Team naam" maxlength="50">
-                    <select id="team-color">
-                        <option value="#FF6B6B">Rood</option>
-                        <option value="#4ECDC4">Turquoise</option>
-                        <option value="#45B7D1">Blauw</option>
-                        <option value="#96CEB4">Groen</option>
-                        <option value="#FFEAA7">Geel</option>
-                        <option value="#DDA0DD">Plum</option>
-                        <option value="#98D8C8">Mint</option>
-                        <option value="#F7DC6F">Gold</option>
-                        <option value="#BB8FCE">Purple</option>
-                        <option value="#85C1E9">Light Blue</option>
+                    <input type="text" id="team-name" placeholder="Team naam" maxlength="50" aria-label="Team naam">
+                    <select id="team-color" title="Kleur kiezen" aria-label="Team kleur">
+                        <option value="#FF6B6B">🔴 Rood</option>
+                        <option value="#4ECDC4">🔵 Turquoise</option>
+                        <option value="#45B7D1">🔵 Blauw</option>
+                        <option value="#96CEB4">🟢 Groen</option>
+                        <option value="#FFEAA7">🟡 Geel</option>
+                        <option value="#DDA0DD">🟣 Plum</option>
+                        <option value="#98D8C8">🟢 Mint</option>
+                        <option value="#F7DC6F">🟡 Gold</option>
+                        <option value="#BB8FCE">🟣 Purple</option>
+                        <option value="#85C1E9">🔵 Light Blue</option>
                     </select>
-                    <select id="team-icon">
+                    <select id="team-icon" title="Icoon kiezen" aria-label="Team icoon">
                         <option value="team">👥 Team</option>
                         <option value="star">⭐ Ster</option>
                         <option value="fire">🔥 Vuur</option>
@@ -46,7 +46,7 @@
                         <option value="crown">👑 Kroon</option>
                         <option value="superhero">🦸 Superheld</option>
                     </select>
-                    <button id="add-team-btn" class="add-btn">Team Toevoegen</button>
+                    <button id="add-team-btn" class="add-btn">Toevoegen</button>
                 </div>
 
                 <div class="teams-grid" id="teams-grid">
@@ -57,6 +57,7 @@
             <div class="actions-section">
                 <div class="action-buttons">
                     <button id="start-session-btn" class="start-btn">Start Sessie</button>
+                    <button id="delete-session-btn" class="delete-btn">Verwijder Sessie</button>
                     <button id="back-btn" class="back-btn">Terug naar Start</button>
                 </div>
 

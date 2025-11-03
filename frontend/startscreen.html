@@ -54,7 +54,7 @@
                 </form>
             </div>
 
-            <div class="active-session" id="active-session" style="display: none;">
+            <div class="active-session hidden" id="active-session">
                 <h2>Actieve Sessie</h2>
                 <div id="active-session-info"></div>
                 <div class="session-actions">
@@ -64,7 +64,10 @@
             </div>
 
             <div class="recent-sessions" id="recent-sessions">
-                <h2>Recente Sessies</h2>
+                <div class="section-header">
+                    <h2>Recente Sessies</h2>
+                    <button id="view-all-sessions-btn" class="view-all-btn">Alle Sessies Bekijken</button>
+                </div>
                 <div id="sessions-list">Laden...</div>
             </div>
         </main>

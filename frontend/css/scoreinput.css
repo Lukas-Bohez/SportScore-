@@ -451,7 +451,111 @@ h2::after {
     transform: translateY(-2px);
 }
 
-/* Recent Scores */
+/* Custom Quick Actions */
+.custom-quick-actions {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.custom-quick-actions h4 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+.custom-action-btn {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-background);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.custom-action-btn:hover {
+    background: var(--secondary-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.custom-action-btn.remove {
+    background: var(--danger-color);
+    color: white;
+    margin-left: 5px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.custom-action-btn.remove:hover {
+    background: #c0392b;
+}
+
+/* Create Quick Action */
+.create-quick-action {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.create-quick-action h4 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+.create-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.create-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.create-form input:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+}
+
+.add-custom-btn {
+    padding: 8px 16px;
+    background: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.add-custom-btn:hover {
+    background: #229954;
+    transform: translateY(-1px);
+}
+
+.add-custom-btn:disabled {
+    background: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* No custom actions message */
+.no-custom-actions {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 10px;
+}
 .recent-scores {
     background: var(--card-background);
     border-radius: var(--border-radius);
@@ -485,7 +589,7 @@ h2::after {
 
 .score-change {
     font-weight: bold;
-    font-size: 1.2rem;
+    font-size: 1rem;
     padding: 5px 10px;
     border-radius: 20px;
     min-width: 60px;
@@ -597,7 +701,7 @@ h2::after {
 }
 
 .score-change {
-    font-size: 4rem;
+    font-size: 2.5rem;
     font-weight: bold;
     margin-bottom: 10px;
 }

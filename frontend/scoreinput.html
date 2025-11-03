@@ -61,6 +61,19 @@
                         <button class="quick-btn correct" onclick="scoreInput.addQuickScore('Correct Answer +1', 1)">+1 Correct</button>
                         <button class="quick-btn wrong" onclick="scoreInput.addQuickScore('Wrong Answer -1', -1)">-1 Wrong</button>
                     </div>
+
+                    <div class="custom-quick-actions" id="custom-quick-actions">
+                        <!-- Custom quick actions will be loaded here -->
+                    </div>
+
+                    <div class="create-quick-action">
+                        <h4>Maak Snelle Actie</h4>
+                        <div class="create-form">
+                            <input type="text" id="custom-reason" placeholder="Reden (bijv. 3 Pointer)" maxlength="50">
+                            <input type="number" id="custom-points" placeholder="Punten" min="-100" max="100">
+                            <button id="add-custom-action" class="add-custom-btn">Toevoegen</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

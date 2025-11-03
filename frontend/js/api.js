@@ -21,6 +21,11 @@ class ScoreboardAPI {
         upgrade: true, // Allow upgrade to websocket
         rememberUpgrade: false, // Don't remember across sessions
         autoConnect: true, // Auto connect on creation
+        cors: {
+          origin: 'http://localhost:3000',
+          methods: ['GET', 'POST'],
+          credentials: false,
+        },
       });
       this.setupSocketListeners();
     }
@@ -94,11 +99,17 @@ class ScoreboardAPI {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
       headers: {
-        'Content-Type': 'application/json',
         ...options.headers,
       },
       ...options,
+      mode: 'cors',
+      credentials: 'omit',
     };
+
+    // Only set Content-Type for requests with a body
+    if (options.body) {
+      config.headers['Content-Type'] = 'application/json';
+    }
 
     try {
       const response = await fetch(url, config);
@@ -403,7 +414,13 @@ class ScoreboardAPI {
 // Create global API instance
 const api = new ScoreboardAPI();
 
-// Initialize socket connection when DOM is ready
+// Initialize socket connection when DOM is ready - only for pages that need real-time updates
 document.addEventListener('DOMContentLoaded', () => {
-  api.initSocket();
+  // Only initialize Socket.IO for pages that need it
+  const currentPage = window.location.pathname.split('/').pop();
+  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'admin.html'];
+
+  if (pagesNeedingSocket.includes(currentPage)) {
+    api.initSocket();
+  }
 });

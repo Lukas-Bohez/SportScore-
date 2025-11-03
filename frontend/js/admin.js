@@ -29,6 +29,9 @@ class AdminInterface {
 
     // Status messages
     this.statusMessage = document.getElementById('status-message');
+    // Dashboard action buttons
+    this.openSessionBtn = document.getElementById('open-session-btn');
+    this.stopSessionBtn = document.getElementById('stop-session-btn');
   }
 
   setupEventListeners() {
@@ -47,6 +50,10 @@ class AdminInterface {
     // Real-time updates
     api.on('session_update', (data) => this.handleSessionUpdate(data));
     api.on('score_update', (data) => this.handleScoreUpdate(data));
+
+    // Dashboard open/stop buttons
+    if (this.openSessionBtn) this.openSessionBtn.addEventListener('click', () => this.openActiveSession());
+    if (this.stopSessionBtn) this.stopSessionBtn.addEventListener('click', () => this.stopActiveSession());
   }
 
   setupNavigation() {
@@ -123,7 +130,9 @@ class AdminInterface {
 
   async populateSessionSelects() {
     try {
-      const sessions = await api.request('/api/v1/sessions');
+      const response = await api.request('/api/v1/sessions');
+      // Handle both response formats: {sessions: [...]} or [...] directly
+      const sessions = Array.isArray(response) ? response : response.sessions || [];
       const sessionSelects = ['team-session-id', 'score-session'];
       sessionSelects.forEach((selectId) => {
         const select = document.getElementById(selectId);
@@ -147,7 +156,8 @@ class AdminInterface {
     if (!teamSelect || !sessionId) return;
 
     try {
-      const teams = await api.request(`/api/v1/sessions/${sessionId}/teams`);
+      const response = await api.request(`/api/v1/sessions/${sessionId}/teams`);
+      const teams = Array.isArray(response) ? response : response.teams || [];
       teamSelect.innerHTML = '<option value="">Selecteer team...</option>';
       teams.forEach((team) => {
         const option = document.createElement('option');
@@ -163,7 +173,9 @@ class AdminInterface {
   // Sessions Management
   async loadSessions() {
     try {
-      const sessions = await api.request('/api/v1/sessions');
+      const response = await api.request('/api/v1/sessions');
+      // Handle both response formats: {sessions: [...]} or [...] directly
+      const sessions = Array.isArray(response) ? response : response.sessions || [];
       this.renderSessionsTable(sessions);
     } catch (error) {
       api.handleError(error, 'loading sessions');
@@ -204,6 +216,24 @@ class AdminInterface {
       custom: 'Custom',
     };
     return types[gameType] || gameType;
+  }
+
+  getStatusBadge(status) {
+    const statusClasses = {
+      setup: 'badge badge-secondary',
+      active: 'badge badge-success',
+      paused: 'badge badge-warning',
+      completed: 'badge badge-info',
+    };
+    const statusTexts = {
+      setup: 'Setup',
+      active: 'Actief',
+      paused: 'Gepauzeerd',
+      completed: 'Voltooid',
+    };
+    const cssClass = statusClasses[status] || 'badge badge-secondary';
+    const text = statusTexts[status] || status;
+    return `<span class="${cssClass}">${text}</span>`;
   }
 
   getSessionActionButtons(session) {
@@ -279,6 +309,44 @@ class AdminInterface {
     }
   }
 
+  // Open the leaderboard (big screen) in a new tab/window for the active session
+  async openActiveSession() {
+    try {
+      const active = await api.request('/api/v1/sessions/active');
+      if (!active || !active.id) {
+        this.showStatusMessage('Geen actieve sessie om te openen', 'error');
+        return;
+      }
+      // Open the public leaderboard which reads the current active session
+      window.open('leaderboard.html', '_blank');
+      this.showStatusMessage('Leaderboard geopend', 'success');
+    } catch (error) {
+      api.handleError(error, 'opening active session');
+      this.showStatusMessage('Kon leaderboard niet openen', 'error');
+    }
+  }
+
+  // Stop (complete) the currently active session
+  async stopActiveSession() {
+    try {
+      const active = await api.request('/api/v1/sessions/active');
+      if (!active || !active.id) {
+        this.showStatusMessage('Geen actieve sessie om te stoppen', 'error');
+        return;
+      }
+      if (!confirm('Weet je zeker dat je de actieve sessie wilt beëindigen?')) return;
+      await api.request(`/api/v1/sessions/${active.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      this.showStatusMessage('Sessie gestopt', 'success');
+      await this.loadSessions();
+    } catch (error) {
+      api.handleError(error, 'stopping active session');
+      this.showStatusMessage('Kon sessie niet stoppen', 'error');
+    }
+  }
+
   async pauseSession(id) {
     try {
       await api.request(`/api/v1/sessions/${id}`, {
@@ -312,12 +380,14 @@ class AdminInterface {
     try {
       // Load teams for the current session if one is selected
       if (this.currentSession) {
-        const teams = await api.request(`/api/v1/sessions/${this.currentSession}/teams`);
+        const response = await api.request(`/api/v1/sessions/${this.currentSession}/teams`);
+        const teams = Array.isArray(response) ? response : response.teams || [];
         this.renderTeamsTable(teams);
       } else {
         // Load all teams with session info
-        const allTeams = await api.request('/api/v1/sessions/teams');
-        this.renderTeamsTable(allTeams);
+        const response = await api.request('/api/v1/sessions/teams');
+        const teams = Array.isArray(response) ? response : response.teams || [];
+        this.renderTeamsTable(teams);
       }
     } catch (error) {
       api.handleError(error, 'loading teams');
@@ -385,7 +455,8 @@ class AdminInterface {
 
     try {
       // Find the session ID for this team
-      const teams = await api.request('/api/v1/sessions/teams');
+      const response = await api.request('/api/v1/sessions/teams');
+      const teams = Array.isArray(response) ? response : response.teams || [];
       const team = teams.find((t) => t.id == id);
       if (team) {
         await api.request(`/api/v1/sessions/${team.session_id}/teams/${id}`, { method: 'DELETE' });
@@ -402,12 +473,14 @@ class AdminInterface {
   async loadScores() {
     try {
       if (this.currentSession) {
-        const scores = await api.request(`/api/v1/sessions/${this.currentSession}/scores`);
+        const response = await api.request(`/api/v1/sessions/${this.currentSession}/scores`);
+        const scores = Array.isArray(response) ? response : response.scores || [];
         this.renderScoresTable(scores);
       } else {
         // Load all scores with session/team info
-        const allScores = await api.request('/api/v1/sessions/scores');
-        this.renderScoresTable(allScores);
+        const response = await api.request('/api/v1/sessions/scores');
+        const scores = Array.isArray(response) ? response : response.scores || [];
+        this.renderScoresTable(scores);
       }
     } catch (error) {
       api.handleError(error, 'loading scores');
@@ -484,7 +557,8 @@ class AdminInterface {
 
     try {
       // Find the session ID for this score
-      const scores = await api.request('/api/v1/sessions/scores');
+      const response = await api.request('/api/v1/sessions/scores');
+      const scores = Array.isArray(response) ? response : response.scores || [];
       const score = scores.find((s) => s.id == id);
       if (score) {
         await api.request(`/api/v1/sessions/${score.session_id}/scores/${id}`, { method: 'DELETE' });

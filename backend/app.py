@@ -40,7 +40,7 @@ from models.models import (
 )
 
 from typing import Dict, Any, Optional, List
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi import Request
 from fastapi import Query
 import queue
@@ -58,13 +58,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Scoreboard Backend", version="1.0.0")
 
-# CORS middleware for FastAPI
+# CORS middleware - allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Rate limiting setup
@@ -74,13 +74,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # Socket.IO server setup
-# Socket.IO server setup
 # Disable Socket.IO's own CORS header handling so FastAPI's CORSMiddleware
 # is the single source of Access-Control-Allow-Origin headers. If both
 # Socket.IO and FastAPI add the header you'll get duplicated values like
 # 'http://localhost:3000, *' which browsers reject.
 sio = socketio.AsyncServer(
-    cors_allowed_origins=None,
+    cors_allowed_origins=None,  # Disable Socket.IO CORS handling
     async_mode='asgi',
     logger=False
 )
@@ -90,8 +89,12 @@ ENDPOINT = "/api/v1"  # API base endpoint
 # Store connected clients
 connected_clients = set()
 
-# Mount Socket.IO on the same app
-app.mount("/socket.io", socketio.ASGIApp(sio, app))
+# Mount Socket.IO on the same app. Pass cors_allowed_origins=None to the ASGIApp
+# so the ASGI wrapper does not add its own Access-Control-Allow-Origin header.
+# The Socket.IO server itself (`sio`) is configured to accept all origins so the
+# engineio origin check succeeds, while FastAPI's CORSMiddleware will remain the
+# single source of CORS headers for regular HTTP endpoints.
+app.mount("/socket.io", socketio.ASGIApp(sio, app, socketio_path='socket.io'))
 
 # ----------------------------------------------------
 # Socket.IO event handlers
@@ -401,18 +404,37 @@ async def create_session(session: SessionCreate):
 
     return SessionResponse(**created_session)
 
+@app.get(f"{ENDPOINT}/sessions/active")
+async def get_active_session():
+    """Return the currently active session or null when none exists."""
+    session = SessionRepository.get_active_session()
+    print(f"Active session from DB: {session}")
+    if session:
+        # Ensure defaults for fields that might be None from database
+        if session.get('current_round') is None:
+            session['current_round'] = 1
+        if session.get('max_teams') is None:
+            session['max_teams'] = 10
+        if session.get('total_rounds') is None:
+            session['total_rounds'] = 1
+        if session.get('status') is None:
+            session['status'] = 'setup'
+        if session.get('game_type') is None:
+            session['game_type'] = 'custom'
+        # Convert datetime to str for JSON serialization
+        for key, value in session.items():
+            if isinstance(value, datetime):
+                session[key] = value.isoformat()
+        print(f"Returning session: {session}")
+        return session
+    print("No active session, returning None")
+    return None
+
 @app.get(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse)
 async def get_session(session_id: int):
     session = SessionRepository.get_session_by_id(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return SessionResponse(**session)
-
-@app.get(f"{ENDPOINT}/sessions/active", response_model=SessionResponse)
-async def get_active_session():
-    session = SessionRepository.get_active_session()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active session found")
     return SessionResponse(**session)
 
 @app.put(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse)

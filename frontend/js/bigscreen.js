@@ -189,38 +189,52 @@ class BigScreenDisplay {
   setupEventListeners() {
     // Listen for real-time updates
     api.on('session_score_update', (data) => {
+      console.log('BigScreen: Received session_score_update event:', data);
       // Refresh the entire leaderboard when a score is updated
       this.loadInitialData();
     });
 
+    // Also listen for legacy score_update events for backward compatibility
+    api.on('score_update', (data) => {
+      console.log('BigScreen: Received score_update event:', data);
+      // Refresh the entire leaderboard when a score is updated (legacy)
+      this.loadInitialData();
+    });
+
     api.on('session_status_update', (data) => {
+      console.log('BigScreen: Received session_status_update event:', data);
       // Refresh when session status changes (active, paused, completed, etc.)
       this.loadInitialData();
     });
 
     api.on('team_update', (data) => {
+      console.log('BigScreen: Received team_update event:', data);
       // Refresh when teams are added, updated, or removed
       this.loadInitialData();
     });
 
     // Listen for session creation/updates that might make a new session active
     api.on('session_update', (data) => {
+      console.log('BigScreen: Received session_update event:', data);
       // Refresh when any session is updated (could be a new active session)
       this.loadInitialData();
     });
 
     api.on('session_created', (data) => {
+      console.log('BigScreen: Received session_created event:', data);
       // Refresh when a new session is created (might become active)
       this.loadInitialData();
     });
 
     api.on('connected', () => {
+      console.log('BigScreen: Socket.IO connected');
       this.showConnectionStatus('Connected', 'success');
       // Refresh data when connection is established
       this.loadInitialData();
     });
 
     api.on('disconnected', () => {
+      console.log('BigScreen: Socket.IO disconnected');
       this.showConnectionStatus('Disconnected', 'error');
     });
   }

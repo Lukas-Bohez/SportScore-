@@ -7,6 +7,7 @@ class ScoreInput {
     this.recentScores = [];
     this.timer = null;
     this.timeRemaining = 0;
+    this.customQuickActions = [];
 
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
@@ -20,6 +21,7 @@ class ScoreInput {
   async init() {
     this.bindElements();
     this.setupEventListeners();
+    this.loadCustomQuickActions();
     await this.loadSession();
     await this.loadTeams();
     await this.loadLeaderboard();
@@ -52,6 +54,12 @@ class ScoreInput {
     this.animTeamIcon = document.getElementById('anim-team-icon');
     this.animScoreChange = document.getElementById('anim-score-change');
     this.animTeamName = document.getElementById('anim-team-name');
+
+    // Custom quick actions elements
+    this.customQuickActionsContainer = document.getElementById('custom-quick-actions');
+    this.customReasonInput = document.getElementById('custom-reason');
+    this.customPointsInput = document.getElementById('custom-points');
+    this.addCustomBtn = document.getElementById('add-custom-action');
   }
 
   setupEventListeners() {
@@ -81,6 +89,9 @@ class ScoreInput {
     this.pauseSessionBtn.addEventListener('click', () => this.togglePause());
     this.nextRoundBtn.addEventListener('click', () => this.nextRound());
     this.endSessionBtn.addEventListener('click', () => this.endSession());
+
+    // Custom quick actions
+    this.addCustomBtn.addEventListener('click', () => this.addCustomQuickAction());
 
     // Real-time updates
     api.on('session_score_update', (data) => this.handleScoreUpdate(data));
@@ -441,6 +452,101 @@ class ScoreInput {
       superhero: '🦸',
     };
     return iconMap[iconName] || '👥';
+  }
+
+  // Custom Quick Actions Methods
+  loadCustomQuickActions() {
+    const stored = localStorage.getItem('customQuickActions');
+    if (stored) {
+      try {
+        this.customQuickActions = JSON.parse(stored);
+      } catch (error) {
+        console.error('Error loading custom quick actions:', error);
+        this.customQuickActions = [];
+      }
+    }
+    this.displayCustomQuickActions();
+  }
+
+  saveCustomQuickActions() {
+    localStorage.setItem('customQuickActions', JSON.stringify(this.customQuickActions));
+  }
+
+  addCustomQuickAction() {
+    const reason = this.customReasonInput.value.trim();
+    const points = parseInt(this.customPointsInput.value);
+
+    if (!reason) {
+      alert('Voer een reden in voor de snelle actie.');
+      this.customReasonInput.focus();
+      return;
+    }
+
+    if (isNaN(points) || points === 0) {
+      alert('Voer een geldig aantal punten in (niet 0).');
+      this.customPointsInput.focus();
+      return;
+    }
+
+    if (points < -100 || points > 100) {
+      alert('Punten moeten tussen -100 en 100 liggen.');
+      this.customPointsInput.focus();
+      return;
+    }
+
+    // Check for duplicate reasons
+    if (this.customQuickActions.some((action) => action.reason.toLowerCase() === reason.toLowerCase())) {
+      alert('Een snelle actie met deze reden bestaat al.');
+      this.customReasonInput.focus();
+      return;
+    }
+
+    const newAction = {
+      id: Date.now(), // Simple unique ID
+      reason: reason,
+      points: points,
+    };
+
+    this.customQuickActions.push(newAction);
+    this.saveCustomQuickActions();
+    this.displayCustomQuickActions();
+
+    // Reset form
+    this.customReasonInput.value = '';
+    this.customPointsInput.value = '';
+
+    // Focus back to reason input
+    this.customReasonInput.focus();
+  }
+
+  removeCustomQuickAction(actionId) {
+    if (confirm('Weet je zeker dat je deze snelle actie wilt verwijderen?')) {
+      this.customQuickActions = this.customQuickActions.filter((action) => action.id !== actionId);
+      this.saveCustomQuickActions();
+      this.displayCustomQuickActions();
+    }
+  }
+
+  displayCustomQuickActions() {
+    if (!this.customQuickActionsContainer) return;
+
+    if (this.customQuickActions.length === 0) {
+      this.customQuickActionsContainer.innerHTML = '<div class="no-custom-actions">Nog geen aangepaste snelle acties</div>';
+      return;
+    }
+
+    const actionsHtml = this.customQuickActions
+      .map(
+        (action) => `
+        <button class="custom-action-btn" onclick="scoreInput.addQuickScore('${action.reason.replace(/'/g, "\\'")}', ${action.points})">
+          ${action.reason} (${action.points >= 0 ? '+' : ''}${action.points})
+          <button class="custom-action-btn remove" onclick="event.stopPropagation(); scoreInput.removeCustomQuickAction(${action.id})" title="Verwijderen">×</button>
+        </button>
+      `
+      )
+      .join('');
+
+    this.customQuickActionsContainer.innerHTML = actionsHtml;
   }
 }
 

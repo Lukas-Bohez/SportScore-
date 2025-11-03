@@ -18,21 +18,43 @@ class StartScreen {
     this.continueBtn = document.getElementById('continue-session');
     this.endBtn = document.getElementById('end-session');
     this.sessionsList = document.getElementById('sessions-list');
+    this.viewAllSessionsBtn = document.getElementById('view-all-sessions-btn');
+
+    // Log missing elements for debugging
+    if (!this.sessionForm) console.warn('session-form element not found');
+    if (!this.activeSessionDiv) console.warn('active-session element not found');
+    if (!this.activeSessionInfo) console.warn('active-session-info element not found');
+    if (!this.continueBtn) console.warn('continue-session element not found');
+    if (!this.endBtn) console.warn('end-session element not found');
+    if (!this.sessionsList) console.warn('sessions-list element not found');
+    if (!this.viewAllSessionsBtn) console.warn('view-all-sessions-btn element not found');
   }
 
   setupEventListeners() {
-    this.sessionForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.createNewSession();
-    });
+    if (this.sessionForm) {
+      this.sessionForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.createNewSession();
+      });
+    }
 
-    this.continueBtn.addEventListener('click', () => {
-      this.continueSession();
-    });
+    if (this.continueBtn) {
+      this.continueBtn.addEventListener('click', () => {
+        this.continueSession();
+      });
+    }
 
-    this.endBtn.addEventListener('click', () => {
-      this.endSession();
-    });
+    if (this.endBtn) {
+      this.endBtn.addEventListener('click', () => {
+        this.endSession();
+      });
+    }
+
+    if (this.viewAllSessionsBtn) {
+      this.viewAllSessionsBtn.addEventListener('click', () => {
+        this.viewAllSessions();
+      });
+    }
   }
 
   async createNewSession() {
@@ -71,7 +93,7 @@ class StartScreen {
   }
 
   showActiveSession(session) {
-    this.activeSessionDiv.style.display = 'block';
+    this.activeSessionDiv.classList.remove('hidden');
 
     const gameTypeNames = {
       custom: 'Aangepast',
@@ -124,14 +146,35 @@ class StartScreen {
     }
   }
 
+  viewAllSessions() {
+    // Load and display ALL sessions instead of redirecting to admin
+    this.loadAllSessions();
+  }
+
   async loadRecentSessions() {
     try {
       const response = await api.get('/api/v1/sessions');
-      if (response && response.sessions) {
-        this.displayRecentSessions(response.sessions.slice(0, 5)); // Show last 5 sessions
+      // Handle both response formats: {sessions: [...]} or [...] directly
+      const sessions = Array.isArray(response) ? response : response.sessions || [];
+      if (sessions.length > 0) {
+        this.displayRecentSessions(sessions.slice(0, 5)); // Show only 5 recent sessions
       }
     } catch (error) {
       api.handleError(error, 'loading recent sessions');
+      this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
+    }
+  }
+
+  async loadAllSessions() {
+    try {
+      const response = await api.get('/api/v1/sessions');
+      // Handle both response formats: {sessions: [...]} or [...] directly
+      const sessions = Array.isArray(response) ? response : response.sessions || [];
+      if (sessions.length > 0) {
+        this.displayRecentSessions(sessions); // Show ALL sessions
+      }
+    } catch (error) {
+      api.handleError(error, 'loading all sessions');
       this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
     }
   }
