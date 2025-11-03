@@ -1,11 +1,7 @@
 from mysql import connector
 from typing import List, Dict, Any, Optional
 import threading
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+from .config import DB_CONFIG
 
 class Database:
     # Thread-local storage prevents weak reference issues
@@ -16,13 +12,7 @@ class Database:
         """Open connection thread-safe"""
         try:
             if not hasattr(cls._local, 'db'):
-                db_config = {
-                    'host': os.getenv('DB_HOST', 'localhost'),
-                    'user': os.getenv('DB_USER', 'root'),
-                    'password': os.getenv('DB_PASSWORD', ''),
-                    'database': os.getenv('DB_NAME', 'scoreboard'),
-                    'port': int(os.getenv('DB_PORT', 3306))
-                }
+                db_config = DB_CONFIG.copy()
                 cls._local.db = connector.connect(**db_config)
                 cls._local.cursor = cls._local.db.cursor(dictionary=True, buffered=True)
         except connector.Error as err:

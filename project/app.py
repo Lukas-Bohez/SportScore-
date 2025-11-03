@@ -12,10 +12,6 @@ import threading
 from threading import Thread, Event, Lock
 import socket
 import logging
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address

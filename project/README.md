@@ -37,20 +37,34 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Environment Configuration
+### 4. Database Configuration
 
-Create a `.env` file with your database settings:
-```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_secure_password
-DB_NAME=scoreboard
-DB_PORT=3306
-JWT_SECRET_KEY=your_jwt_secret_key_here
-DEBUG=True
+Create the database configuration file:
+
+**Copy the example config:**
+```bash
+cp database/config.py database/config.py.local
 ```
 
-**⚠️ Security Note:** Never commit `.env` files to version control. The `.gitignore` file excludes them automatically.
+**Edit `database/config.py` with your database settings:**
+```python
+# Database connection settings
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'your_secure_password',
+    'database': 'scoreboard',
+    'port': 3306
+}
+
+# JWT Secret for authentication
+JWT_SECRET_KEY = 'your_jwt_secret_key_here'
+
+# Application settings
+DEBUG = True
+```
+
+**⚠️ Security Note:** The `database/config.py` file is excluded from version control by `.gitignore`. Never commit this file to GitHub.
 
 ### 5. Database Setup
 
@@ -169,11 +183,12 @@ project/
 ├── run.py                    # Cross-platform run script
 ├── test_compatibility.py     # Compatibility test suite
 ├── requirements.txt          # Python dependencies
-├── .env                      # Environment configuration
+├── .gitignore                # Git ignore rules
 ├── database_schema.sql       # Database schema
 ├── README.md                 # This file
 ├── database/
 │   ├── __init__.py
+│   ├── config.py             # Database configuration (NOT in git)
 │   ├── database.py           # MySQL connection class
 │   └── datarepository.py     # Data access layer
 └── models/

@@ -162,6 +162,7 @@ config.py
 config.json
 secrets.json
 credentials.json
+database/config.py
 
 # Virtual environments
 venv/
