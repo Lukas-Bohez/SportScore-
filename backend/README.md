@@ -149,11 +149,39 @@ python test_compatibility.py
 - `PUT /api/v1/scores/{id}` - Update score
 - `DELETE /api/v1/scores/{id}` - Delete score
 
+### Sessions (Teambuilding)
+- `GET /api/v1/sessions` - List all sessions
+- `POST /api/v1/sessions` - Create a new session
+- `GET /api/v1/sessions/active` - Get currently active session (or null)
+- `GET /api/v1/sessions/{id}` - Get session by ID
+- `PUT /api/v1/sessions/{id}` - Update session
+- `DELETE /api/v1/sessions/{id}` - Delete session
+
+### Session Teams
+- `GET /api/v1/sessions/{session_id}/teams` - List teams for a session
+- `POST /api/v1/sessions/{session_id}/teams` - Create a team in a session
+- `PUT /api/v1/sessions/{session_id}/teams/{team_id}` - Update a team in a session
+- `DELETE /api/v1/sessions/{session_id}/teams/{team_id}` - Delete a team in a session
+
+### Session Scores
+- `GET /api/v1/sessions/{session_id}/scores` - List scores for a session
+- `POST /api/v1/sessions/{session_id}/scores` - Create a score in a session
+- `DELETE /api/v1/sessions/{session_id}/scores/{score_id}` - Delete a score in a session
+
+### Live
+- `GET /api/v1/sessions/{session_id}/leaderboard` - Get leaderboard for a session
+- `GET /api/v1/live/leaderboard` - Get live leaderboard for the active session
+- `GET /api/v1/health` - Backend health check
+
 ## Real-time Events
 
 Connect to `/socket.io` for real-time updates:
 
-- `score_update`: Emitted when a new score is added
+- `session_created`: Emitted when a new session is created
+- `session_update`: Emitted when a session is updated
+- `team_update`: Emitted when a team is created/updated/deleted in a session
+- `session_score_update`: Emitted when a session score is recorded
+- `score_update`: Emitted when a legacy game score is added
 - `welcome`: Sent to new clients upon connection
 
 ## Database Schema

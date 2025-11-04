@@ -41,6 +41,7 @@ from fastapi import Request
 from fastapi import Query
 import queue
 from uuid import uuid4
+import json
 
 # ----------------------------------------------------
 # Logging Setup
@@ -52,7 +53,11 @@ logger = logging.getLogger(__name__)
 # App setup
 # ----------------------------------------------------
 
-app = FastAPI(title="Scoreboard Backend", version="1.0.0")
+app = FastAPI(
+    title="Scoreboard Backend",
+    version="1.0.0",
+    description="REST + Socket.IO backend for TeamScore. All REST endpoints are prefixed with /api/v1."
+)
 
 # ----------------------------------------------------
 # Helpers
@@ -74,10 +79,10 @@ def _jsonable(value):
 # CORS middleware - allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=["*"],  # Allow all origins (as requested)
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 
@@ -383,12 +388,24 @@ async def get_game_score_summary(game_id: int):
 # Session Endpoints (Teambuilding)
 # ===========================================
 
-@app.get(f"{ENDPOINT}/sessions", response_model=SessionListResponse)
+@app.get(
+    f"{ENDPOINT}/sessions",
+    response_model=SessionListResponse,
+    tags=["Sessions"],
+    summary="List sessions",
+    description="Return all sessions ordered by creation time."
+)
 async def get_sessions():
     sessions = SessionRepository.get_all_sessions()
     return SessionListResponse(sessions=[SessionResponse(**session) for session in sessions])
 
-@app.post(f"{ENDPOINT}/sessions", response_model=SessionResponse)
+@app.post(
+    f"{ENDPOINT}/sessions",
+    response_model=SessionResponse,
+    tags=["Sessions"],
+    summary="Create a new session",
+    description="Create a new teambuilding session and broadcast a session_created event."
+)
 async def create_session(session: SessionCreate):
     session_id = SessionRepository.create_session(
         session.name, session.game_type, session.max_teams,
@@ -405,7 +422,12 @@ async def create_session(session: SessionCreate):
 
     return SessionResponse(**created_session)
 
-@app.get(f"{ENDPOINT}/sessions/active")
+@app.get(
+    f"{ENDPOINT}/sessions/active",
+    tags=["Sessions"],
+    summary="Get active session",
+    description="Return the currently active session or null if none is active."
+)
 async def get_active_session():
     """Return the currently active session or null when none exists."""
     session = SessionRepository.get_active_session()
@@ -431,14 +453,20 @@ async def get_active_session():
     print("No active session, returning None")
     return None
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse)
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse, tags=["Sessions"], summary="Get a session by id")
 async def get_session(session_id: int):
     session = SessionRepository.get_session_by_id(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return SessionResponse(**session)
 
-@app.put(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse)
+@app.put(
+    f"{ENDPOINT}/sessions/{{session_id}}",
+    response_model=SessionResponse,
+    tags=["Sessions"],
+    summary="Update a session",
+    description="Update mutable fields of a session and broadcast a session_update event."
+)
 async def update_session(session_id: int, session_update: SessionUpdate):
     success = SessionRepository.update_session(
         session_id, session_update.name, session_update.game_type,
@@ -459,7 +487,7 @@ async def update_session(session_id: int, session_update: SessionUpdate):
 
     return SessionResponse(**updated_session)
 
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}")
+@app.delete(f"{ENDPOINT}/sessions/{{session_id}}", tags=["Sessions"], summary="Delete a session")
 async def delete_session(session_id: int):
     success = SessionRepository.delete_session(session_id)
     if not success:
@@ -467,18 +495,57 @@ async def delete_session(session_id: int):
     return {"message": "Session deleted successfully"}
 
 # Session Teams Endpoints
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/teams", response_model=SessionTeamListResponse)
+@app.get(
+    f"{ENDPOINT}/sessions/{{session_id}}/teams",
+    response_model=SessionTeamListResponse,
+    tags=["Session Teams"],
+    summary="List teams for a session"
+)
 async def get_session_teams(session_id: int):
     teams = SessionTeamRepository.get_teams_by_session(session_id)
     return SessionTeamListResponse(teams=[SessionTeamResponse(**team) for team in teams])
 
-@app.post(f"{ENDPOINT}/sessions/{{session_id}}/teams", response_model=SessionTeamResponse)
-async def create_session_team(session_id: int, team: SessionTeamCreate):
-    if team.session_id != session_id:
+@app.post(
+    f"{ENDPOINT}/sessions/{{session_id}}/teams",
+    response_model=SessionTeamResponse,
+    tags=["Session Teams"],
+    summary="Create a team in a session"
+)
+async def create_session_team(session_id: int, request: Request):
+    """Create a team in a session.
+
+    Accepts standard JSON (application/json) and also tolerates plain text bodies
+    containing JSON to be resilient against strict CORS/preflight behaviors on some setups.
+    """
+    payload: Dict[str, Any]
+    try:
+        # Prefer normal JSON parsing
+        payload = await request.json()
+    except Exception:
+        # Fallback: try parsing raw body as JSON even if content-type is not application/json
+        try:
+            raw = await request.body()
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode('utf-8', errors='ignore')
+            payload = json.loads(raw or '{}')
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid request body")
+
+    # Extract and validate fields
+    body_session_id = payload.get('session_id')
+    name = (payload.get('name') or '').strip()
+    color = payload.get('color') or '#333333'
+    icon = payload.get('icon') or 'team'
+
+    if not name:
+        raise HTTPException(status_code=422, detail="Field 'name' is required")
+
+    # If body had a different session_id than the path, reject
+    if body_session_id is not None and int(body_session_id) != int(session_id):
         raise HTTPException(status_code=400, detail="Session ID mismatch")
-    team_id = SessionTeamRepository.create_team(
-        team.session_id, team.name, team.color, team.icon
-    )
+
+    # Create team
+    team_id = SessionTeamRepository.create_team(session_id, name, color, icon)
     created_team = SessionTeamRepository.get_team_by_id(team_id)
 
     # Emit real-time update for new team creation
@@ -497,7 +564,12 @@ async def create_session_team(session_id: int, team: SessionTeamCreate):
 
     return SessionTeamResponse(**created_team)
 
-@app.put(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}", response_model=SessionTeamResponse)
+@app.put(
+    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}",
+    response_model=SessionTeamResponse,
+    tags=["Session Teams"],
+    summary="Update a team in a session"
+)
 async def update_session_team(session_id: int, team_id: int, team_update: SessionTeamUpdate):
     success = SessionTeamRepository.update_team(
         team_id, team_update.name, team_update.color, team_update.icon,
@@ -522,7 +594,7 @@ async def update_session_team(session_id: int, team_id: int, team_update: Sessio
 
     return SessionTeamResponse(**updated_team)
 
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}")
+@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}", tags=["Session Teams"], summary="Delete a session team")
 async def delete_session_team(session_id: int, team_id: int):
     success = SessionTeamRepository.delete_team(team_id)
     if not success:
@@ -540,12 +612,22 @@ async def delete_session_team(session_id: int, team_id: int):
     return {"message": "Team deleted successfully"}
 
 # Session Scores Endpoints
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/scores", response_model=SessionScoreListResponse)
+@app.get(
+    f"{ENDPOINT}/sessions/{{session_id}}/scores",
+    response_model=SessionScoreListResponse,
+    tags=["Session Scores"],
+    summary="List scores for a session"
+)
 async def get_session_scores(session_id: int):
     scores = SessionScoreRepository.get_scores_by_session(session_id)
     return SessionScoreListResponse(scores=[SessionScoreResponse(**score) for score in scores])
 
-@app.post(f"{ENDPOINT}/sessions/{{session_id}}/scores", response_model=SessionScoreResponse)
+@app.post(
+    f"{ENDPOINT}/sessions/{{session_id}}/scores",
+    response_model=SessionScoreResponse,
+    tags=["Session Scores"],
+    summary="Create a score in a session"
+)
 async def create_session_score(session_id: int, score: SessionScoreCreate):
     if score.session_id != session_id:
         raise HTTPException(status_code=400, detail="Session ID mismatch")
@@ -598,12 +680,17 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
 
     return SessionScoreResponse(**created_score)
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/leaderboard")
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/leaderboard", tags=["Sessions"], summary="Get session leaderboard")
 async def get_session_leaderboard(session_id: int):
     summary = SessionScoreRepository.get_session_score_summary(session_id)
     return {"leaderboard": summary}
 
-@app.get(f"{ENDPOINT}/live/leaderboard")
+@app.get(
+    f"{ENDPOINT}/live/leaderboard",
+    tags=["Live"],
+    summary="Get live leaderboard",
+    description="Return leaderboard for the currently active session (if any)."
+)
 async def get_live_leaderboard():
     """Get leaderboard for the currently active session"""
     session = SessionRepository.get_active_session()
@@ -634,6 +721,22 @@ async def test_socket():
 # ----------------------------------------------------
 # Main
 # ----------------------------------------------------
+
+# Health check endpoint (useful for uptime and debugging CORS/network issues)
+@app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
+async def health():
+    return {"status": "ok", "time": datetime.now().isoformat()}
+
+# Explicit CORS preflight handler (helps when running behind the Socket.IO ASGI wrapper)
+@app.options("/{full_path:path}")
+async def preflight(full_path: str):
+    # Manually add CORS headers to be extra safe when routed via the Socket.IO ASGI wrapper
+    resp = Response(status_code=204)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    resp.headers["Access-Control-Allow-Credentials"] = "true"
+    return resp
 
 if __name__ == "__main__":
     print("Scoreboard Backend Starting...")

@@ -3,7 +3,7 @@
 ## ⚠️ IMPORTANT: Admin Password
 **Admin Password: `admin123`**
 
-Use this password to access the admin interface at `http://localhost:3000/startscreen.html`
+Use this password to access the start screen at `http://localhost:3000/startscreen.html`
 
 ---
 
@@ -22,14 +22,20 @@ project/
 │   └── database_schema.sql    # MySQL database schema
 ├── frontend/                  # Frontend application
 │   ├── index.html            # Big screen display
-│   ├── admin.html            # Admin interface
+│   ├── startscreen.html      # Start / session hub
+│   ├── teamsetup.html        # Configure teams for a session
+│   ├── scoreinput.html       # Input scores during a session
+│   ├── leaderboard.html      # Live leaderboard
 │   ├── css/
 │   │   ├── styles.css        # Big screen styles
 │   │   └── admin.css         # Admin interface styles
 │   └── js/
 │       ├── api.js            # API client and Socket.IO
 │       ├── bigscreen.js      # Big screen functionality
-│       └── admin.js          # Admin interface functionality
+│       ├── startscreen.js    # Start/session logic
+│       ├── teamsetup.js      # Team setup logic
+│       ├── scoreinput.js     # Score input logic
+│       └── leaderboard.js    # Leaderboard logic
 ├── serve_frontend.py          # Simple HTTP server for frontend
 └── README.md                 # This file
 ```
@@ -44,8 +50,11 @@ project/
 - Comprehensive error handling
 
 ### Frontend
-- **Big Screen Display** (`index.html`): Live game display with real-time updates
-- **Admin Interface** (`admin.html`): Complete management system for all data
+- **Big Screen Display** (`index.html`): Live display with real-time updates
+- **Start Screen** (`startscreen.html`): Create/continue sessions and see recent ones
+- **Team Setup** (`teamsetup.html`): Manage teams within a session
+- **Score Input** (`scoreinput.html`): Record points for teams
+- **Leaderboard** (`leaderboard.html`): View session standings
 - Responsive design for various screen sizes
 - Real-time score updates and game status
 
@@ -86,7 +95,7 @@ project/
    ```bash
    python run.py
    ```
-   The API will be available at `http://localhost:8000`
+   The API will be available at `http://localhost:8000` (Swagger at `/docs`)
 
 ### 2. Frontend Setup
 
@@ -103,62 +112,67 @@ project/
 - Displays live game information with real-time updates
 - Shows team names, scores, game time, and score breakdown
 
-### Admin Interface
-- Open `http://localhost:3000/admin.html` in a browser
-- Manage all aspects of the scoreboard system:
-  - **Sports**: Add/edit/delete sports
-  - **Teams**: Create teams and assign to sports
-  - **Players**: Manage team rosters
-  - **Games**: Schedule and manage games
-  - **Scores**: Record scores and track game progress
-  - **History**: View completed games
+### Start Screen / Sessions
+- Open `http://localhost:3000/startscreen.html` in a browser
+- Create a new session or continue an active one; view recent sessions
 
 ## API Endpoints
 
+All REST endpoints are prefixed with `/api/v1`.
+
 ### Sports
-- `GET /sports` - List all sports
-- `POST /sports` - Create new sport
-- `PUT /sports/{id}` - Update sport
-- `DELETE /sports/{id}` - Delete sport
+- `GET /api/v1/sports` - List all sports
+- `POST /api/v1/sports` - Create new sport
+- `PUT /api/v1/sports/{id}` - Update sport
+- `DELETE /api/v1/sports/{id}` - Delete sport
 
 ### Teams
-- `GET /teams` - List all teams
-- `POST /teams` - Create new team
-- `PUT /teams/{id}` - Update team
-- `DELETE /teams/{id}` - Delete team
+- `GET /api/v1/teams` - List all teams
+- `POST /api/v1/teams` - Create new team
+- `PUT /api/v1/teams/{id}` - Update team
+- `DELETE /api/v1/teams/{id}` - Delete team
 
 ### Players
-- `GET /players` - List all players
-- `POST /players` - Create new player
-- `PUT /players/{id}` - Update player
-- `DELETE /players/{id}` - Delete player
+- `GET /api/v1/players` - List all players
+- `POST /api/v1/players` - Create new player
+- `PUT /api/v1/players/{id}` - Update player
+- `DELETE /api/v1/players/{id}` - Delete player
 
 ### Games
-- `GET /games` - List all games
-- `POST /games` - Create new game
-- `PUT /games/{id}` - Update game
-- `DELETE /games/{id}` - Delete game
-- `POST /games/{id}/start` - Start game
-- `POST /games/{id}/end` - End game
-- `POST /games/{id}/pause` - Pause game
-- `POST /games/{id}/resume` - Resume game
+- `GET /api/v1/games` - List all games
+- `POST /api/v1/games` - Create new game
+- `PUT /api/v1/games/{id}` - Update game
+- `DELETE /api/v1/games/{id}` - Delete game
+- `POST /api/v1/games/{id}/start` - Start game
+- `POST /api/v1/games/{id}/end` - End game
+- `POST /api/v1/games/{id}/pause` - Pause game
+- `POST /api/v1/games/{id}/resume` - Resume game
 
 ### Scores
-- `GET /scores` - List all scores
-- `POST /scores` - Create new score
-- `PUT /scores/{id}` - Update score
-- `DELETE /scores/{id}` - Delete score
+- `GET /api/v1/scores` - List all scores
+- `POST /api/v1/scores` - Create new score
+- `PUT /api/v1/scores/{id}` - Update score
+- `DELETE /api/v1/scores/{id}` - Delete score
+
+### Sessions
+- `GET /api/v1/sessions` - List sessions
+- `POST /api/v1/sessions` - Create session
+- `GET /api/v1/sessions/active` - Get active session
+- `PUT /api/v1/sessions/{id}` - Update session
 
 ### Live Data
-- `GET /live` - Get current live game data
-- `GET /history` - Get game history
+- `GET /api/v1/live/leaderboard` - Get live leaderboard for active session
 
 ## Real-time Updates
 
 The system uses Socket.IO for real-time communication:
-- `game_update`: Fired when game data changes
-- `score_update`: Fired when scores are updated
-- `game_status_change`: Fired when game status changes
+- `session_created`: Fired when a new session is created
+- `session_update`: Fired when a session is updated
+- `team_update`: Fired when a session team is created/updated/deleted
+- `session_score_update`: Fired when a session score is recorded
+- `game_update`: Fired when game data changes (legacy)
+- `score_update`: Fired when scores are updated (legacy)
+- `game_status_change`: Fired when game status changes (legacy)
 
 ## Development
 
@@ -191,6 +205,7 @@ When updating the database schema:
 ### Logs
 - Backend logs are displayed in the terminal
 - Frontend errors appear in browser developer console
+- Use `python test_connectivity.py` at repo root to quickly check ports 8000/3000 and API reachability
 
 ## Technologies Used
 

@@ -1,7 +1,16 @@
 // API Client for Scoreboard Application
 class ScoreboardAPI {
-  constructor(baseURL = 'http://localhost:8000') {
-    this.baseURL = baseURL;
+  constructor(baseURL = null) {
+    // Auto-detect backend base URL with sensible fallbacks
+    // Priority: window.SCOREBOARD_API_BASE -> ?apiBase=... -> default localhost:8000
+    const fromGlobal = typeof window !== 'undefined' && window.SCOREBOARD_API_BASE;
+    const fromQuery = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('apiBase')
+      : null;
+    const detected = fromGlobal || fromQuery;
+
+    this.baseURL = (baseURL || detected || 'http://localhost:8000').replace(/\/$/, '');
+    this.API_PREFIX = '/api/v1';
     this.socket = null;
     this.eventListeners = {};
     this.pollingInterval = null;
@@ -274,11 +283,12 @@ class ScoreboardAPI {
   // Generic API request method
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const { silent, ...fetchOptions } = options;
     const config = {
       headers: {
-        ...options.headers,
+        ...fetchOptions.headers,
       },
-      ...options,
+      ...fetchOptions,
       mode: 'cors',
       credentials: 'omit',
     };
@@ -293,159 +303,181 @@ class ScoreboardAPI {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      // Gracefully handle empty/no-content responses
+      const contentType = response.headers.get('content-type') || '';
+      const contentLength = response.headers.get('content-length');
+      if (response.status === 204 || contentLength === '0') {
+        return null;
+      }
+      if (!contentType.includes('application/json')) {
+        // Try to parse text, but return null if empty
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+      }
       return await response.json();
     } catch (error) {
-      console.error(`API request failed: ${endpoint}`, error);
+      // Provide clearer diagnostics for network vs HTTP errors
+      if (!silent) {
+        if (error instanceof TypeError) {
+          console.error(
+            `API network error: Failed to fetch ${url}. Is the backend running at ${this.baseURL}?`,
+            error
+          );
+        } else {
+          console.error(`API request failed: ${endpoint}`, error);
+        }
+      }
       throw error;
     }
   }
 
   // Sports Management
   async getSports() {
-    return this.request('/sports');
+    return this.request(`${this.API_PREFIX}/sports`);
   }
 
   async createSport(data) {
-    return this.request('/sports', {
+    return this.request(`${this.API_PREFIX}/sports`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateSport(id, data) {
-    return this.request(`/sports/${id}`, {
+    return this.request(`${this.API_PREFIX}/sports/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteSport(id) {
-    return this.request(`/sports/${id}`, {
+    return this.request(`${this.API_PREFIX}/sports/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Teams Management
   async getTeams() {
-    return this.request('/teams');
+    return this.request(`${this.API_PREFIX}/teams`);
   }
 
   async createTeam(data) {
-    return this.request('/teams', {
+    return this.request(`${this.API_PREFIX}/teams`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateTeam(id, data) {
-    return this.request(`/teams/${id}`, {
+    return this.request(`${this.API_PREFIX}/teams/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteTeam(id) {
-    return this.request(`/teams/${id}`, {
+    return this.request(`${this.API_PREFIX}/teams/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Players Management
   async getPlayers() {
-    return this.request('/players');
+    return this.request(`${this.API_PREFIX}/players`);
   }
 
   async createPlayer(data) {
-    return this.request('/players', {
+    return this.request(`${this.API_PREFIX}/players`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updatePlayer(id, data) {
-    return this.request(`/players/${id}`, {
+    return this.request(`${this.API_PREFIX}/players/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deletePlayer(id) {
-    return this.request(`/players/${id}`, {
+    return this.request(`${this.API_PREFIX}/players/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Games Management
   async getGames() {
-    return this.request('/games');
+    return this.request(`${this.API_PREFIX}/games`);
   }
 
   async createGame(data) {
-    return this.request('/games', {
+    return this.request(`${this.API_PREFIX}/games`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateGame(id, data) {
-    return this.request(`/games/${id}`, {
+    return this.request(`${this.API_PREFIX}/games/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteGame(id) {
-    return this.request(`/games/${id}`, {
+    return this.request(`${this.API_PREFIX}/games/${id}`, {
       method: 'DELETE',
     });
   }
 
   async startGame(id) {
-    return this.request(`/games/${id}/start`, {
+    return this.request(`${this.API_PREFIX}/games/${id}/start`, {
       method: 'POST',
     });
   }
 
   async endGame(id) {
-    return this.request(`/games/${id}/end`, {
+    return this.request(`${this.API_PREFIX}/games/${id}/end`, {
       method: 'POST',
     });
   }
 
   async pauseGame(id) {
-    return this.request(`/games/${id}/pause`, {
+    return this.request(`${this.API_PREFIX}/games/${id}/pause`, {
       method: 'POST',
     });
   }
 
   async resumeGame(id) {
-    return this.request(`/games/${id}/resume`, {
+    return this.request(`${this.API_PREFIX}/games/${id}/resume`, {
       method: 'POST',
     });
   }
 
   // Scores Management
   async getScores(gameId = null) {
-    const endpoint = gameId ? `/scores?game_id=${gameId}` : '/scores';
+    const endpoint = gameId ? `${this.API_PREFIX}/scores?game_id=${gameId}` : `${this.API_PREFIX}/scores`;
     return this.request(endpoint);
   }
 
   async createScore(data) {
-    return this.request('/scores', {
+    return this.request(`${this.API_PREFIX}/scores`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateScore(id, data) {
-    return this.request(`/scores/${id}`, {
+    return this.request(`${this.API_PREFIX}/scores/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteScore(id) {
-    return this.request(`/scores/${id}`, {
+    return this.request(`${this.API_PREFIX}/scores/${id}`, {
       method: 'DELETE',
     });
   }
@@ -455,10 +487,11 @@ class ScoreboardAPI {
     return this.request(endpoint);
   }
 
-  async post(endpoint, data) {
+  async post(endpoint, data, options = {}) {
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
+      ...options,
     });
   }
 
@@ -473,6 +506,39 @@ class ScoreboardAPI {
     return this.request(endpoint, {
       method: 'DELETE',
     });
+  }
+
+  // Silent variants (suppress error logging in console)
+  async postSilent(endpoint, data) {
+    try {
+      return await this.post(endpoint, data, { silent: true });
+    } catch (e) {
+      // Swallow network/HTTP errors and let caller rely on realtime ack/polling
+      return null;
+    }
+  }
+
+  async putSilent(endpoint, data) {
+    try {
+      return await this.request(endpoint, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+        silent: true,
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async deleteSilent(endpoint) {
+    try {
+      return await this.request(endpoint, {
+        method: 'DELETE',
+        silent: true,
+      });
+    } catch (e) {
+      return null;
+    }
   }
 
   // Sessions Management
@@ -596,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Only initialize Socket.IO for pages that need it
   const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
   console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
-  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'admin.html'];
+  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html'];
 
   if (pagesNeedingSocket.includes(currentPage)) {
     console.log('API: Page needs Socket.IO, initializing...');

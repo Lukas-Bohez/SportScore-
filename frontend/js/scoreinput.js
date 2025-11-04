@@ -279,18 +279,17 @@ class ScoreInput {
 
     // Prepare real-time acknowledgement listener before sending
     const ackPromise = new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve(false);
-      }, 1500);
-
       const handler = (data) => {
         if (data && String(data.session_id) === String(this.sessionId) && Number(data.team_id) === teamId && Number(data.points) === points) {
-          clearTimeout(timeout);
           api.off('session_score_update', handler);
           resolve(true);
         }
       };
       api.on('session_score_update', handler);
+      const timeout = setTimeout(() => {
+        api.off('session_score_update', handler);
+        resolve(false);
+      }, 1500);
     });
 
     try {
@@ -302,7 +301,7 @@ class ScoreInput {
         round_number: this.session.current_round,
       };
 
-      await api.post(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+  await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
 
       // Treat as success
       this.onScoreSubmitSuccess(teamId, points);
@@ -310,7 +309,7 @@ class ScoreInput {
       // If the API call failed, but we got a realtime event, treat it as success
       const acknowledged = await ackPromise;
       if (acknowledged) {
-        console.log('Score submission acknowledged via real-time event; suppressing error UI.');
+        // No noisy console error thanks to postSilent; proceed as success
         this.onScoreSubmitSuccess(teamId, points);
       } else {
         api.handleError(error, 'submitting score');

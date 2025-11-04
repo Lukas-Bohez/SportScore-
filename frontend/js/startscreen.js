@@ -87,8 +87,20 @@ class StartScreen {
         this.showActiveSession(activeSession);
       }
     } catch (error) {
-      // No active session found, which is fine
-      console.log('No active session found');
+      // Distinguish between no active session and backend not reachable
+      if (error instanceof TypeError) {
+        // Network error likely means backend is down
+        const container = document.getElementById('recent-sessions');
+        if (container) {
+          const warn = document.createElement('div');
+          warn.className = 'warning-banner';
+          warn.textContent = 'Kan geen verbinding maken met de backend op http://localhost:8000. Start de backend server en vernieuw deze pagina.';
+          container.prepend(warn);
+        }
+        console.warn('Backend likely not running at API base URL.');
+      } else {
+        console.log('No active session found');
+      }
     }
   }
 
@@ -156,9 +168,8 @@ class StartScreen {
       const response = await api.get('/api/v1/sessions');
       // Handle both response formats: {sessions: [...]} or [...] directly
       const sessions = Array.isArray(response) ? response : response.sessions || [];
-      if (sessions.length > 0) {
-        this.displayRecentSessions(sessions.slice(0, 5)); // Show only 5 recent sessions
-      }
+      // Always render the section, even if empty, to replace the "Laden..." placeholder
+      this.displayRecentSessions(sessions.slice(0, 5)); // Show up to 5 recent sessions
     } catch (error) {
       api.handleError(error, 'loading recent sessions');
       this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
@@ -170,9 +181,8 @@ class StartScreen {
       const response = await api.get('/api/v1/sessions');
       // Handle both response formats: {sessions: [...]} or [...] directly
       const sessions = Array.isArray(response) ? response : response.sessions || [];
-      if (sessions.length > 0) {
-        this.displayRecentSessions(sessions); // Show ALL sessions
-      }
+      // Always render the section to show either the list or the empty state
+      this.displayRecentSessions(sessions);
     } catch (error) {
       api.handleError(error, 'loading all sessions');
       this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';

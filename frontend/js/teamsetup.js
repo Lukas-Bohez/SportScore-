@@ -4,6 +4,7 @@ class TeamSetup {
     this.sessionId = null;
     this.session = null;
     this.teams = [];
+    this.pendingTeams = new Map();
     this.init();
   }
 
@@ -126,19 +127,24 @@ class TeamSetup {
 
   createTeamCard(team) {
     const card = document.createElement('div');
-    card.className = 'team-card';
+    card.className = 'team-card' + (team._pending ? ' pending' : '');
     card.dataset.teamId = team.id;
 
     card.innerHTML = `
             <span class="team-icon">${this.getIconEmoji(team.icon)}</span>
             <div class="team-name">${team.name}</div>
             <div class="team-color-indicator" style="background-color: ${team.color}"></div>
-            <div class="team-score">${team.score}</div>
+            <div class="team-score">${team._pending ? 'Toevoegen…' : team.score}</div>
             <div class="team-actions">
-                <button class="edit-btn" onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
-                <button class="delete-btn" onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
+                <button class="edit-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
+                <button class="delete-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
             </div>
         `;
+
+    if (team._pending) {
+      // Light visual hint without needing new CSS
+      card.style.opacity = '0.7';
+    }
 
     return card;
   }
@@ -179,21 +185,115 @@ class TeamSetup {
       icon: this.teamIconSelect.value,
     };
 
+    // Optimistic UI: add a temporary team card immediately
+    const tempId = `temp_${Date.now()}`;
+    const tempTeam = {
+      id: tempId,
+      name: teamName,
+      color: this.teamColorSelect.value,
+      icon: this.teamIconSelect.value,
+      score: 0,
+      _pending: true,
+    };
+    this.pendingTeams.set(tempId, teamName.toLowerCase());
+    this.teams.push(tempTeam);
+    this.updateTeamsDisplay();
+    this.updateTeamsCount();
+
+    // Prepare real-time acknowledgement listener before sending
+    const ackPromise = new Promise((resolve) => {
+      const handler = (data) => {
+        if (
+          data &&
+          Number(data.session_id) === Number(this.sessionId) &&
+          (data.action === 'created' || data.team) &&
+          data.team && data.team.name && data.team.name.toLowerCase() === teamName.toLowerCase()
+        ) {
+          api.off('team_update', handler);
+          resolve(true);
+        }
+      };
+      api.on('team_update', handler);
+      const timeout = setTimeout(() => {
+        api.off('team_update', handler);
+        resolve(false);
+      }, 5000); // wait a bit longer for realtime ack
+    });
+
     try {
-      const newTeam = await api.post(`/api/v1/sessions/${this.sessionId}/teams`, teamData);
+
+      const newTeam = await api.postSilent(`/api/v1/sessions/${this.sessionId}/teams`, teamData);
       if (newTeam) {
-        this.teams.push(newTeam);
+        // Replace the optimistic team with the real one
+        const idx = this.teams.findIndex((t) => t.id === tempId || (t._pending && (newTeam.name || '').toLowerCase() === (t.name || '').toLowerCase()));
+        if (idx !== -1) {
+          this.teams[idx] = newTeam;
+          this.pendingTeams.delete(tempId);
+        } else {
+          await this.loadTeams();
+        }
+      } else {
+        const acknowledged = await ackPromise;
+        if (acknowledged) {
+          await this.loadTeams();
+        } else {
+          // Fallback: poll the API briefly to confirm if team exists
+          const found = await this.waitForTeamPresence(teamName, 5000, 500);
+          if (found) {
+            await this.loadTeams();
+          } else {
+            // No response, no ack, and not found by polling; treat as failure
+            // Remove optimistic card
+            this.teams = this.teams.filter((t) => t.id !== tempId);
+            this.updateTeamsDisplay();
+            this.updateTeamsCount();
+            throw new Error('Team creation not acknowledged');
+          }
+        }
+      }
+
+      this.updateTeamsDisplay();
+      this.updateTeamsCount();
+
+      // Clear form
+      this.teamNameInput.value = '';
+      this.teamNameInput.focus();
+    } catch (error) {
+      // If the API call failed, try realtime ack or polling before surfacing an error
+      const acknowledged = await ackPromise;
+      if (acknowledged || await this.waitForTeamPresence(teamName, 5000, 500)) {
+        await this.loadTeams();
         this.updateTeamsDisplay();
         this.updateTeamsCount();
-
         // Clear form
         this.teamNameInput.value = '';
         this.teamNameInput.focus();
+      } else {
+        // Remove optimistic card on total failure
+        this.teams = this.teams.filter((t) => !(t._pending && (t.name || '').toLowerCase() === teamName.toLowerCase()));
+        this.updateTeamsDisplay();
+        this.updateTeamsCount();
+        api.handleError(error, 'adding team');
+        alert('Fout bij het toevoegen van het team.');
       }
-    } catch (error) {
-      api.handleError(error, 'adding team');
-      alert('Fout bij het toevoegen van het team.');
     }
+  }
+
+  // Poll helper to check if a team with a given name appears server-side
+  async waitForTeamPresence(teamName, timeoutMs = 5000, intervalMs = 500) {
+    const end = Date.now() + timeoutMs;
+    const normalized = teamName.toLowerCase();
+    while (Date.now() < end) {
+      try {
+        const response = await api.get(`/api/v1/sessions/${this.sessionId}/teams`);
+        const exists = response && response.teams && response.teams.some(t => (t.name || '').toLowerCase() === normalized);
+        if (exists) return true;
+      } catch (e) {
+        // ignore and retry
+      }
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return false;
   }
 
   editTeam(teamId) {
