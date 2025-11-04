@@ -532,3 +532,15 @@ class SessionScoreRepository:
                  JOIN sessions s ON ss.session_id = s.id
                  ORDER BY ss.timestamp DESC"""
         return Database.get_rows(sql)
+
+    @staticmethod
+    def get_team_total_score(session_id: int, team_id: int) -> int:
+        """Get the total score for a specific team in a session by summing all session_scores"""
+        sql = """
+        SELECT COALESCE(SUM(ss.points), 0) as total_score
+        FROM session_scores ss
+        WHERE ss.session_id = %s AND ss.team_id = %s
+        """
+        params = [session_id, team_id]
+        result = Database.get_one_row(sql, params)
+        return result['total_score'] if result else 0

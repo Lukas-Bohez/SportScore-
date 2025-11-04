@@ -190,15 +190,15 @@ class BigScreenDisplay {
     // Listen for real-time updates
     api.on('session_score_update', (data) => {
       console.log('BigScreen: Received session_score_update event:', data);
-      // Refresh the entire leaderboard when a score is updated
-      this.loadInitialData();
+      // Update the leaderboard incrementally instead of full refresh
+      this.updateScore(data);
     });
 
     // Also listen for legacy score_update events for backward compatibility
     api.on('score_update', (data) => {
       console.log('BigScreen: Received score_update event:', data);
-      // Refresh the entire leaderboard when a score is updated (legacy)
-      this.loadInitialData();
+      // Update the leaderboard incrementally (legacy)
+      this.updateScore(data);
     });
 
     api.on('session_status_update', (data) => {
@@ -209,8 +209,8 @@ class BigScreenDisplay {
 
     api.on('team_update', (data) => {
       console.log('BigScreen: Received team_update event:', data);
-      // Refresh when teams are added, updated, or removed
-      this.loadInitialData();
+      // Update team data incrementally
+      this.updateTeam(data);
     });
 
     // Listen for session creation/updates that might make a new session active
@@ -224,6 +224,15 @@ class BigScreenDisplay {
       console.log('BigScreen: Received session_created event:', data);
       // Refresh when a new session is created (might become active)
       this.loadInitialData();
+    });
+
+    api.on('welcome', (data) => {
+      console.log('BigScreen: Received welcome event:', data);
+    });
+
+    api.on('test_event', (data) => {
+      console.log('BigScreen: Received test_event:', data);
+      alert('Test event received: ' + JSON.stringify(data));
     });
 
     api.on('connected', () => {
@@ -253,11 +262,119 @@ class BigScreenDisplay {
     }
   }
 
-  updateDisplay(data) {
-    this.currentSession = data.session;
-    this.updateSessionInfo(data.session);
-    this.updateLeaderboard(data.leaderboard);
+  updateDisplay(liveData) {
+    // Update both session info and leaderboard
+    if (liveData.session) {
+      this.currentSession = liveData.session;
+      this.updateSessionInfo(liveData.session);
+    }
+    if (liveData.leaderboard) {
+      this.updateLeaderboard(liveData.leaderboard);
+    }
     this.updateLastUpdateTime();
+  }
+
+  updateScore(data) {
+    // For score updates, we need the total score which isn't in the event
+    // So we do a full refresh to get accurate data
+    console.log('Score update received, refreshing leaderboard');
+    this.loadInitialData();
+  }
+
+  updateTeam(data) {
+    // Update team data without full refresh
+    if (!this.currentSession || !this.teamsContainer) {
+      // If no session loaded yet, do full refresh
+      this.loadInitialData();
+      return;
+    }
+
+    // Normalize team data from database format to leaderboard format
+    const teamData = {
+      team_name: data.team.name,
+      team_icon: data.team.icon,
+      team_color: data.team.color,
+      total_score: data.team.total_score || data.team.score || 0, // Use total_score if available, fallback to score
+      is_eliminated: data.team.is_eliminated || false,
+    };
+
+    if (data.action === 'deleted') {
+      // Remove the team element
+      const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
+      for (const teamElement of teamElements) {
+        const teamNameElement = teamElement.querySelector('.team-name');
+        if (teamNameElement && teamNameElement.textContent === teamData.team_name) {
+          teamElement.remove();
+          break;
+        }
+      }
+    } else {
+      // Update or add team
+      let teamElement = null;
+      const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
+
+      // Check if team already exists
+      for (const element of teamElements) {
+        const teamNameElement = element.querySelector('.team-name');
+        if (teamNameElement && teamNameElement.textContent === teamData.team_name) {
+          teamElement = element;
+          break;
+        }
+      }
+
+      if (teamElement) {
+        // Update existing team
+        const iconElement = teamElement.querySelector('.team-icon');
+        const scoreElement = teamElement.querySelector('.team-score');
+
+        if (iconElement) {
+          iconElement.textContent = this.getEmojiFromName(teamData.team_icon);
+        }
+        if (scoreElement) {
+          scoreElement.textContent = teamData.total_score;
+        }
+        teamElement.style.borderLeftColor = teamData.team_color || '#333';
+
+        // Update eliminated status
+        if (teamData.is_eliminated) {
+          teamElement.classList.add('eliminated');
+        } else {
+          teamElement.classList.remove('eliminated');
+        }
+      } else {
+        // Add new team
+        const newTeamElement = this.createTeamElement(teamData, teamElements.length + 1);
+        this.teamsContainer.appendChild(newTeamElement);
+      }
+
+      // Re-sort the leaderboard
+      this.sortLeaderboard();
+    }
+
+    this.updateLastUpdateTime();
+  }
+
+  sortLeaderboard() {
+    // Sort teams by score and update positions
+    if (!this.teamsContainer) return;
+
+    const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
+
+    // Sort by score descending
+    teamElements.sort((a, b) => {
+      const scoreA = parseInt(a.querySelector('.team-score').textContent) || 0;
+      const scoreB = parseInt(b.querySelector('.team-score').textContent) || 0;
+      return scoreB - scoreA;
+    });
+
+    // Re-append in sorted order and update positions
+    teamElements.forEach((element, index) => {
+      const positionElement = element.querySelector('.team-position');
+      if (positionElement) {
+        positionElement.textContent = index + 1;
+      }
+      this.teamsContainer.appendChild(element);
+    });
   }
 
   updateSessionInfo(session) {

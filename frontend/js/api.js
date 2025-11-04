@@ -4,31 +4,156 @@ class ScoreboardAPI {
     this.baseURL = baseURL;
     this.socket = null;
     this.eventListeners = {};
+    this.pollingInterval = null;
+    this.lastLeaderboardData = null;
+    this.pollingFallbackActive = false;
   }
 
   // Initialize Socket.IO connection
   initSocket() {
+    console.log('API: Initializing Socket.IO connection to:', this.baseURL);
     if (typeof io !== 'undefined') {
+      console.log('API: Socket.IO library found, creating connection...');
       this.socket = io(this.baseURL, {
-        // Enhanced configuration for better reliability and compatibility
-        transports: ['polling', 'websocket'], // Try polling first for compatibility
+        // Use only polling for now to avoid websocket issues
+        transports: ['polling'], // Only polling
         timeout: 30000, // 30 second timeout
-        reconnection: true, // Enable reconnection
-        reconnectionAttempts: 10, // More retry attempts
-        reconnectionDelay: 2000, // Start with 2 second delay
-        reconnectionDelayMax: 10000, // Max 10 second delay
-        forceNew: false, // Allow connection reuse
-        upgrade: true, // Allow upgrade to websocket
+        reconnection: false, // Disable reconnection to avoid CORS issues
+        reconnectionAttempts: 0, // No retry attempts
+        forceNew: true, // Force new connection to avoid reuse issues
+        multiplex: false, // Disable multiplexing
+        withCredentials: false, // Disable credentials for CORS
+        upgrade: false, // Disable websocket upgrade
         rememberUpgrade: false, // Don't remember across sessions
         autoConnect: true, // Auto connect on creation
-        cors: {
-          origin: 'http://localhost:3000',
-          methods: ['GET', 'POST'],
-          credentials: false,
-        },
       });
+      console.log('API: Socket.IO connection created, setting up listeners...');
       this.setupSocketListeners();
+
+      // Set up fallback polling if Socket.IO fails
+      this.socket.on('connect_error', (error) => {
+        console.log('API: Socket.IO connection failed, starting polling fallback:', error.message);
+        this.startPollingFallback();
+      });
+
+      this.socket.on('connect_timeout', () => {
+        console.log('API: Socket.IO connection timeout, starting polling fallback');
+        this.startPollingFallback();
+      });
+    } else {
+      console.error('API: Socket.IO library not found, using polling fallback!');
+      this.startPollingFallback();
     }
+  }
+
+  // Start polling fallback when Socket.IO fails
+  startPollingFallback() {
+    if (this.pollingFallbackActive) return;
+
+    console.log('API: Starting polling fallback for real-time updates');
+    this.pollingFallbackActive = true;
+
+    // Poll every 5 seconds for updates
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const liveData = await this.getLiveLeaderboard();
+
+        // Check if leaderboard data has changed
+        if (this.hasLeaderboardChanged(liveData)) {
+          console.log('API: Leaderboard changed, emitting update events');
+          this.emitLeaderboardUpdateEvents(liveData);
+          this.lastLeaderboardData = liveData;
+        }
+      } catch (error) {
+        console.error('API: Polling fallback error:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    // Emit connected event for fallback
+    this.emit('connected');
+  }
+
+  // Check if leaderboard data has changed
+  hasLeaderboardChanged(newData) {
+    if (!this.lastLeaderboardData) return true;
+
+    const oldLeaderboard = this.lastLeaderboardData.leaderboard || [];
+    const newLeaderboard = newData.leaderboard || [];
+
+    if (oldLeaderboard.length !== newLeaderboard.length) return true;
+
+    // Check if any team scores have changed
+    for (let i = 0; i < newLeaderboard.length; i++) {
+      const oldTeam = oldLeaderboard[i];
+      const newTeam = newLeaderboard[i];
+
+      if (!oldTeam || !newTeam) return true;
+      if (oldTeam.team_name !== newTeam.team_name) return true;
+      if ((oldTeam.total_score || oldTeam.score || 0) !== (newTeam.total_score || newTeam.score || 0)) return true;
+    }
+
+    return false;
+  }
+
+  // Emit events based on leaderboard changes
+  emitLeaderboardUpdateEvents(liveData) {
+    const leaderboard = liveData.leaderboard || [];
+    const oldLeaderboard = this.lastLeaderboardData?.leaderboard || [];
+
+    // Emit team_update events for changed teams
+    leaderboard.forEach((newTeam, index) => {
+      const oldTeam = oldLeaderboard.find((t) => t.team_name === newTeam.team_name);
+
+      if (!oldTeam || (oldTeam.total_score || oldTeam.score || 0) !== (newTeam.total_score || newTeam.score || 0)) {
+        // Score changed
+        this.emit('session_score_update', {
+          session_id: liveData.session?.id,
+          team_id: newTeam.team_id,
+          points: (newTeam.total_score || newTeam.score || 0) - (oldTeam?.total_score || oldTeam?.score || 0),
+          reason: 'Score update',
+          round_number: 1,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Also emit team update
+        this.emit('team_update', {
+          session_id: liveData.session?.id,
+          team_id: newTeam.team_id,
+          team: {
+            id: newTeam.team_id,
+            name: newTeam.team_name,
+            color: newTeam.team_color,
+            icon: newTeam.team_icon,
+            score: newTeam.total_score || newTeam.score || 0,
+            total_score: newTeam.total_score || newTeam.score || 0,
+            is_eliminated: newTeam.is_eliminated || false,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // Check for new teams
+    leaderboard.forEach((newTeam) => {
+      const exists = oldLeaderboard.some((t) => t.team_name === newTeam.team_name);
+      if (!exists) {
+        this.emit('team_update', {
+          session_id: liveData.session?.id,
+          team_id: newTeam.team_id,
+          team: {
+            id: newTeam.team_id,
+            name: newTeam.team_name,
+            color: newTeam.team_color,
+            icon: newTeam.team_icon,
+            score: newTeam.total_score || newTeam.score || 0,
+            total_score: newTeam.total_score || newTeam.score || 0,
+            is_eliminated: newTeam.is_eliminated || false,
+          },
+          action: 'created',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
   }
 
   // Setup Socket.IO event listeners
@@ -36,51 +161,76 @@ class ScoreboardAPI {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('API: Connected to server via Socket.IO');
       this.emit('connected');
+      // Stop polling if Socket.IO connects successfully
+      if (this.pollingFallbackActive) {
+        console.log('API: Socket.IO connected, stopping polling fallback');
+        this.stopPollingFallback();
+      }
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+      console.log('API: Disconnected from server');
       this.emit('disconnected');
+      // Start polling fallback if Socket.IO disconnects
+      if (!this.pollingFallbackActive) {
+        this.startPollingFallback();
+      }
     });
 
     // Session-specific events
     this.socket.on('session_score_update', (data) => {
+      console.log('API: Received session_score_update event:', data);
       this.emit('session_score_update', data);
     });
 
     this.socket.on('session_status_update', (data) => {
+      console.log('API: Received session_status_update event:', data);
       this.emit('session_status_update', data);
     });
 
     this.socket.on('team_update', (data) => {
+      console.log('API: Received team_update event:', data);
       this.emit('team_update', data);
     });
 
     this.socket.on('session_update', (data) => {
+      console.log('API: Received session_update event:', data);
       this.emit('session_update', data);
     });
 
     this.socket.on('session_created', (data) => {
+      console.log('API: Received session_created event:', data);
       this.emit('session_created', data);
+    });
+
+    this.socket.on('welcome', (data) => {
+      console.log('API: Received welcome event:', data);
+      this.emit('welcome', data);
+    });
+
+    this.socket.on('test_event', (data) => {
+      console.log('API: Received test_event:', data);
+      this.emit('test_event', data);
     });
 
     // Legacy game events (for backward compatibility)
     this.socket.on('game_update', (data) => {
+      console.log('API: Received game_update event:', data);
       this.emit('game_update', data);
     });
 
     this.socket.on('score_update', (data) => {
+      console.log('API: Received score_update event:', data);
       this.emit('score_update', data);
     });
 
     this.socket.on('game_status_change', (data) => {
+      console.log('API: Received game_status_change event:', data);
       this.emit('game_status_change', data);
     });
   }
-
-  // Custom event emitter for API events
   on(event, callback) {
     if (!this.eventListeners[event]) {
       this.eventListeners[event] = [];
@@ -91,6 +241,16 @@ class ScoreboardAPI {
   emit(event, data) {
     if (this.eventListeners[event]) {
       this.eventListeners[event].forEach((callback) => callback(data));
+    }
+  }
+
+  // Stop polling fallback
+  stopPollingFallback() {
+    if (this.pollingInterval) {
+      console.log('API: Stopping polling fallback');
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      this.pollingFallbackActive = false;
     }
   }
 
@@ -417,10 +577,14 @@ const api = new ScoreboardAPI();
 // Initialize socket connection when DOM is ready - only for pages that need real-time updates
 document.addEventListener('DOMContentLoaded', () => {
   // Only initialize Socket.IO for pages that need it
-  const currentPage = window.location.pathname.split('/').pop();
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
+  console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
   const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'admin.html'];
 
   if (pagesNeedingSocket.includes(currentPage)) {
+    console.log('API: Page needs Socket.IO, initializing...');
     api.initSocket();
+  } else {
+    console.log('API: Page does not need Socket.IO, skipping initialization');
   }
 });

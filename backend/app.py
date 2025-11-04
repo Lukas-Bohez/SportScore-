@@ -13,10 +13,6 @@ from threading import Thread, Event, Lock
 import socket
 import logging
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 # Import repositories
 from database.datarepository import (
@@ -61,25 +57,16 @@ app = FastAPI(title="Scoreboard Backend", version="1.0.0")
 # CORS middleware - allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Allow specific origins
+    allow_origins="*", # Allow all origins everywhere
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
 )
 
-# Rate limiting setup
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 
-# Socket.IO server setup
-# Disable Socket.IO's own CORS header handling so FastAPI's CORSMiddleware
-# is the single source of Access-Control-Allow-Origin headers. If both
-# Socket.IO and FastAPI add the header you'll get duplicated values like
-# 'http://localhost:3000, *' which browsers reject.
+
 sio = socketio.AsyncServer(
-    cors_allowed_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Allow specific origins for Socket.IO
+    cors_allowed_origins="*",  # Allow all origins for Socket.IO
     async_mode='asgi',
     logger=False
 )
@@ -89,11 +76,7 @@ ENDPOINT = "/api/v1"  # API base endpoint
 # Store connected clients
 connected_clients = set()
 
-# Mount Socket.IO on the same app. Pass cors_allowed_origins=None to the ASGIApp
-# so the ASGI wrapper does not add its own Access-Control-Allow-Origin header.
-# The Socket.IO server itself (`sio`) is configured to accept all origins so the
-# engineio origin check succeeds, while FastAPI's CORSMiddleware will remain the
-# single source of CORS headers for regular HTTP endpoints.
+
 app.mount("/socket.io", socketio.ASGIApp(sio, app, socketio_path='socket.io'))
 
 # ----------------------------------------------------
@@ -102,7 +85,7 @@ app.mount("/socket.io", socketio.ASGIApp(sio, app, socketio_path='socket.io'))
 
 @sio.event
 async def connect(sid, environ):
-    print(f"Client {sid} connected")
+    print(f"Client {sid} connected - Total clients: {len(connected_clients) + 1}")
     connected_clients.add(sid)
 
     # Send welcome message
@@ -114,7 +97,7 @@ async def connect(sid, environ):
 
 @sio.event
 async def disconnect(sid):
-    print(f"Client {sid} disconnected")
+    print(f"Client {sid} disconnected - Total clients: {len(connected_clients) - 1}")
     if sid in connected_clients:
         connected_clients.remove(sid)
 
@@ -481,10 +464,15 @@ async def create_session_team(session_id: int, team: SessionTeamCreate):
     created_team = SessionTeamRepository.get_team_by_id(team_id)
 
     # Emit real-time update for new team creation
+    print(f"Emitting team_update event for team creation: session_id={session_id}, team_id={team_id}")
+    total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
     await sio.emit('team_update', {
         'session_id': session_id,
         'team_id': team_id,
-        'team': created_team,
+        'team': {
+            **created_team,
+            'total_score': total_score
+        },
         'action': 'created',
         'timestamp': datetime.now().isoformat()
     })
@@ -502,10 +490,15 @@ async def update_session_team(session_id: int, team_id: int, team_update: Sessio
     updated_team = SessionTeamRepository.get_team_by_id(team_id)
 
     # Emit real-time update for team changes
+    print(f"Emitting team_update event for team update: session_id={session_id}, team_id={team_id}")
+    total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
     await sio.emit('team_update', {
         'session_id': session_id,
         'team_id': team_id,
-        'team': updated_team,
+        'team': {
+            **updated_team,
+            'total_score': total_score
+        },
         'timestamp': datetime.now().isoformat()
     })
 
@@ -518,6 +511,7 @@ async def delete_session_team(session_id: int, team_id: int):
         raise HTTPException(status_code=400, detail="Failed to delete team")
 
     # Emit real-time update for team deletion
+    print(f"Emitting team_update event for team deletion: session_id={session_id}, team_id={team_id}")
     await sio.emit('team_update', {
         'session_id': session_id,
         'team_id': team_id,
@@ -555,7 +549,8 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     )
     created_score = SessionScoreRepository.get_score_by_id(score_id)
 
-    # Emit real-time update
+    # Emit real-time update for score
+    print(f"Emitting session_score_update event: session_id={session_id}, team_id={score.team_id}, points={score.points}")
     await sio.emit('session_score_update', {
         'session_id': session_id,
         'team_id': score.team_id,
@@ -563,6 +558,20 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
         'reason': score.reason,
         'round_number': score.round_number,
         'timestamp': created_score['timestamp'].isoformat()
+    })
+
+    # Also emit team update since score changed
+    updated_team = SessionTeamRepository.get_team_by_id(score.team_id)
+    total_score = SessionScoreRepository.get_team_total_score(session_id, score.team_id)
+    print(f"Emitting team_update event for score change: session_id={session_id}, team_id={score.team_id}, total_score={total_score}")
+    await sio.emit('team_update', {
+        'session_id': session_id,
+        'team_id': score.team_id,
+        'team': {
+            **updated_team,
+            'total_score': total_score  # Add calculated total score
+        },
+        'timestamp': datetime.now().isoformat()
     })
 
     return SessionScoreResponse(**created_score)
@@ -589,18 +598,16 @@ async def delete_session_score(session_id: int, score_id: int):
         raise HTTPException(status_code=400, detail="Failed to delete score")
     return {"message": "Score deleted successfully"}
 
-# Global session endpoints for admin interface
-@app.get(f"{ENDPOINT}/sessions/teams")
-async def get_all_session_teams():
-    """Get all teams across all sessions with session info"""
-    teams = SessionTeamRepository.get_all_teams_with_session_info()
-    return {"teams": teams}
-
-@app.get(f"{ENDPOINT}/sessions/scores")
-async def get_all_session_scores():
-    """Get all scores across all sessions with session and team info"""
-    scores = SessionScoreRepository.get_all_scores_with_info()
-    return {"scores": scores}
+@app.get("/test-socket")
+async def test_socket():
+    """Test endpoint to send a test Socket.IO event"""
+    print(f"Sending test event to {len(connected_clients)} connected clients")
+    await sio.emit('test_event', {
+        'message': 'This is a test event',
+        'timestamp': datetime.now().isoformat(),
+        'connected_clients': len(connected_clients)
+    })
+    return {"message": "Test event sent", "connected_clients": len(connected_clients)}
 
 # ----------------------------------------------------
 # Main
