@@ -15,16 +15,18 @@ class ScoreboardAPI {
     if (typeof io !== 'undefined') {
       console.log('API: Socket.IO library found, creating connection...');
       this.socket = io(this.baseURL, {
-        // Use only polling for now to avoid websocket issues
-        transports: ['polling'], // Only polling
+        // Allow both polling and websocket transports like working config
+        transports: ['polling', 'websocket'], // Allow both transports
         timeout: 30000, // 30 second timeout
-        reconnection: false, // Disable reconnection to avoid CORS issues
-        reconnectionAttempts: 0, // No retry attempts
-        forceNew: true, // Force new connection to avoid reuse issues
+        reconnection: true, // Enable reconnection like working config
+        reconnectionAttempts: 10, // More retry attempts
+        reconnectionDelay: 2000, // Start with 2 second delay
+        reconnectionDelayMax: 10000, // Max 10 second delay
+        forceNew: false, // Allow connection reuse like working config
+        upgrade: true, // Allow websocket upgrade like working config
+        rememberUpgrade: false, // Don't remember upgrade like working config
         multiplex: false, // Disable multiplexing
         withCredentials: false, // Disable credentials for CORS
-        upgrade: false, // Disable websocket upgrade
-        rememberUpgrade: false, // Don't remember across sessions
         autoConnect: true, // Auto connect on creation
       });
       console.log('API: Socket.IO connection created, setting up listeners...');
@@ -236,6 +238,21 @@ class ScoreboardAPI {
       this.eventListeners[event] = [];
     }
     this.eventListeners[event].push(callback);
+  }
+
+  // Remove a specific listener
+  off(event, callback) {
+    if (!this.eventListeners[event]) return;
+    this.eventListeners[event] = this.eventListeners[event].filter((cb) => cb !== callback);
+  }
+
+  // Add a one-time listener that auto-removes after first call
+  once(event, callback) {
+    const wrapper = (data) => {
+      this.off(event, wrapper);
+      callback(data);
+    };
+    this.on(event, wrapper);
   }
 
   emit(event, data) {

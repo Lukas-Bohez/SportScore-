@@ -54,19 +54,36 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Scoreboard Backend", version="1.0.0")
 
+# ----------------------------------------------------
+# Helpers
+# ----------------------------------------------------
+def _jsonable(value):
+    """Recursively convert datetimes and nested structures to JSON-serializable types."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        t = type(value)
+        return t(_jsonable(v) for v in value)
+    if isinstance(value, set):
+        # sets aren't JSON serializable; turn into list
+        return [_jsonable(v) for v in value]
+    return value
+
 # CORS middleware - allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins="*", # Allow all origins everywhere
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 
 
 sio = socketio.AsyncServer(
-    cors_allowed_origins="*",  # Allow all origins for Socket.IO
+    cors_allowed_origins="*",
     async_mode='asgi',
     logger=False
 )
@@ -77,7 +94,8 @@ ENDPOINT = "/api/v1"  # API base endpoint
 connected_clients = set()
 
 
-app.mount("/socket.io", socketio.ASGIApp(sio, app, socketio_path='socket.io'))
+# Expose Socket.IO as the top-level ASGI app to avoid duplicate CORS headers on /socket.io
+asgi = socketio.ASGIApp(sio, app, socketio_path='socket.io')
 
 # ----------------------------------------------------
 # Socket.IO event handlers
@@ -379,11 +397,11 @@ async def create_session(session: SessionCreate):
     created_session = SessionRepository.get_session_by_id(session_id)
 
     # Emit real-time update for new session creation
-    await sio.emit('session_created', {
+    await sio.emit('session_created', _jsonable({
         'session_id': session_id,
         'session': created_session,
         'timestamp': datetime.now().isoformat()
-    })
+    }))
 
     return SessionResponse(**created_session)
 
@@ -433,11 +451,11 @@ async def update_session(session_id: int, session_update: SessionUpdate):
     updated_session = SessionRepository.get_session_by_id(session_id)
 
     # Emit real-time update for session changes
-    await sio.emit('session_update', {
+    await sio.emit('session_update', _jsonable({
         'session_id': session_id,
         'session': updated_session,
         'timestamp': datetime.now().isoformat()
-    })
+    }))
 
     return SessionResponse(**updated_session)
 
@@ -466,7 +484,7 @@ async def create_session_team(session_id: int, team: SessionTeamCreate):
     # Emit real-time update for new team creation
     print(f"Emitting team_update event for team creation: session_id={session_id}, team_id={team_id}")
     total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
-    await sio.emit('team_update', {
+    await sio.emit('team_update', _jsonable({
         'session_id': session_id,
         'team_id': team_id,
         'team': {
@@ -475,7 +493,7 @@ async def create_session_team(session_id: int, team: SessionTeamCreate):
         },
         'action': 'created',
         'timestamp': datetime.now().isoformat()
-    })
+    }))
 
     return SessionTeamResponse(**created_team)
 
@@ -492,7 +510,7 @@ async def update_session_team(session_id: int, team_id: int, team_update: Sessio
     # Emit real-time update for team changes
     print(f"Emitting team_update event for team update: session_id={session_id}, team_id={team_id}")
     total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
-    await sio.emit('team_update', {
+    await sio.emit('team_update', _jsonable({
         'session_id': session_id,
         'team_id': team_id,
         'team': {
@@ -500,7 +518,7 @@ async def update_session_team(session_id: int, team_id: int, team_update: Sessio
             'total_score': total_score
         },
         'timestamp': datetime.now().isoformat()
-    })
+    }))
 
     return SessionTeamResponse(**updated_team)
 
@@ -539,8 +557,12 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     session = SessionRepository.get_session_by_id(session_id)
     if session and session['game_type'] == 'elimination':
         team = SessionTeamRepository.get_team_by_id(score.team_id)
-        if team and team['score'] + score.points < 0:
-            SessionTeamRepository.update_team(score.team_id, is_eliminated=True)
+        if team:
+            new_score = team['score'] + score.points
+            if new_score < 0:
+                SessionTeamRepository.update_team(score.team_id, is_eliminated=True)
+            elif new_score >= 0:
+                SessionTeamRepository.update_team(score.team_id, is_eliminated=False)
 
     # Create score record
     score_id = SessionScoreRepository.create_score(
@@ -564,7 +586,7 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     updated_team = SessionTeamRepository.get_team_by_id(score.team_id)
     total_score = SessionScoreRepository.get_team_total_score(session_id, score.team_id)
     print(f"Emitting team_update event for score change: session_id={session_id}, team_id={score.team_id}, total_score={total_score}")
-    await sio.emit('team_update', {
+    await sio.emit('team_update', _jsonable({
         'session_id': session_id,
         'team_id': score.team_id,
         'team': {
@@ -572,7 +594,7 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
             'total_score': total_score  # Add calculated total score
         },
         'timestamp': datetime.now().isoformat()
-    })
+    }))
 
     return SessionScoreResponse(**created_score)
 
@@ -616,7 +638,7 @@ async def test_socket():
 if __name__ == "__main__":
     print("Scoreboard Backend Starting...")
     uvicorn.run(
-        "app:app",
+        "app:asgi",
         host="0.0.0.0",
         port=8000,
         reload=True

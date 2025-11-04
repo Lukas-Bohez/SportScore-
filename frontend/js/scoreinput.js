@@ -277,6 +277,22 @@ class ScoreInput {
       return;
     }
 
+    // Prepare real-time acknowledgement listener before sending
+    const ackPromise = new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve(false);
+      }, 1500);
+
+      const handler = (data) => {
+        if (data && String(data.session_id) === String(this.sessionId) && Number(data.team_id) === teamId && Number(data.points) === points) {
+          clearTimeout(timeout);
+          api.off('session_score_update', handler);
+          resolve(true);
+        }
+      };
+      api.on('session_score_update', handler);
+    });
+
     try {
       const scoreData = {
         session_id: parseInt(this.sessionId),
@@ -288,25 +304,37 @@ class ScoreInput {
 
       await api.post(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
 
-      // Show animation
-      this.showScoreAnimation(teamId, points);
-
-      // Reset form
-      this.reasonInput.value = '';
-      this.pointsInput.value = 1;
-
-      // Reload data
-      this.loadLeaderboard();
-      this.loadTeams(); // Refresh team scores
-
-      // Load recent scores with a small delay to ensure the score is saved
-      setTimeout(() => {
-        this.loadRecentScores();
-      }, 500);
+      // Treat as success
+      this.onScoreSubmitSuccess(teamId, points);
     } catch (error) {
-      api.handleError(error, 'submitting score');
-      alert('Fout bij het toevoegen van de score.');
+      // If the API call failed, but we got a realtime event, treat it as success
+      const acknowledged = await ackPromise;
+      if (acknowledged) {
+        console.log('Score submission acknowledged via real-time event; suppressing error UI.');
+        this.onScoreSubmitSuccess(teamId, points);
+      } else {
+        api.handleError(error, 'submitting score');
+        alert('Fout bij het toevoegen van de score.');
+      }
     }
+  }
+
+  onScoreSubmitSuccess(teamId, points) {
+    // Show animation
+    this.showScoreAnimation(teamId, points);
+
+    // Reset form
+    this.reasonInput.value = '';
+    this.pointsInput.value = 1;
+
+    // Reload data (these will also be refreshed by realtime events, but keep it deterministic)
+    this.loadLeaderboard();
+    this.loadTeams();
+
+    // Load recent scores with a small delay to ensure the score is saved
+    setTimeout(() => {
+      this.loadRecentScores();
+    }, 500);
   }
 
   addQuickScore(reason, points) {
