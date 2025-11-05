@@ -22,81 +22,36 @@ echo ✅ MySQL found at %MYSQL_PATH%
 
 REM Get database config from config.py
 echo 📋 Reading database configuration...
-for /f "tokens=1,2,3,4 delims= " %%a in ('python -c "from backend.database.config import DB_CONFIG; print(DB_CONFIG['user'], DB_CONFIG['password'], DB_CONFIG['host'], DB_CONFIG['port'])"') do (
+for /f "tokens=1,2,3,4" %%a in ('python -c "from backend.database.config import DB_CONFIG; print(DB_CONFIG['user'], DB_CONFIG['password'], DB_CONFIG['host'], DB_CONFIG['port'])"') do (
     set DB_USER=%%a
     set DB_PASSWORD=%%b
     set DB_HOST=%%c
     set DB_PORT=%%d
 )
 
-echo Using database: user=%DB_USER%, password=%DB_PASSWORD%, host=%DB_HOST%, port=%DB_PORT%
+echo Using database: user=%DB_USER%, host=%DB_HOST%, port=%DB_PORT%
 
-REM Check database structure and rebuild if needed
-echo 🔍 Validating database structure...
-
-REM Check if database exists
-"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "SHOW DATABASES LIKE 'scoreboard';" 2>nul | findstr /C:"scoreboard" >nul
-
+REM Create database if not exists
+echo 📦 Creating database 'scoreboard' if it doesn't exist...
+"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "CREATE DATABASE IF NOT EXISTS scoreboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>nul
 if %errorlevel% neq 0 (
-    echo 📦 Database does not exist, creating...
-    "%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "CREATE DATABASE scoreboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>nul
-    if %errorlevel% neq 0 (
-        echo ❌ Failed to create database. Please check MySQL credentials and connection.
-        pause
-        exit /b 1
-    )
-    echo 🏗️ Creating database structure...
-    "%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% scoreboard < "backend\database_schema.sql" 2>nul
-    if %errorlevel% neq 0 (
-        echo ❌ Failed to create database schema
-        pause
-        exit /b 1
-    )
-    echo ✅ Database created successfully
-    goto :database_ready
+    echo ❌ Failed to create database. Please check MySQL credentials and connection.
+    pause
+    exit /b 1
 )
 
-REM Database exists, check if structure is correct
-set STRUCTURE_OK=1
+echo ✅ Database created
 
-REM Check for new required tables
-"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "USE scoreboard; SHOW TABLES LIKE 'games';" 2>nul | findstr /C:"games" >nul
-if %errorlevel% neq 0 set STRUCTURE_OK=0
-
-REM Check for old tables that shouldn't exist
-"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "USE scoreboard; SHOW TABLES LIKE 'sessions';" 2>nul | findstr /C:"sessions" >nul
-if %errorlevel% equ 0 set STRUCTURE_OK=0
-
-"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "USE scoreboard; SHOW TABLES LIKE 'session_teams';" 2>nul | findstr /C:"session_teams" >nul
-if %errorlevel% equ 0 set STRUCTURE_OK=0
-
-"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "USE scoreboard; SHOW TABLES LIKE 'score_types';" 2>nul | findstr /C:"score_types" >nul
-if %errorlevel% equ 0 set STRUCTURE_OK=0
-
-REM If structure is wrong, rebuild
-if %STRUCTURE_OK% equ 0 (
-    echo ⚠️ Database structure is incorrect or outdated
-    echo 🗑️ Dropping and rebuilding database...
-    "%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "DROP DATABASE scoreboard;" 2>nul
-    "%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% -e "CREATE DATABASE scoreboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>nul
-    if %errorlevel% neq 0 (
-        echo ❌ Failed to create database. Please check MySQL credentials and connection.
-        pause
-        exit /b 1
-    )
-    echo 🏗️ Creating new database structure...
-    "%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% scoreboard < "backend\database_schema.sql" 2>nul
-    if %errorlevel% neq 0 (
-        echo ❌ Failed to create database schema
-        pause
-        exit /b 1
-    )
-    echo ✅ Database rebuilt with correct structure
-) else (
-    echo ✅ Database structure is correct
+REM Execute database schema
+echo 🏗️ Setting up database schema...
+"%MYSQL_PATH%" -u %DB_USER% -p%DB_PASSWORD% -h %DB_HOST% -P %DB_PORT% scoreboard < "backend\database_schema.sql" 2>nul
+if %errorlevel% neq 0 (
+    echo ❌ Failed to execute database schema
+    pause
+    exit /b 1
 )
 
-:database_ready
+echo ✅ Database schema applied
 
 REM Start backend in background
 echo 🚀 Starting backend server...
