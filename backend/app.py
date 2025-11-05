@@ -214,7 +214,7 @@ async def get_players(team_id: Optional[int] = Query(None)):
 
 @app.post(f"{ENDPOINT}/players", response_model=PlayerResponse)
 async def create_player(player: PlayerCreate):
-    player_id = PlayerRepository.create_player(player.name, player.team_id)
+    player_id = PlayerRepository.create_player(player.name, player.team_id, player.position)
     if not player_id:
         raise HTTPException(status_code=400, detail="Failed to create player")
     created_player = PlayerRepository.get_player_by_id(player_id)
@@ -229,7 +229,7 @@ async def get_player(player_id: int):
 
 @app.put(f"{ENDPOINT}/players/{{player_id}}", response_model=PlayerResponse)
 async def update_player(player_id: int, player_update: PlayerUpdate):
-    success = PlayerRepository.update_player(player_id, player_update.name, player_update.team_id)
+    success = PlayerRepository.update_player(player_id, player_update.name, player_update.team_id, player_update.position)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update player")
     updated_player = PlayerRepository.get_player_by_id(player_id)
@@ -564,6 +564,44 @@ async def create_session_team(session_id: int, request: Request):
 
     return SessionTeamResponse(**created_team)
 
+
+@app.get(
+    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players",
+    response_model=PlayerListResponse,
+    tags=["Session Team Players"],
+    summary="List players for a session team"
+)
+async def get_players_for_team(session_id: int, team_id: int):
+    # Validate team exists and belongs to session
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    if not team or int(team.get('session_id') or 0) != int(session_id):
+        raise HTTPException(status_code=404, detail="Team not found in session")
+    players = PlayerRepository.get_players_by_team(team_id)
+    return PlayerListResponse(players=[PlayerResponse(**p) for p in players])
+
+
+@app.post(
+    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players",
+    response_model=PlayerResponse,
+    tags=["Session Team Players"],
+    summary="Create player for a session team"
+)
+async def create_player_for_team(session_id: int, team_id: int, player: PlayerCreate):
+    # Validate team exists and belongs to session
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    if not team or int(team.get('session_id') or 0) != int(session_id):
+        raise HTTPException(status_code=404, detail="Team not found in session")
+
+    # Ensure team_id matches path
+    if player.team_id and int(player.team_id) != int(team_id):
+        raise HTTPException(status_code=400, detail="Team ID mismatch")
+
+    player_id = PlayerRepository.create_player(player.name, team_id, player.position)
+    if not player_id:
+        raise HTTPException(status_code=400, detail="Failed to create player")
+    created_player = PlayerRepository.get_player_by_id(player_id)
+    return PlayerResponse(**created_player)
+
 @app.put(
     f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}",
     response_model=SessionTeamResponse,
@@ -632,8 +670,10 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     if score.session_id != session_id:
         raise HTTPException(status_code=400, detail="Session ID mismatch")
 
-    # Update team score
-    SessionTeamRepository.update_team_score(score.team_id, score.points)
+    # NOTE: Previously we updated team score here which created a duplicate score entry
+    # (SessionTeamRepository.update_team_score now creates a score row for backwards compatibility).
+    # Creating the session score below already inserts the score row, so calling
+    # update_team_score here results in two rows per submission. Remove the extra call.
 
     # Check if team should be eliminated (only for elimination mode)
     session = SessionRepository.get_session_by_id(session_id)

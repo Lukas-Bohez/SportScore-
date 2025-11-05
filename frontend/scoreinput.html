@@ -37,11 +37,18 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="player-select">Selecteer Speler (optioneel):</label>
+                        <select id="player-select">
+                            <option value="">Heel team / geen specifieke speler</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="points-input">Punten:</label>
                         <div class="points-controls">
-                            <button id="subtract-btn" class="points-btn subtract">-</button>
+                            <button id="subtract-btn" type="button" class="points-btn subtract">-</button>
                             <input type="number" id="points-input" value="1" min="1" max="100">
-                            <button id="add-btn" class="points-btn add">+</button>
+                            <button id="add-btn" type="button" class="points-btn add">+</button>
                         </div>
                     </div>
 
@@ -50,16 +57,16 @@
                         <input type="text" id="reason-input" placeholder="bijv. Quiz vraag correct, Bonus punten..." maxlength="200">
                     </div>
 
-                    <button id="submit-score-btn" class="submit-btn">Score Toevoegen</button>
+                    <button id="submit-score-btn" type="button" class="submit-btn">Score Toevoegen</button>
                 </div>
 
                 <div class="quick-actions">
                     <h3>Snelle Acties</h3>
                     <div class="quick-buttons">
-                        <button class="quick-btn bonus" onclick="scoreInput.addQuickScore('Bonus +5', 5)">+5 Bonus</button>
-                        <button class="quick-btn penalty" onclick="scoreInput.addQuickScore('Penalty -2', -2)">-2 Penalty</button>
-                        <button class="quick-btn correct" onclick="scoreInput.addQuickScore('Juist Antwoord +1', 1)">+1 Juist</button>
-                        <button class="quick-btn wrong" onclick="scoreInput.addQuickScore('Verkeerd Antwoord -1', -1)">-1 Verkeerd</button>
+                        <button type="button" class="quick-btn bonus" onclick="scoreInput.addQuickScore('Bonus +5', 5)">+5 Bonus</button>
+                        <button type="button" class="quick-btn penalty" onclick="scoreInput.addQuickScore('Penalty -2', -2)">-2 Penalty</button>
+                        <button type="button" class="quick-btn correct" onclick="scoreInput.addQuickScore('Juist Antwoord +1', 1)">+1 Juist</button>
+                        <button type="button" class="quick-btn wrong" onclick="scoreInput.addQuickScore('Verkeerd Antwoord -1', -1)">-1 Verkeerd</button>
                     </div>
 
                     <div class="custom-quick-actions" id="custom-quick-actions">
@@ -71,7 +78,7 @@
                         <div class="create-form">
                             <input type="text" id="custom-reason" placeholder="Reden (bijv. 3 Pointer)" maxlength="50">
                             <input type="number" id="custom-points" placeholder="Punten" min="-100" max="100">
-                            <button id="add-custom-action" class="add-custom-btn">Toevoegen</button>
+                            <button id="add-custom-action" type="button" class="add-custom-btn">Toevoegen</button>
                         </div>
                     </div>
                 </div>
@@ -87,9 +94,9 @@
 
         <footer class="footer">
             <div class="session-controls">
-                <button id="pause-session-btn" class="control-btn pause">Pauze</button>
-                <button id="next-round-btn" class="control-btn next">Volgende Ronde</button>
-                <button id="end-session-btn" class="control-btn end">Sessie Beëindigen</button>
+                <button id="pause-session-btn" type="button" class="control-btn pause">Pauze</button>
+                <button id="next-round-btn" type="button" class="control-btn next">Volgende Ronde</button>
+                <button id="end-session-btn" type="button" class="control-btn end">Sessie Beëindigen</button>
             </div>
         </footer>
     </div>

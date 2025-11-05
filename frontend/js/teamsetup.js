@@ -48,6 +48,7 @@ class TeamSetup {
     this.editTeamIcon = document.getElementById('edit-team-icon');
     this.saveTeamBtn = document.getElementById('save-team-btn');
     this.cancelEditBtn = document.getElementById('cancel-edit-btn');
+    // Note: players are rendered inline per team card (no modals)
   }
 
   setupEventListeners() {
@@ -61,6 +62,8 @@ class TeamSetup {
     // Modal events
     this.saveTeamBtn.addEventListener('click', () => this.saveTeamEdit());
     this.cancelEditBtn.addEventListener('click', () => this.hideTeamModal());
+
+  // players are handled inline on each team card
 
     // Enter key in team name input
     this.teamNameInput.addEventListener('keypress', (e) => {
@@ -122,6 +125,9 @@ class TeamSetup {
     this.teams.forEach((team) => {
       const teamCard = this.createTeamCard(team);
       this.teamsGrid.appendChild(teamCard);
+      // Load players inline for each team card
+      // Use a micro-task to allow the card to be in the DOM
+      Promise.resolve().then(() => this.loadPlayersForTeam(team.id));
     });
   }
 
@@ -131,15 +137,28 @@ class TeamSetup {
     card.dataset.teamId = team.id;
 
     card.innerHTML = `
-            <span class="team-icon">${this.getIconEmoji(team.icon)}</span>
-            <div class="team-name">${team.name}</div>
-            <div class="team-color-indicator" style="background-color: ${team.color}"></div>
-            <div class="team-score">${team._pending ? 'Toevoegen…' : team.score}</div>
-            <div class="team-actions">
-                <button class="edit-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
-                <button class="delete-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
-            </div>
-        `;
+      <div class="team-header">
+        <span class="team-icon">${this.getIconEmoji(team.icon)}</span>
+        <div class="team-meta">
+          <div class="team-name">${team.name}</div>
+          <div class="team-color-indicator" style="background-color: ${team.color}"></div>
+          <div class="team-score">${team._pending ? 'Toevoegen…' : team.score}</div>
+        </div>
+        <div class="team-actions">
+          <button class="edit-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
+          <button class="delete-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
+        </div>
+      </div>
+
+      <div class="players-section" id="players-for-${team.id}">
+        <div class="players-list" id="players-list-${team.id}">Laden…</div>
+        <div class="add-player-inline">
+          <input type="text" id="new-player-name-${team.id}" placeholder="Speler naam" maxlength="100">
+          <input type="text" id="new-player-position-${team.id}" placeholder="Positie (optioneel)" maxlength="50">
+          <button class="add-player-inline-btn" onclick="teamSetup.addPlayerInline(${team.id})">Voeg speler toe</button>
+        </div>
+      </div>
+    `;
 
     if (team._pending) {
       // Light visual hint without needing new CSS
@@ -147,6 +166,121 @@ class TeamSetup {
     }
 
     return card;
+  }
+
+  async loadPlayersForTeam(teamId) {
+    const listEl = document.getElementById(`players-list-${teamId}`);
+    if (!listEl) return;
+    try {
+      listEl.innerHTML = '<p style="color:#666">Laden…</p>';
+      const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
+      const players = resp && resp.players ? resp.players : [];
+      if (!players || players.length === 0) {
+        listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
+        return;
+      }
+      listEl.innerHTML = '';
+      players.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'player-row';
+        el.innerHTML = `
+          <span class="player-name">${this.escapeHtml(p.name)}</span>
+          <span class="player-pos">${p.position ? this.escapeHtml(p.position) : ''}</span>
+          <button class="delete-player-btn" onclick="teamSetup.deletePlayerInline(${p.id}, ${teamId})">Verwijderen</button>
+        `;
+        listEl.appendChild(el);
+      });
+    } catch (err) {
+      // If the server returns 405 (endpoint not available) treat as "no players yet"
+      const msg = err && err.message ? err.message : '';
+      const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+      if (status405) {
+        // Try global players list as a fallback so we can still show players created via /api/v1/players
+        try {
+          const fallback = await api.get(`/api/v1/players?team_id=${teamId}`);
+          const players2 = fallback && fallback.players ? fallback.players : [];
+          if (!players2 || players2.length === 0) {
+            listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
+            return;
+          }
+          listEl.innerHTML = '';
+          players2.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'player-row';
+            el.innerHTML = `
+              <span class="player-name">${this.escapeHtml(p.name)}</span>
+              <span class="player-pos">${p.position ? this.escapeHtml(p.position) : ''}</span>
+              <button class="delete-player-btn" onclick="teamSetup.deletePlayerInline(${p.id}, ${teamId})">Verwijderen</button>
+            `;
+            listEl.appendChild(el);
+          });
+        } catch (err2) {
+          // If fallback also fails, show no players message
+          api.handleError(err2, 'loading players fallback');
+          listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
+        }
+      } else {
+        api.handleError(err, 'loading players');
+        listEl.innerHTML = '<p style="color:crimson">Fout bij laden van spelers.</p>';
+      }
+    }
+  }
+
+  escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  async addPlayerInline(teamId) {
+    const nameEl = document.getElementById(`new-player-name-${teamId}`);
+    const posEl = document.getElementById(`new-player-position-${teamId}`);
+    if (!nameEl) return;
+    const name = (nameEl.value || '').trim();
+    const position = posEl ? (posEl.value || '').trim() : undefined;
+    if (!name) {
+      alert('Voer een spelersnaam in.');
+      nameEl.focus();
+      return;
+    }
+    try {
+      const payload = { name: name, team_id: Number(teamId) };
+      if (position) payload.position = position;
+      await api.postSilent(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`, payload);
+      nameEl.value = '';
+      if (posEl) posEl.value = '';
+      await this.loadPlayersForTeam(teamId);
+    } catch (err) {
+      // If the session-scoped players endpoint is not available (405), fallback to global players endpoint
+      const msg = err && err.message ? err.message : '';
+      const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+      if (status405) {
+        try {
+          const payload = { name: name, team_id: Number(teamId) };
+          if (position) payload.position = position;
+          await api.postSilent('/api/v1/players', payload);
+          nameEl.value = '';
+          if (posEl) posEl.value = '';
+          await this.loadPlayersForTeam(teamId);
+          return;
+        } catch (err2) {
+          api.handleError(err2, 'adding player fallback');
+          alert('Fout bij het toevoegen van speler.');
+          return;
+        }
+      }
+      api.handleError(err, 'adding player');
+      alert('Fout bij het toevoegen van speler.');
+    }
+  }
+
+  async deletePlayerInline(playerId, teamId) {
+    if (!confirm('Weet je zeker dat je deze speler wilt verwijderen?')) return;
+    try {
+      await api.delete(`/api/v1/players/${playerId}`);
+      await this.loadPlayersForTeam(teamId);
+    } catch (err) {
+      api.handleError(err, 'deleting player');
+      alert('Fout bij het verwijderen van speler.');
+    }
   }
 
   getIconEmoji(iconName) {

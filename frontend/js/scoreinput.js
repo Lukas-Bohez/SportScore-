@@ -8,6 +8,7 @@ class ScoreInput {
     this.timer = null;
     this.timeRemaining = 0;
     this.customQuickActions = [];
+  this.isSubmitting = false;
 
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
@@ -37,6 +38,7 @@ class ScoreInput {
     // Main sections
     this.leaderboard = document.getElementById('leaderboard');
     this.teamSelect = document.getElementById('team-select');
+    this.playerSelect = document.getElementById('player-select');
     this.pointsInput = document.getElementById('points-input');
     this.reasonInput = document.getElementById('reason-input');
     this.submitScoreBtn = document.getElementById('submit-score-btn');
@@ -66,6 +68,9 @@ class ScoreInput {
     // Score input controls
     this.subtractBtn.addEventListener('click', () => this.adjustPoints(-1));
     this.addBtn.addEventListener('click', () => this.adjustPoints(1));
+
+    // Team selection change - load players for selected team
+    this.teamSelect.addEventListener('change', () => this.onTeamChange());
 
     // Form submission
     this.submitScoreBtn.addEventListener('click', () => this.submitScore());
@@ -140,11 +145,69 @@ class ScoreInput {
     });
   }
 
+  async onTeamChange() {
+    const teamId = this.teamSelect.value;
+    if (!teamId) {
+      this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+      return;
+    }
+    await this.loadPlayersForTeam(teamId);
+  }
+
+  async loadPlayersForTeam(teamId) {
+    try {
+      this.playerSelect.innerHTML = '<option value="">Laden...</option>';
+      const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
+      const players = resp && resp.players ? resp.players : [];
+      
+      this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+      
+      if (players && players.length > 0) {
+        players.forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = p.position ? `${p.name} (${p.position})` : p.name;
+          this.playerSelect.appendChild(option);
+        });
+      }
+    } catch (err) {
+      // Try fallback to global players endpoint
+      const msg = err && err.message ? err.message : '';
+      const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+      if (status405) {
+        try {
+          const fallback = await api.get(`/api/v1/players?team_id=${teamId}`);
+          const players2 = fallback && fallback.players ? fallback.players : [];
+          
+          this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+          
+          if (players2 && players2.length > 0) {
+            players2.forEach(p => {
+              const option = document.createElement('option');
+              option.value = p.id;
+              option.textContent = p.position ? `${p.name} (${p.position})` : p.name;
+              this.playerSelect.appendChild(option);
+            });
+          }
+        } catch (err2) {
+          this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+          console.error('Failed to load players:', err2);
+        }
+      } else {
+        this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+        console.error('Failed to load players:', err);
+      }
+    }
+  }
+
   async loadLeaderboard() {
     try {
       // Load all scores for this session to calculate leaderboard
       const scoresResponse = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
       const allScores = scoresResponse.scores || [];
+
+      // Load players for all teams
+      await this.loadPlayersForAllTeams();
 
       // Calculate leaderboard from teams and scores
       const leaderboard = this.calculateLeaderboard(allScores);
@@ -154,16 +217,39 @@ class ScoreInput {
     }
   }
 
+  async loadPlayersForAllTeams() {
+    for (const team of this.teams) {
+      try {
+        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
+        team.players = resp && resp.players ? resp.players : [];
+      } catch (err) {
+        const msg = err && err.message ? err.message : '';
+        const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+        if (status405) {
+          try {
+            const fallback = await api.get(`/api/v1/players?team_id=${team.id}`);
+            team.players = fallback && fallback.players ? fallback.players : [];
+          } catch (err2) {
+            team.players = [];
+          }
+        } else {
+          team.players = [];
+        }
+      }
+    }
+  }
+
   calculateLeaderboard(allScores) {
     const teamScores = {};
 
-    // Initialize teams with 0 score
+    // Initialize teams with 0 score and include players
     this.teams.forEach((team) => {
       teamScores[team.id] = {
         id: team.id,
         name: team.name,
         icon: team.icon,
         score: 0,
+        players: team.players || [],
       };
     });
 
@@ -190,16 +276,29 @@ class ScoreInput {
 
     const leaderboardHtml = leaderboard
       .map(
-        (team, index) => `
-      <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
-        <div class="rank">#${index + 1}</div>
-        <div class="team-info">
-          <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
-          <div class="team-name">${team.name}</div>
-        </div>
-        <div class="team-score">${team.score}</div>
-      </div>
-    `
+        (team, index) => {
+          const playersHtml = team.players && team.players.length > 0
+            ? `<div class="team-players">
+                 ${team.players.map(p => `
+                   <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
+                     ${p.position ? `${p.name} (${p.position})` : p.name}
+                   </button>
+                 `).join('')}
+               </div>`
+            : '';
+          
+          return `
+            <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
+              <div class="rank">#${index + 1}</div>
+              <div class="team-info">
+                <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
+                <div class="team-name">${team.name}</div>
+              </div>
+              <div class="team-score">${team.score}</div>
+              ${playersHtml}
+            </div>
+          `;
+        }
       )
       .join('');
 
@@ -256,24 +355,56 @@ class ScoreInput {
 
   selectTeam(teamId) {
     this.teamSelect.value = teamId;
+    // Trigger the team change event to load players
+    this.onTeamChange();
     // Optional: Add visual feedback or focus the points input
     this.pointsInput.focus();
   }
 
+  selectTeamAndPlayer(teamId, playerId) {
+    this.teamSelect.value = teamId;
+    // Trigger team change first to load players
+    this.onTeamChange().then(() => {
+      // After players are loaded, select the specific player
+      setTimeout(() => {
+        this.playerSelect.value = playerId;
+        this.pointsInput.focus();
+      }, 100);
+    });
+  }
+
   async submitScore() {
+    // Prevent double submissions
+    if (this.isSubmitting) {
+      return;
+    }
+    this.isSubmitting = true;
+
+    // Disable submit and quick buttons
+    if (this.submitScoreBtn) this.submitScoreBtn.disabled = true;
+    const quickButtons = document.querySelectorAll('.quick-btn, .custom-action-btn');
+    quickButtons.forEach((b) => (b.disabled = true));
+
     const teamId = parseInt(this.teamSelect.value);
+    const playerId = this.playerSelect.value ? parseInt(this.playerSelect.value) : null;
     const points = parseInt(this.pointsInput.value);
     const reason = this.reasonInput.value.trim();
 
     if (!teamId) {
       alert('Selecteer een team.');
       this.teamSelect.focus();
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
       return;
     }
 
     if (isNaN(points)) {
       alert('Voer een geldig aantal punten in.');
       this.pointsInput.focus();
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
       return;
     }
 
@@ -286,7 +417,7 @@ class ScoreInput {
         }
       };
       api.on('session_score_update', handler);
-      const timeout = setTimeout(() => {
+      setTimeout(() => {
         api.off('session_score_update', handler);
         resolve(false);
       }, 1500);
@@ -300,8 +431,14 @@ class ScoreInput {
         reason: reason || 'Handmatig',
         round_number: this.session.current_round,
       };
+      
+      // Include player_id if a specific player was selected
+      if (playerId) {
+        scoreData.player_id = playerId;
+      }
 
-  await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+  // posting score
+      await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
 
       // Treat as success
       this.onScoreSubmitSuccess(teamId, points);
@@ -309,12 +446,15 @@ class ScoreInput {
       // If the API call failed, but we got a realtime event, treat it as success
       const acknowledged = await ackPromise;
       if (acknowledged) {
-        // No noisy console error thanks to postSilent; proceed as success
         this.onScoreSubmitSuccess(teamId, points);
       } else {
         api.handleError(error, 'submitting score');
         alert('Fout bij het toevoegen van de score.');
       }
+    } finally {
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
     }
   }
 
@@ -345,6 +485,7 @@ class ScoreInput {
 
     this.pointsInput.value = points;
     this.reasonInput.value = reason;
+    // Call submitScore (guarded by isSubmitting) - this diagnostic helps find duplicate callers
     this.submitScore();
   }
 
@@ -575,11 +716,11 @@ class ScoreInput {
     const actionsHtml = this.customQuickActions
       .map(
         (action) => `
-        <button class="custom-action-btn" onclick="scoreInput.addQuickScore('${action.reason.replace(/'/g, "\\'")}', ${action.points})">
-          ${action.reason} (${action.points >= 0 ? '+' : ''}${action.points})
-          <button class="custom-action-btn remove" onclick="event.stopPropagation(); scoreInput.removeCustomQuickAction(${action.id})" title="Verwijderen">×</button>
-        </button>
-      `
+          <button type="button" class="custom-action-btn" onclick="scoreInput.addQuickScore('${action.reason.replace(/'/g, "\\'")}', ${action.points})">
+            ${action.reason} (${action.points >= 0 ? '+' : ''}${action.points})
+            <button type="button" class="custom-action-btn remove" onclick="event.stopPropagation(); scoreInput.removeCustomQuickAction(${action.id})" title="Verwijderen">×</button>
+          </button>
+        `
       )
       .join('');
 

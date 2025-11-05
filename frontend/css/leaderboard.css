@@ -248,6 +248,23 @@ body {
     font-size: 2rem;
 }
 
+.team-players {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #cccccc;
+    font-size: 0.9rem;
+    color: #666666;
+}
+
+.team-players .players-label {
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.team-players .players-list {
+    color: #444444;
+}
+
 .team-header .team-name {
     font-size: 1.3rem;
     font-weight: 600;

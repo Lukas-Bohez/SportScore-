@@ -64,11 +64,37 @@ class LeaderboardView {
       // Load scores
       const scoresResponse = await api.getSessionScores(this.sessionId);
       this.scoresData = scoresResponse.scores || scoresResponse || [];
+      
+      // Load players for all teams
+      await this.loadPlayersForAllTeams();
     } catch (error) {
       api.handleError(error, 'loading teams and scores');
       // Continue with empty arrays if loading fails
       this.teamsData = [];
       this.scoresData = [];
+    }
+  }
+
+  async loadPlayersForAllTeams() {
+    for (const team of this.teamsData) {
+      try {
+        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
+        team.players = resp && resp.players ? resp.players : [];
+      } catch (err) {
+        // Try fallback to global players
+        const msg = err && err.message ? err.message : '';
+        const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+        if (status405) {
+          try {
+            const fallback = await api.get(`/api/v1/players?team_id=${team.id}`);
+            team.players = fallback && fallback.players ? fallback.players : [];
+          } catch (err2) {
+            team.players = [];
+          }
+        } else {
+          team.players = [];
+        }
+      }
     }
   }
 
@@ -176,6 +202,13 @@ class LeaderboardView {
 
   createTeamCard(team) {
     const teamScore = this.calculateTeamScore(team.id);
+    const players = team.players || [];
+    const playersHtml = players.length > 0
+      ? `<div class="team-players">
+           <span class="players-label">Spelers:</span>
+           <span class="players-list">${players.map(p => p.position ? `${p.name} (${p.position})` : p.name).join(', ')}</span>
+         </div>`
+      : '';
 
     return `
       <div class="team-card" style="border-color: ${team.color || '#333'}">
@@ -195,6 +228,7 @@ class LeaderboardView {
             </span>
           </div>
         </div>
+        ${playersHtml}
       </div>
     `;
   }

@@ -252,6 +252,10 @@ class BigScreenDisplay {
     try {
       const liveData = await api.getLiveLeaderboard();
       if (liveData && liveData.session) {
+        // Load players for teams in the leaderboard
+        if (liveData.leaderboard && liveData.leaderboard.length > 0) {
+          await this.loadPlayersForLeaderboard(liveData.session.id, liveData.leaderboard);
+        }
         this.updateDisplay(liveData);
       } else {
         this.showNoSessionMessage();
@@ -259,6 +263,28 @@ class BigScreenDisplay {
     } catch (error) {
       api.handleError(error, 'loading initial data');
       this.showNoSessionMessage();
+    }
+  }
+
+  async loadPlayersForLeaderboard(sessionId, leaderboard) {
+    for (const team of leaderboard) {
+      try {
+        const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
+        team.players = resp && resp.players ? resp.players : [];
+      } catch (err) {
+        const msg = err && err.message ? err.message : '';
+        const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
+        if (status405 && team.team_id) {
+          try {
+            const fallback = await api.get(`/api/v1/players?team_id=${team.team_id}`);
+            team.players = fallback && fallback.players ? fallback.players : [];
+          } catch (err2) {
+            team.players = [];
+          }
+        } else {
+          team.players = [];
+        }
+      }
     }
   }
 
@@ -418,6 +444,13 @@ class BigScreenDisplay {
     teamDiv.className = `leaderboard-team ${team.is_eliminated ? 'eliminated' : ''}`;
     teamDiv.style.borderLeftColor = team.team_color || '#333';
 
+    const players = team.players || [];
+    const playersHtml = players.length > 0
+      ? `<div class="team-players-bigscreen">
+           ${players.map(p => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
+         </div>`
+      : '';
+
     teamDiv.innerHTML = `
       <div class="team-position">${position}</div>
       <div class="team-info">
@@ -425,6 +458,7 @@ class BigScreenDisplay {
         <div class="team-icon">${this.getEmojiFromName(team.team_icon)}</div>
       </div>
       <div class="team-score">${team.total_score || 0}</div>
+      ${playersHtml}
     `;
 
     return teamDiv;

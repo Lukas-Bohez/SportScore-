@@ -535,6 +535,7 @@ body {
 .leaderboard-team {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     background: #f8f8f8;
     border: 2px solid #cccccc;
     border-left: 8px solid #333333;
@@ -567,6 +568,27 @@ body {
     border-radius: 4px;
     font-size: 0.8rem;
     font-weight: bold;
+}
+
+.team-players-bigscreen {
+    flex-basis: 100%;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #d0d0d0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.player-badge-bigscreen {
+    background: #e7f3ff;
+    color: #0066cc;
+    border: 1px solid #b3d9ff;
+    padding: 8px 14px;
+    border-radius: 18px;
+    font-size: 1rem;
+    font-weight: 500;
+    display: inline-block;
 }
 
 .team-position {

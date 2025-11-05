@@ -36,6 +36,7 @@ class TeamResponse(TeamBase):
 class PlayerBase(BaseModel):
     name: str
     team_id: int
+    position: Optional[str] = None
 
 class PlayerCreate(PlayerBase):
     pass
@@ -43,6 +44,7 @@ class PlayerCreate(PlayerBase):
 class PlayerUpdate(BaseModel):
     name: Optional[str] = None
     team_id: Optional[int] = None
+    position: Optional[str] = None
 
 class PlayerResponse(PlayerBase):
     id: int

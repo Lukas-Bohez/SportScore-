@@ -96,9 +96,9 @@ class TeamRepository:
 class PlayerRepository:
 
     @staticmethod
-    def create_player(name: str, team_id: int) -> int:
-        sql = "INSERT INTO players (name, team_id) VALUES (%s, %s)"
-        params = [name, team_id]
+    def create_player(name: str, team_id: int, position: Optional[str] = None) -> int:
+        sql = "INSERT INTO players (name, team_id, position) VALUES (%s, %s, %s)"
+        params = [name, team_id, position]
         return Database.execute_sql(sql, params)
 
     @staticmethod
@@ -119,7 +119,8 @@ class PlayerRepository:
         return Database.get_rows(sql, params)
 
     @staticmethod
-    def update_player(player_id: int, name: Optional[str] = None, team_id: Optional[int] = None) -> bool:
+    def update_player(player_id: int, name: Optional[str] = None, team_id: Optional[int] = None,
+                      position: Optional[str] = None) -> bool:
         sql = "UPDATE players SET "
         params = []
         updates = []
@@ -129,6 +130,10 @@ class PlayerRepository:
         if team_id is not None:
             updates.append("team_id = %s")
             params.append(team_id)
+        if position is not None:
+            updates.append("position = %s")
+            params.append(position)
+
         if not updates:
             return False
         sql += ", ".join(updates) + " WHERE id = %s"
