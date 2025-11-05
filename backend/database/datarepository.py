@@ -1,6 +1,7 @@
 from .database import Database
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+import json
 
 class SportRepository:
 
@@ -45,52 +46,52 @@ class SportRepository:
         return Database.execute_sql(sql, params) is not None
 
 class TeamRepository:
+    """
+    LEGACY: Deze repository wordt niet meer gebruikt in de nieuwe structuur.
+    Teams zijn nu direct gekoppeld aan games, niet aan sports.
+    Gebruik SessionTeamRepository voor team beheer.
+    """
 
     @staticmethod
     def create_team(name: str, sport_id: int) -> int:
-        sql = "INSERT INTO teams (name, sport_id) VALUES (%s, %s)"
-        params = [name, sport_id]
-        return Database.execute_sql(sql, params)
+        # Legacy functie - niet gebruiken in nieuwe code
+        # Teams moeten nu via een game worden aangemaakt
+        return None
 
     @staticmethod
     def get_all_teams() -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM teams ORDER BY id ASC"
+        # Geef alle teams terug (uit alle games)
+        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+                 FROM teams t ORDER BY t.id ASC"""
         return Database.get_rows(sql)
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM teams WHERE id = %s"
-        params = [team_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+                 FROM teams t WHERE t.id = %s"""
+        return Database.get_one_row(sql, [team_id])
 
     @staticmethod
     def get_teams_by_sport(sport_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM teams WHERE sport_id = %s ORDER BY id ASC"
-        params = [sport_id]
-        return Database.get_rows(sql, params)
+        # Geef teams voor alle games van deze sport
+        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+                 FROM teams t
+                 JOIN games g ON t.game_id = g.id
+                 WHERE g.sport_id = %s ORDER BY t.id ASC"""
+        return Database.get_rows(sql, [sport_id])
 
     @staticmethod
     def update_team(team_id: int, name: Optional[str] = None, sport_id: Optional[int] = None) -> bool:
-        sql = "UPDATE teams SET "
-        params = []
-        updates = []
-        if name is not None:
-            updates.append("name = %s")
-            params.append(name)
-        if sport_id is not None:
-            updates.append("sport_id = %s")
-            params.append(sport_id)
-        if not updates:
+        # In nieuwe structuur kunnen we alleen naam updaten
+        if name is None:
             return False
-        sql += ", ".join(updates) + " WHERE id = %s"
-        params.append(team_id)
-        return Database.execute_sql(sql, params) is not None
+        sql = "UPDATE teams SET name = %s WHERE id = %s"
+        return Database.execute_sql(sql, [name, team_id]) is not None
 
     @staticmethod
     def delete_team(team_id: int) -> bool:
         sql = "DELETE FROM teams WHERE id = %s"
-        params = [team_id]
-        return Database.execute_sql(sql, params) is not None
+        return Database.execute_sql(sql, [team_id]) is not None
 
 class PlayerRepository:
 
@@ -141,88 +142,155 @@ class PlayerRepository:
         return Database.execute_sql(sql, params) is not None
 
 class ScoreTypeRepository:
+    """
+    LEGACY: Score types tabel bestaat niet meer in nieuwe structuur.
+    Score types zijn nu strings in de scores tabel (score_type kolom).
+    Deze repository blijft beschikbaar voor backwards compatibility.
+    """
+
+    # Virtuele score types voor backwards compatibility
+    _VIRTUAL_SCORE_TYPES = [
+        {"id": 1, "name": "point", "description": "Algemene punten"},
+        {"id": 2, "name": "goal", "description": "Doelpunt"},
+        {"id": 3, "name": "bonus", "description": "Bonus punten"},
+        {"id": 4, "name": "penalty", "description": "Strafpunten"},
+    ]
 
     @staticmethod
     def create_score_type(name: str, description: Optional[str] = None) -> int:
-        sql = "INSERT INTO score_types (name, description) VALUES (%s, %s)"
-        params = [name, description]
-        return Database.execute_sql(sql, params)
+        # Returneer een dummy ID - score types worden niet meer opgeslagen
+        return len(ScoreTypeRepository._VIRTUAL_SCORE_TYPES) + 1
 
     @staticmethod
     def get_all_score_types() -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM score_types ORDER BY id ASC"
-        return Database.get_rows(sql)
+        # Returneer virtuele score types
+        return ScoreTypeRepository._VIRTUAL_SCORE_TYPES.copy()
 
     @staticmethod
     def get_score_type_by_id(score_type_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM score_types WHERE id = %s"
-        params = [score_type_id]
-        return Database.get_one_row(sql, params)
+        for st in ScoreTypeRepository._VIRTUAL_SCORE_TYPES:
+            if st["id"] == score_type_id:
+                return st.copy()
+        return None
 
     @staticmethod
     def update_score_type(score_type_id: int, name: Optional[str] = None, description: Optional[str] = None) -> bool:
-        sql = "UPDATE score_types SET "
-        params = []
-        updates = []
-        if name is not None:
-            updates.append("name = %s")
-            params.append(name)
-        if description is not None:
-            updates.append("description = %s")
-            params.append(description)
-        if not updates:
-            return False
-        sql += ", ".join(updates) + " WHERE id = %s"
-        params.append(score_type_id)
-        return Database.execute_sql(sql, params) is not None
+        # Doe alsof update succesvol is
+        return True
 
     @staticmethod
     def delete_score_type(score_type_id: int) -> bool:
-        sql = "DELETE FROM score_types WHERE id = %s"
-        params = [score_type_id]
-        return Database.execute_sql(sql, params) is not None
+        # Doe alsof delete succesvol is
+        return True
 
 class GameRepository:
+    """
+    LEGACY: Oude game API (voor 1-op-1 wedstrijden).
+    In nieuwe structuur worden alle games opgeslagen in de games tabel,
+    maar zonder team1_id/team2_id - teams worden apart opgeslagen.
+    Deze repository blijft werken voor backwards compatibility.
+    """
 
     @staticmethod
     def create_game(sport_id: int, team1_id: int, team2_id: int, start_time: datetime, status: str = "scheduled") -> int:
-        sql = "INSERT INTO games (sport_id, team1_id, team2_id, start_time, status) VALUES (%s, %s, %s, %s, %s)"
-        params = [sport_id, team1_id, team2_id, start_time, status]
-        return Database.execute_sql(sql, params)
+        # Maak een game aan en koppel de twee teams
+        # Status mapping: scheduled -> setup, in_progress -> active, completed -> completed
+        status_map = {
+            "scheduled": "setup",
+            "in_progress": "active",
+            "ongoing": "active",
+            "completed": "completed",
+            "cancelled": "cancelled"
+        }
+        new_status = status_map.get(status, "setup")
+        
+        # Maak game aan
+        sql = """INSERT INTO games (name, sport_id, game_type, status, start_time)
+                 VALUES (%s, %s, %s, %s, %s)"""
+        # Genereer naam op basis van team namen
+        game_name = f"Match {datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        game_id = Database.execute_sql(sql, [game_name, sport_id, 'match', new_status, start_time])
+        
+        # Opmerking: team1_id en team2_id worden genegeerd omdat teams nu
+        # via de teams tabel worden gekoppeld aan games
+        return game_id
 
     @staticmethod
     def get_all_games() -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM games ORDER BY start_time DESC"
-        return Database.get_rows(sql)
+        # Haal alle games op, probeer team1 en team2 te simuleren
+        sql = """SELECT g.id, g.sport_id, g.start_time, g.end_time,
+                        CASE 
+                            WHEN g.status = 'setup' THEN 'scheduled'
+                            WHEN g.status = 'active' THEN 'in_progress'
+                            WHEN g.status = 'paused' THEN 'in_progress'
+                            ELSE g.status
+                        END as status,
+                        g.created_at, g.updated_at
+                 FROM games g 
+                 WHERE g.game_type = 'match'
+                 ORDER BY g.start_time DESC"""
+        games = Database.get_rows(sql)
+        
+        # Voeg dummy team IDs toe
+        for game in games or []:
+            teams = Database.get_rows("SELECT id FROM teams WHERE game_id = %s LIMIT 2", [game['id']])
+            game['team1_id'] = teams[0]['id'] if len(teams) > 0 else None
+            game['team2_id'] = teams[1]['id'] if len(teams) > 1 else None
+        
+        return games
 
     @staticmethod
     def get_game_by_id(game_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM games WHERE id = %s"
-        params = [game_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT g.id, g.sport_id, g.start_time, g.end_time,
+                        CASE 
+                            WHEN g.status = 'setup' THEN 'scheduled'
+                            WHEN g.status = 'active' THEN 'in_progress'
+                            WHEN g.status = 'paused' THEN 'in_progress'
+                            ELSE g.status
+                        END as status,
+                        g.created_at, g.updated_at
+                 FROM games g WHERE g.id = %s"""
+        game = Database.get_one_row(sql, [game_id])
+        
+        if game:
+            teams = Database.get_rows("SELECT id FROM teams WHERE game_id = %s LIMIT 2", [game_id])
+            game['team1_id'] = teams[0]['id'] if len(teams) > 0 else None
+            game['team2_id'] = teams[1]['id'] if len(teams) > 1 else None
+        
+        return game
 
     @staticmethod
     def get_games_by_sport(sport_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM games WHERE sport_id = %s ORDER BY start_time DESC"
-        params = [sport_id]
-        return Database.get_rows(sql, params)
+        sql = """SELECT g.id, g.sport_id, g.start_time, g.end_time,
+                        CASE 
+                            WHEN g.status = 'setup' THEN 'scheduled'
+                            WHEN g.status = 'active' THEN 'in_progress'
+                            WHEN g.status = 'paused' THEN 'in_progress'
+                            ELSE g.status
+                        END as status,
+                        g.created_at, g.updated_at
+                 FROM games g 
+                 WHERE g.sport_id = %s AND g.game_type = 'match'
+                 ORDER BY g.start_time DESC"""
+        games = Database.get_rows(sql, [sport_id])
+        
+        for game in games or []:
+            teams = Database.get_rows("SELECT id FROM teams WHERE game_id = %s LIMIT 2", [game['id']])
+            game['team1_id'] = teams[0]['id'] if len(teams) > 0 else None
+            game['team2_id'] = teams[1]['id'] if len(teams) > 1 else None
+        
+        return games
 
     @staticmethod
     def update_game(game_id: int, sport_id: Optional[int] = None, team1_id: Optional[int] = None,
                    team2_id: Optional[int] = None, start_time: Optional[datetime] = None,
                    end_time: Optional[datetime] = None, status: Optional[str] = None) -> bool:
-        sql = "UPDATE games SET "
-        params = []
         updates = []
+        params = []
+        
         if sport_id is not None:
             updates.append("sport_id = %s")
             params.append(sport_id)
-        if team1_id is not None:
-            updates.append("team1_id = %s")
-            params.append(team1_id)
-        if team2_id is not None:
-            updates.append("team2_id = %s")
-            params.append(team2_id)
         if start_time is not None:
             updates.append("start_time = %s")
             params.append(start_time)
@@ -230,64 +298,118 @@ class GameRepository:
             updates.append("end_time = %s")
             params.append(end_time)
         if status is not None:
+            # Map old status to new status
+            status_map = {
+                "scheduled": "setup",
+                "in_progress": "active",
+                "ongoing": "active",
+                "completed": "completed",
+                "cancelled": "cancelled"
+            }
+            new_status = status_map.get(status, status)
             updates.append("status = %s")
-            params.append(status)
+            params.append(new_status)
+        
         if not updates:
             return False
-        sql += ", ".join(updates) + " WHERE id = %s"
+            
+        sql = f"UPDATE games SET {', '.join(updates)} WHERE id = %s"
         params.append(game_id)
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
     def delete_game(game_id: int) -> bool:
         sql = "DELETE FROM games WHERE id = %s"
-        params = [game_id]
-        return Database.execute_sql(sql, params) is not None
+        return Database.execute_sql(sql, [game_id]) is not None
 
 class ScoreRepository:
+    """
+    Score repository aangepast voor nieuwe structuur.
+    score_type_id is nu score_type (string), value is nu points.
+    """
 
     @staticmethod
     def create_score(game_id: int, team_id: int, score_type_id: int, value: int, player_id: Optional[int] = None) -> int:
-        sql = "INSERT INTO scores (game_id, team_id, score_type_id, value, player_id) VALUES (%s, %s, %s, %s, %s)"
-        params = [game_id, team_id, score_type_id, value, player_id]
-        return Database.execute_sql(sql, params)
+        # Map score_type_id naar score_type string
+        score_type_map = {
+            1: "point",
+            2: "goal",
+            3: "bonus",
+            4: "penalty"
+        }
+        score_type = score_type_map.get(score_type_id, "point")
+        
+        sql = """INSERT INTO scores (game_id, team_id, player_id, points, score_type)
+                 VALUES (%s, %s, %s, %s, %s)"""
+        return Database.execute_sql(sql, [game_id, team_id, player_id, value, score_type])
 
     @staticmethod
     def get_all_scores() -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM scores ORDER BY timestamp DESC"
+        sql = """SELECT s.id, s.game_id, s.team_id, s.player_id, s.points as value,
+                        CASE s.score_type
+                            WHEN 'point' THEN 1
+                            WHEN 'goal' THEN 2
+                            WHEN 'bonus' THEN 3
+                            WHEN 'penalty' THEN 4
+                            ELSE 1
+                        END as score_type_id,
+                        s.timestamp
+                 FROM scores s ORDER BY s.timestamp DESC"""
         return Database.get_rows(sql)
 
     @staticmethod
     def get_score_by_id(score_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM scores WHERE id = %s"
-        params = [score_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT s.id, s.game_id, s.team_id, s.player_id, s.points as value,
+                        CASE s.score_type
+                            WHEN 'point' THEN 1
+                            WHEN 'goal' THEN 2
+                            WHEN 'bonus' THEN 3
+                            WHEN 'penalty' THEN 4
+                            ELSE 1
+                        END as score_type_id,
+                        s.timestamp
+                 FROM scores s WHERE s.id = %s"""
+        return Database.get_one_row(sql, [score_id])
 
     @staticmethod
     def get_scores_by_game(game_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM scores WHERE game_id = %s ORDER BY timestamp ASC"
-        params = [game_id]
-        return Database.get_rows(sql, params)
+        sql = """SELECT s.id, s.game_id, s.team_id, s.player_id, s.points as value,
+                        CASE s.score_type
+                            WHEN 'point' THEN 1
+                            WHEN 'goal' THEN 2
+                            WHEN 'bonus' THEN 3
+                            WHEN 'penalty' THEN 4
+                            ELSE 1
+                        END as score_type_id,
+                        s.timestamp
+                 FROM scores s WHERE s.game_id = %s ORDER BY s.timestamp ASC"""
+        return Database.get_rows(sql, [game_id])
 
     @staticmethod
     def get_scores_by_team(team_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM scores WHERE team_id = %s ORDER BY timestamp DESC"
-        params = [team_id]
-        return Database.get_rows(sql, params)
+        sql = """SELECT s.id, s.game_id, s.team_id, s.player_id, s.points as value,
+                        CASE s.score_type
+                            WHEN 'point' THEN 1
+                            WHEN 'goal' THEN 2
+                            WHEN 'bonus' THEN 3
+                            WHEN 'penalty' THEN 4
+                            ELSE 1
+                        END as score_type_id,
+                        s.timestamp
+                 FROM scores s WHERE s.team_id = %s ORDER BY s.timestamp DESC"""
+        return Database.get_rows(sql, [team_id])
 
     @staticmethod
     def update_score(score_id: int, value: Optional[int] = None) -> bool:
         if value is None:
             return False
-        sql = "UPDATE scores SET value = %s WHERE id = %s"
-        params = [value, score_id]
-        return Database.execute_sql(sql, params) is not None
+        sql = "UPDATE scores SET points = %s WHERE id = %s"
+        return Database.execute_sql(sql, [value, score_id]) is not None
 
     @staticmethod
     def delete_score(score_id: int) -> bool:
         sql = "DELETE FROM scores WHERE id = %s"
-        params = [score_id]
-        return Database.execute_sql(sql, params) is not None
+        return Database.execute_sql(sql, [score_id]) is not None
 
     @staticmethod
     def get_game_score_summary(game_id: int) -> Dict[str, Any]:
@@ -295,53 +417,103 @@ class ScoreRepository:
         SELECT
             t.id as team_id,
             t.name as team_name,
-            st.name as score_type,
-            SUM(s.value) as total_score
+            s.score_type as score_type,
+            SUM(s.points) as total_score
         FROM scores s
         JOIN teams t ON s.team_id = t.id
-        JOIN score_types st ON s.score_type_id = st.id
         WHERE s.game_id = %s
-        GROUP BY t.id, t.name, st.name
-        ORDER BY t.id, st.name
+        GROUP BY t.id, t.name, s.score_type
+        ORDER BY t.id, s.score_type
         """
-        params = [game_id]
-        results = Database.get_rows(sql, params)
+        results = Database.get_rows(sql, [game_id])
         return results if results else []
 
 class SessionRepository:
+    """
+    Session repository - nu geïmplementeerd met de games tabel.
+    Sessions zijn gewoon games met bepaalde game_types.
+    """
 
     @staticmethod
     def create_session(name: str, game_type: str = "custom", max_teams: int = 10,
                       total_rounds: int = 1, time_limit: Optional[int] = None) -> int:
-        sql = """INSERT INTO sessions (name, game_type, max_teams, total_rounds, time_limit)
-                 VALUES (%s, %s, %s, %s, %s)"""
-        params = [name, game_type, max_teams, total_rounds, time_limit]
-        return Database.execute_sql(sql, params)
+        # Sessies worden opgeslagen als games, sport_id = Teambuilding (ID 4)
+        # Probeer teambuilding sport te vinden, anders gebruik custom (ID 5)
+        sport_result = Database.get_one_row("SELECT id FROM sports WHERE name = 'Teambuilding' LIMIT 1")
+        if not sport_result:
+            sport_result = Database.get_one_row("SELECT id FROM sports WHERE name = 'Custom' LIMIT 1")
+        sport_id = sport_result['id'] if sport_result else 4
+        
+        # Sla max_teams op in settings JSON
+        settings = json.dumps({"max_teams": max_teams})
+        
+        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings])
 
     @staticmethod
     def get_all_sessions() -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM sessions ORDER BY created_at DESC"
-        return Database.get_rows(sql)
+        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
+                        g.created_at, g.updated_at,
+                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                 FROM games g
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 ORDER BY g.created_at DESC"""
+        sessions = Database.get_rows(sql)
+        
+        # Converteer JSON extract naar int
+        for session in sessions or []:
+            if 'max_teams' in session and isinstance(session['max_teams'], str):
+                try:
+                    session['max_teams'] = int(session['max_teams'])
+                except:
+                    session['max_teams'] = 10
+        
+        return sessions
 
     @staticmethod
     def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM sessions WHERE id = %s"
-        params = [session_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
+                        g.created_at, g.updated_at,
+                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                 FROM games g WHERE g.id = %s"""
+        session = Database.get_one_row(sql, [session_id])
+        
+        if session and 'max_teams' in session and isinstance(session['max_teams'], str):
+            try:
+                session['max_teams'] = int(session['max_teams'])
+            except:
+                session['max_teams'] = 10
+        
+        return session
 
     @staticmethod
     def get_active_session() -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM sessions WHERE status IN ('setup', 'active', 'paused') ORDER BY updated_at DESC LIMIT 1"
-        return Database.get_one_row(sql)
+        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
+                        g.created_at, g.updated_at,
+                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                 FROM games g
+                 WHERE g.status IN ('setup', 'active', 'paused')
+                 AND g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 ORDER BY g.updated_at DESC LIMIT 1"""
+        session = Database.get_one_row(sql)
+        
+        if session and 'max_teams' in session and isinstance(session['max_teams'], str):
+            try:
+                session['max_teams'] = int(session['max_teams'])
+            except:
+                session['max_teams'] = 10
+        
+        return session
 
     @staticmethod
     def update_session(session_id: int, name: Optional[str] = None, game_type: Optional[str] = None,
                       status: Optional[str] = None, max_teams: Optional[int] = None,
                       current_round: Optional[int] = None, total_rounds: Optional[int] = None,
                       time_limit: Optional[int] = None) -> bool:
-        sql = "UPDATE sessions SET "
-        params = []
         updates = []
+        params = []
+        
         if name is not None:
             updates.append("name = %s")
             params.append(name)
@@ -351,9 +523,6 @@ class SessionRepository:
         if status is not None:
             updates.append("status = %s")
             params.append(status)
-        if max_teams is not None:
-            updates.append("max_teams = %s")
-            params.append(max_teams)
         if current_round is not None:
             updates.append("current_round = %s")
             params.append(current_round)
@@ -363,47 +532,75 @@ class SessionRepository:
         if time_limit is not None:
             updates.append("time_limit = %s")
             params.append(time_limit)
+        
+        # max_teams gaat in settings JSON
+        if max_teams is not None:
+            # Haal huidige settings op
+            current = Database.get_one_row("SELECT settings FROM games WHERE id = %s", [session_id])
+            current_settings = {}
+            if current and current.get('settings'):
+                try:
+                    current_settings = json.loads(current['settings'])
+                except:
+                    pass
+            current_settings['max_teams'] = max_teams
+            updates.append("settings = %s")
+            params.append(json.dumps(current_settings))
+        
         if not updates:
             return False
-        sql += ", ".join(updates) + " WHERE id = %s"
+            
+        sql = f"UPDATE games SET {', '.join(updates)} WHERE id = %s"
         params.append(session_id)
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
     def delete_session(session_id: int) -> bool:
-        sql = "DELETE FROM sessions WHERE id = %s"
-        params = [session_id]
-        return Database.execute_sql(sql, params) is not None
+        sql = "DELETE FROM games WHERE id = %s"
+        return Database.execute_sql(sql, [session_id]) is not None
 
 class SessionTeamRepository:
+    """
+    Session team repository - nu geïmplementeerd met de teams tabel.
+    """
 
     @staticmethod
     def create_team(session_id: int, name: str, color: str = "#333333", icon: str = "team") -> int:
-        sql = """INSERT INTO session_teams (session_id, name, color, icon)
+        sql = """INSERT INTO teams (game_id, name, color, icon)
                  VALUES (%s, %s, %s, %s)"""
-        params = [session_id, name, color, icon]
-        return Database.execute_sql(sql, params)
+        return Database.execute_sql(sql, [session_id, name, color, icon])
 
     @staticmethod
     def get_teams_by_session(session_id: int) -> List[Dict[str, Any]]:
-        sql = """SELECT * FROM session_teams WHERE session_id = %s
-                 ORDER BY score DESC, name ASC"""
-        params = [session_id]
-        return Database.get_rows(sql, params)
+        # Bereken score per team vanuit scores tabel
+        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
+                        t.created_at, t.updated_at,
+                        COALESCE(SUM(s.points), 0) as score
+                 FROM teams t
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
+                 WHERE t.game_id = %s
+                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, t.created_at, t.updated_at
+                 ORDER BY score DESC, t.name ASC"""
+        return Database.get_rows(sql, [session_id])
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM session_teams WHERE id = %s"
-        params = [team_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
+                        t.created_at, t.updated_at,
+                        COALESCE(SUM(s.points), 0) as score
+                 FROM teams t
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
+                 WHERE t.id = %s
+                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, t.created_at, t.updated_at"""
+        return Database.get_one_row(sql, [team_id])
 
     @staticmethod
     def update_team(team_id: int, name: Optional[str] = None, color: Optional[str] = None,
                    icon: Optional[str] = None, score: Optional[int] = None,
                    is_eliminated: Optional[bool] = None) -> bool:
-        sql = "UPDATE session_teams SET "
-        params = []
         updates = []
+        params = []
+        
         if name is not None:
             updates.append("name = %s")
             params.append(name)
@@ -413,95 +610,112 @@ class SessionTeamRepository:
         if icon is not None:
             updates.append("icon = %s")
             params.append(icon)
-        if score is not None:
-            updates.append("score = %s")
-            params.append(score)
         if is_eliminated is not None:
             updates.append("is_eliminated = %s")
             params.append(is_eliminated)
+        
+        # Score wordt niet meer direct opgeslagen, maar berekend uit scores tabel
+        # Als er toch een score update wordt gevraagd, negeren we die
+        
         if not updates:
             return False
-        sql += ", ".join(updates) + " WHERE id = %s"
+            
+        sql = f"UPDATE teams SET {', '.join(updates)} WHERE id = %s"
         params.append(team_id)
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
     def update_team_score(team_id: int, points: int) -> bool:
-        sql = "UPDATE session_teams SET score = score + %s WHERE id = %s"
-        params = [points, team_id]
-        return Database.execute_sql(sql, params) is not None
+        # Score wordt niet meer direct bijgewerkt
+        # In plaats daarvan moet een score entry worden aangemaakt
+        # Dit is backwards compatibility - maak een score entry aan
+        team = Database.get_one_row("SELECT game_id FROM teams WHERE id = %s", [team_id])
+        if not team:
+            return False
+        
+        sql = """INSERT INTO scores (game_id, team_id, points, score_type, reason)
+                 VALUES (%s, %s, %s, %s, %s)"""
+        result = Database.execute_sql(sql, [team['game_id'], team_id, points, 'point', 'Score update'])
+        return result is not None
 
     @staticmethod
     def delete_team(team_id: int) -> bool:
-        sql = "DELETE FROM session_teams WHERE id = %s"
-        params = [team_id]
-        return Database.execute_sql(sql, params) is not None
+        sql = "DELETE FROM teams WHERE id = %s"
+        return Database.execute_sql(sql, [team_id]) is not None
 
     @staticmethod
     def get_all_teams_with_session_info() -> List[Dict[str, Any]]:
-        sql = """SELECT st.*, s.name as session_name, s.game_type, s.status as session_status
-                 FROM session_teams st
-                 JOIN sessions s ON st.session_id = s.id
-                 ORDER BY s.created_at DESC, st.score DESC, st.name ASC"""
+        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
+                        t.created_at, t.updated_at,
+                        g.name as session_name, g.game_type, g.status as session_status,
+                        COALESCE(SUM(s.points), 0) as score
+                 FROM teams t
+                 JOIN games g ON t.game_id = g.id
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, 
+                          t.created_at, t.updated_at, g.name, g.game_type, g.status
+                 ORDER BY g.created_at DESC, score DESC, t.name ASC"""
         return Database.get_rows(sql)
 
 class SessionScoreRepository:
+    """
+    Session score repository - nu geïmplementeerd met de scores tabel.
+    """
 
     @staticmethod
     def create_score(session_id: int, team_id: int, points: int, reason: Optional[str] = None,
                     round_number: int = 1) -> int:
-        sql = """INSERT INTO session_scores (session_id, team_id, points, reason, round_number)
-                 VALUES (%s, %s, %s, %s, %s)"""
-        params = [session_id, team_id, points, reason, round_number]
-        return Database.execute_sql(sql, params)
+        sql = """INSERT INTO scores (game_id, team_id, points, score_type, reason, round_number)
+                 VALUES (%s, %s, %s, %s, %s, %s)"""
+        return Database.execute_sql(sql, [session_id, team_id, points, 'point', reason, round_number])
 
     @staticmethod
     def get_scores_by_session(session_id: int) -> List[Dict[str, Any]]:
-        sql = """SELECT ss.*, st.name as team_name, st.color as team_color
-                 FROM session_scores ss
-                 JOIN session_teams st ON ss.team_id = st.id
-                 WHERE ss.session_id = %s
-                 ORDER BY ss.timestamp DESC"""
-        params = [session_id]
-        return Database.get_rows(sql, params)
+        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.points, s.reason, s.round_number, s.timestamp,
+                        t.name as team_name, t.color as team_color
+                 FROM scores s
+                 JOIN teams t ON s.team_id = t.id
+                 WHERE s.game_id = %s
+                 ORDER BY s.timestamp DESC"""
+        return Database.get_rows(sql, [session_id])
 
     @staticmethod
     def get_scores_by_team(team_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM session_scores WHERE team_id = %s ORDER BY timestamp DESC"
-        params = [team_id]
-        return Database.get_rows(sql, params)
+        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.points, s.reason, s.round_number, s.timestamp
+                 FROM scores s WHERE s.team_id = %s ORDER BY s.timestamp DESC"""
+        return Database.get_rows(sql, [team_id])
 
     @staticmethod
     def get_session_score_summary(session_id: int) -> List[Dict[str, Any]]:
         sql = """
         SELECT
-            st.id as team_id,
-            st.name as team_name,
-            st.color as team_color,
-            st.icon as team_icon,
-            SUM(ss.points) as total_score,
-            COUNT(ss.id) as score_count
-        FROM session_teams st
-        LEFT JOIN session_scores ss ON st.id = ss.team_id AND st.session_id = ss.session_id
-        WHERE st.session_id = %s AND st.is_eliminated = FALSE
-        GROUP BY st.id, st.name, st.color, st.icon
-        ORDER BY total_score DESC, st.name ASC
+            t.id as team_id,
+            t.name as team_name,
+            t.color as team_color,
+            t.icon as team_icon,
+            COALESCE(SUM(s.points), 0) as total_score,
+            COUNT(s.id) as score_count
+        FROM teams t
+        LEFT JOIN scores s ON t.id = s.team_id AND t.game_id = s.game_id
+        WHERE t.game_id = %s AND t.is_eliminated = FALSE
+        GROUP BY t.id, t.name, t.color, t.icon
+        ORDER BY total_score DESC, t.name ASC
         """
-        params = [session_id]
-        return Database.get_rows(sql, params)
+        return Database.get_rows(sql, [session_id])
 
     @staticmethod
     def get_score_by_id(score_id: int) -> Optional[Dict[str, Any]]:
-        sql = "SELECT * FROM session_scores WHERE id = %s"
-        params = [score_id]
-        return Database.get_one_row(sql, params)
+        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.points, s.reason, s.round_number, s.timestamp
+                 FROM scores s WHERE s.id = %s"""
+        return Database.get_one_row(sql, [score_id])
 
     @staticmethod
     def update_score(score_id: int, points: Optional[int] = None, reason: Optional[str] = None,
                     round_number: Optional[int] = None) -> bool:
-        sql = "UPDATE session_scores SET "
-        params = []
         updates = []
+        params = []
+        
         if points is not None:
             updates.append("points = %s")
             params.append(points)
@@ -511,36 +725,38 @@ class SessionScoreRepository:
         if round_number is not None:
             updates.append("round_number = %s")
             params.append(round_number)
+            
         if not updates:
             return False
-        sql += ", ".join(updates) + " WHERE id = %s"
+            
+        sql = f"UPDATE scores SET {', '.join(updates)} WHERE id = %s"
         params.append(score_id)
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
     def delete_score(score_id: int) -> bool:
-        sql = "DELETE FROM session_scores WHERE id = %s"
-        params = [score_id]
-        return Database.execute_sql(sql, params) is not None
+        sql = "DELETE FROM scores WHERE id = %s"
+        return Database.execute_sql(sql, [score_id]) is not None
 
     @staticmethod
     def get_all_scores_with_info() -> List[Dict[str, Any]]:
-        sql = """SELECT ss.*, st.name as team_name, s.name as session_name,
-                        s.game_type, st.color as team_color
-                 FROM session_scores ss
-                 JOIN session_teams st ON ss.team_id = st.id
-                 JOIN sessions s ON ss.session_id = s.id
-                 ORDER BY ss.timestamp DESC"""
+        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.points, s.reason, s.round_number, s.timestamp,
+                        t.name as team_name, t.color as team_color,
+                        g.name as session_name, g.game_type
+                 FROM scores s
+                 JOIN teams t ON s.team_id = t.id
+                 JOIN games g ON s.game_id = g.id
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 ORDER BY s.timestamp DESC"""
         return Database.get_rows(sql)
 
     @staticmethod
     def get_team_total_score(session_id: int, team_id: int) -> int:
-        """Get the total score for a specific team in a session by summing all session_scores"""
+        """Get the total score for a specific team in a session by summing all scores"""
         sql = """
-        SELECT COALESCE(SUM(ss.points), 0) as total_score
-        FROM session_scores ss
-        WHERE ss.session_id = %s AND ss.team_id = %s
+        SELECT COALESCE(SUM(s.points), 0) as total_score
+        FROM scores s
+        WHERE s.game_id = %s AND s.team_id = %s
         """
-        params = [session_id, team_id]
-        result = Database.get_one_row(sql, params)
+        result = Database.get_one_row(sql, [session_id, team_id])
         return result['total_score'] if result else 0
