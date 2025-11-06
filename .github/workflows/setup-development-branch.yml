@@ -1,0 +1,48 @@
+name: Setup Development Branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-development-branch:
+    runs-on: ubuntu-latest
+    # Only run if development branch doesn't exist
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if development branch exists
+        id: check_branch
+        run: |
+          if git ls-remote --heads origin | grep -q "refs/heads/development"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Development branch already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Development branch does not exist"
+          fi
+      
+      - name: Create development branch
+        if: steps.check_branch.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create development branch from main
+          git checkout -b development
+          git push origin development
+          
+          echo "✓ Development branch created successfully!"
+      
+      - name: Branch already exists
+        if: steps.check_branch.outputs.exists == 'true'
+        run: |
+          echo "Development branch already exists, no action needed."

@@ -6,13 +6,25 @@ This repository uses a two-branch strategy:
 - `main` - Production/release branch
 - `development` - Active development branch
 
-### Automatic Setup (Recommended)
+### Automatic Setup via GitHub Actions (Recommended)
+
+The repository includes a GitHub Actions workflow that automatically creates the `development` branch:
+
+1. **Automatic trigger**: The workflow runs automatically when changes are pushed to the `main` branch
+2. **Manual trigger**: You can also manually trigger the workflow from the Actions tab in GitHub:
+   - Go to the "Actions" tab in your repository
+   - Select "Setup Development Branch" workflow
+   - Click "Run workflow"
+
+### Automatic Setup via Script
 
 Run the setup script to automatically create the development branch:
 
 ```bash
 bash setup_branches.sh
 ```
+
+**Note**: You need to have push access to the repository for this to work.
 
 ### Manual Setup
 

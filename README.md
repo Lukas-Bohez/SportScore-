@@ -10,13 +10,18 @@ This repository is organized for production-ready development:
 
 ## Initial Setup (For Repository Owner)
 
-If the `development` branch hasn't been created yet, run the setup script:
+The `development` branch will be automatically created when changes are pushed to the `main` branch (via GitHub Actions workflow).
 
-```bash
-bash setup_branches.sh
-```
+If you need to create it manually, you can either:
 
-Or follow the manual instructions in [SETUP.md](SETUP.md).
+1. **Run the setup script:**
+   ```bash
+   bash setup_branches.sh
+   ```
+
+2. **Manually trigger the GitHub Actions workflow** in the repository Actions tab (workflow: "Setup Development Branch")
+
+3. **Follow manual instructions** in [SETUP.md](SETUP.md)
 
 ## Getting Started (For Developers)
 
