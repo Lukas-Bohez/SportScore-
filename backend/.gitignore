@@ -163,6 +163,7 @@ config.json
 secrets.json
 credentials.json
 database/config.py
+launch_windows.bat
 
 # Virtual environments
 venv/
