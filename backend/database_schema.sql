@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS games (
     sport_id INT NOT NULL,
     game_type ENUM('match', 'tournament', 'quiz', 'challenge', 'custom') DEFAULT 'custom',
     status ENUM('setup', 'active', 'paused', 'completed', 'cancelled') DEFAULT 'setup',
+    scoring_mode ENUM('team', 'player') DEFAULT 'team' COMMENT 'team = alleen team punten, player = individuele speler punten die optellen naar team totaal',
     start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     end_time DATETIME NULL,
     current_round INT DEFAULT 1,

@@ -62,6 +62,7 @@ class StartScreen {
     const sessionData = {
       name: document.getElementById('session-name').value,
       game_type: document.getElementById('game-type').value,
+      scoring_mode: document.getElementById('scoring-mode').value,
       max_teams: parseInt(document.getElementById('max-teams').value),
       total_rounds: parseInt(document.getElementById('total-rounds').value),
       time_limit: document.getElementById('time-limit').value ? parseInt(document.getElementById('time-limit').value) * 60 : null, // Convert to seconds

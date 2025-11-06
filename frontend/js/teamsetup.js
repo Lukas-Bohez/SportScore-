@@ -39,6 +39,11 @@ class TeamSetup {
     this.teamsCount = document.getElementById('teams-count');
     this.maxTeams = document.getElementById('max-teams');
     this.gameType = document.getElementById('game-type');
+    
+    // Scoring mode radio buttons
+    this.scoringModeTeam = document.getElementById('scoring-mode-team');
+    this.scoringModePlayer = document.getElementById('scoring-mode-player');
+    this.playerModeHint = document.getElementById('player-mode-hint');
 
     // Modal elements
     this.teamModal = document.getElementById('team-modal');
@@ -62,6 +67,14 @@ class TeamSetup {
     // Modal events
     this.saveTeamBtn.addEventListener('click', () => this.saveTeamEdit());
     this.cancelEditBtn.addEventListener('click', () => this.hideTeamModal());
+
+    // Scoring mode change event
+    if (this.scoringModeTeam) {
+      this.scoringModeTeam.addEventListener('change', () => this.updateScoringMode());
+    }
+    if (this.scoringModePlayer) {
+      this.scoringModePlayer.addEventListener('change', () => this.updateScoringMode());
+    }
 
   // players are handled inline on each team card
 
@@ -91,13 +104,23 @@ class TeamSetup {
       this.sessionName.textContent = this.session.name;
     }
     if (this.sessionStatus) {
-      this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}`;
+      const scoringModeText = this.session.scoring_mode === 'player' ? ' | Speler Scores' : ' | Team Scores';
+      this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}${scoringModeText}`;
     }
     if (this.maxTeams) {
       this.maxTeams.textContent = this.session.max_teams;
     }
     if (this.gameType) {
       this.gameType.textContent = this.getGameTypeText(this.session.game_type);
+    }
+    
+    // Set the radio buttons based on current scoring mode
+    if (this.session.scoring_mode === 'player') {
+      if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+      if (this.playerModeHint) this.playerModeHint.style.display = 'block';
+    } else {
+      if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+      if (this.playerModeHint) this.playerModeHint.style.display = 'none';
     }
   }
 
@@ -532,6 +555,67 @@ class TeamSetup {
 
   hideTeamModal() {
     this.teamModal.classList.remove('show');
+  }
+
+  async updateScoringMode() {
+    const selectedMode = this.scoringModePlayer && this.scoringModePlayer.checked ? 'player' : 'team';
+    
+    // Check if session is already active - warn user
+    if (this.session && this.session.status !== 'setup') {
+      const confirmChange = confirm(
+        '⚠️ Waarschuwing: De sessie is al gestart!\n\n' +
+        'Het wijzigen van de score modus tijdens een actieve sessie kan leiden tot inconsistenties.\n\n' +
+        'Weet je zeker dat je wilt doorgaan?'
+      );
+      
+      if (!confirmChange) {
+        // Revert radio button
+        if (this.session.scoring_mode === 'player') {
+          if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else {
+          if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+        }
+        return;
+      }
+    }
+    
+    // Only update if mode actually changed
+    if (this.session && this.session.scoring_mode !== selectedMode) {
+      try {
+        const updateData = {
+          scoring_mode: selectedMode
+        };
+        
+        await api.put(`/api/v1/sessions/${this.sessionId}`, updateData);
+        
+        // Update local session object
+        this.session.scoring_mode = selectedMode;
+        
+        // Update display
+        this.updateSessionDisplay();
+        
+        // Show/hide player mode hint
+        if (this.playerModeHint) {
+          this.playerModeHint.style.display = selectedMode === 'player' ? 'block' : 'none';
+        }
+        
+        // Show feedback
+        const modeText = selectedMode === 'player' ? 'Speler Scores' : 'Team Scores';
+        const emoji = selectedMode === 'player' ? '👤' : '👥';
+        alert(`${emoji} Score modus gewijzigd naar: ${modeText}\n\n${selectedMode === 'player' ? 'Je kunt nu individuele speler scores bijhouden!' : 'Scores gaan nu direct naar teams.'}`);
+        
+      } catch (error) {
+        api.handleError(error, 'updating scoring mode');
+        alert('Fout bij het wijzigen van de score modus.');
+        
+        // Revert radio button to previous state
+        if (this.session.scoring_mode === 'player') {
+          if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else {
+          if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+        }
+      }
+    }
   }
 
   getStatusText(status) {

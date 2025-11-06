@@ -184,6 +184,8 @@ class BigScreenDisplay {
     this.sessionStatus = document.getElementById('game-status');
     this.teamsContainer = document.getElementById('teams-container');
     this.lastUpdateTime = document.getElementById('last-update');
+    this.scoringModeBadge = document.getElementById('scoring-mode-badge');
+    this.scoringModeText = document.getElementById('scoring-mode-text');
   }
 
   setupEventListeners() {
@@ -267,10 +269,31 @@ class BigScreenDisplay {
   }
 
   async loadPlayersForLeaderboard(sessionId, leaderboard) {
+    // First, get all scores for the session to calculate player scores
+    let allScores = [];
+    try {
+      const scoresResponse = await api.get(`/api/v1/sessions/${sessionId}/scores`);
+      allScores = scoresResponse.scores || [];
+    } catch (err) {
+      console.warn('Could not load scores for player stats:', err);
+    }
+
     for (const team of leaderboard) {
       try {
         const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
         team.players = resp && resp.players ? resp.players : [];
+        
+        // Calculate individual player scores from the scores list
+        team.playerScores = {};
+        if (team.players && team.players.length > 0) {
+          team.players.forEach(player => {
+            // Sum up all scores for this player
+            const playerPoints = allScores
+              .filter(score => score.player_id === player.id)
+              .reduce((sum, score) => sum + score.points, 0);
+            team.playerScores[player.id] = playerPoints;
+          });
+        }
       } catch (err) {
         const msg = err && err.message ? err.message : '';
         const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
@@ -278,11 +301,14 @@ class BigScreenDisplay {
           try {
             const fallback = await api.get(`/api/v1/players?team_id=${team.team_id}`);
             team.players = fallback && fallback.players ? fallback.players : [];
+            team.playerScores = {};
           } catch (err2) {
             team.players = [];
+            team.playerScores = {};
           }
         } else {
           team.players = [];
+          team.playerScores = {};
         }
       }
     }
@@ -405,7 +431,21 @@ class BigScreenDisplay {
 
   updateSessionInfo(session) {
     if (this.sessionTitle) {
+      // Add subtle icon for scoring mode
+      const scoringModeIcon = session.scoring_mode === 'player' ? '👤' : '👥';
       this.sessionTitle.textContent = session.name || 'TeamScore Session';
+      
+      // Add icon as separate element for better styling control
+      const existingIcon = this.sessionTitle.querySelector('.scoring-mode-icon');
+      if (existingIcon) {
+        existingIcon.textContent = scoringModeIcon;
+      } else {
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'scoring-mode-icon';
+        iconSpan.textContent = scoringModeIcon;
+        iconSpan.title = session.scoring_mode === 'player' ? 'Speler Scores Modus' : 'Team Scores Modus';
+        this.sessionTitle.appendChild(iconSpan);
+      }
     }
     if (this.sessionStatus) {
       this.sessionStatus.textContent = this.getStatusText(session.status);
@@ -444,12 +484,33 @@ class BigScreenDisplay {
     teamDiv.className = `leaderboard-team ${team.is_eliminated ? 'eliminated' : ''}`;
     teamDiv.style.borderLeftColor = team.team_color || '#333';
 
+    // Check if session is in player scoring mode
+    const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
+    
     const players = team.players || [];
-    const playersHtml = players.length > 0
-      ? `<div class="team-players-bigscreen">
-           ${players.map(p => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
-         </div>`
-      : '';
+    const playerScores = team.playerScores || {};
+    
+    let playersHtml = '';
+    if (players.length > 0) {
+      if (isPlayerMode) {
+        // Player mode: show player names with their individual scores
+        playersHtml = `<div class="team-players-bigscreen player-mode">
+          ${players.map(p => {
+            const score = playerScores[p.id] || 0;
+            const scoreClass = score > 0 ? 'positive' : score < 0 ? 'negative' : '';
+            return `<span class="player-badge-bigscreen with-score ${scoreClass}">
+              <span class="player-name-part">${p.position ? `${p.name} (${p.position})` : p.name}</span>
+              <span class="player-score-part">${score > 0 ? '+' : ''}${score}</span>
+            </span>`;
+          }).join('')}
+        </div>`;
+      } else {
+        // Team mode: just show player names
+        playersHtml = `<div class="team-players-bigscreen">
+          ${players.map(p => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
+        </div>`;
+      }
+    }
 
     teamDiv.innerHTML = `
       <div class="team-position">${position}</div>

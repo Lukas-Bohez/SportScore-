@@ -36,6 +36,17 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="scoring-mode">Score Modus:</label>
+                        <select id="scoring-mode">
+                            <option value="team">Team Scores (alleen totale punten per team)</option>
+                            <option value="player">Speler Scores (individuele punten per speler)</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 4px;">
+                            Bij speler scores worden punten per speler bijgehouden en geteld naar team totaal.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="max-teams">Maximum Aantal Teams:</label>
                         <input type="number" id="max-teams" value="6" min="2" max="20">
                     </div>

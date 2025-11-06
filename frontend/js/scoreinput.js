@@ -117,7 +117,9 @@ class ScoreInput {
 
   updateSessionDisplay() {
     if (this.sessionName) {
-      this.sessionName.textContent = this.session.name;
+      const scoringModeIndicator = this.session.scoring_mode === 'player' ? ' 👤' : ' 👥';
+      const scoringModeTitle = this.session.scoring_mode === 'player' ? 'Speler Scores Modus' : 'Team Scores Modus';
+      this.sessionName.innerHTML = `${this.session.name} <span title="${scoringModeTitle}">${scoringModeIndicator}</span>`;
     }
     if (this.roundInfo) {
       this.roundInfo.textContent = `Ronde ${this.session.current_round}/${this.session.total_rounds}`;
@@ -250,13 +252,26 @@ class ScoreInput {
         icon: team.icon,
         score: 0,
         players: team.players || [],
+        playerScores: {}, // Track individual player scores
       };
+      
+      // Initialize player scores to 0
+      if (team.players) {
+        team.players.forEach(player => {
+          teamScores[team.id].playerScores[player.id] = 0;
+        });
+      }
     });
 
     // Add up all scores
     allScores.forEach((score) => {
       if (teamScores[score.team_id]) {
         teamScores[score.team_id].score += score.points;
+        
+        // If this score is for a specific player, track it
+        if (score.player_id && teamScores[score.team_id].playerScores[score.player_id] !== undefined) {
+          teamScores[score.team_id].playerScores[score.player_id] += score.points;
+        }
       }
     });
 
@@ -274,18 +289,38 @@ class ScoreInput {
     // Sort by score descending
     leaderboard.sort((a, b) => b.score - a.score);
 
+    // Check if session uses player-based scoring
+    const isPlayerMode = this.session && this.session.scoring_mode === 'player';
+
     const leaderboardHtml = leaderboard
       .map(
         (team, index) => {
-          const playersHtml = team.players && team.players.length > 0
-            ? `<div class="team-players">
-                 ${team.players.map(p => `
-                   <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
-                     ${p.position ? `${p.name} (${p.position})` : p.name}
-                   </button>
-                 `).join('')}
-               </div>`
-            : '';
+          let playersHtml = '';
+          
+          if (team.players && team.players.length > 0) {
+            if (isPlayerMode) {
+              // Player mode: show player names with their individual scores
+              playersHtml = `<div class="team-players">
+                ${team.players.map(p => {
+                  const playerScore = team.playerScores[p.id] || 0;
+                  return `
+                    <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
+                      ${p.position ? `${p.name} (${p.position})` : p.name}: <strong>${playerScore}</strong>
+                    </button>
+                  `;
+                }).join('')}
+              </div>`;
+            } else {
+              // Team mode: just show player names as clickable badges
+              playersHtml = `<div class="team-players">
+                ${team.players.map(p => `
+                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
+                    ${p.position ? `${p.name} (${p.position})` : p.name}
+                  </button>
+                `).join('')}
+              </div>`;
+            }
+          }
           
           return `
             <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
@@ -329,9 +364,14 @@ class ScoreInput {
       .map((score) => {
         const team = this.teams.find((t) => t.id === score.team_id);
         const timeAgo = this.getTimeAgo(new Date(score.timestamp));
+        
+        // Check if there's a player name
+        const teamDisplay = team ? team.name : 'Onbekend team';
+        const playerDisplay = score.player_name ? ` - ${score.player_name}` : '';
+        
         return `
         <div class="score-item">
-          <div class="score-team">${team ? team.name : 'Onbekend team'}</div>
+          <div class="score-team">${teamDisplay}${playerDisplay}</div>
           <div class="score-change ${score.points >= 0 ? 'positive' : 'negative'}">
             ${score.points >= 0 ? '+' : ''}${score.points}
           </div>

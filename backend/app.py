@@ -409,7 +409,7 @@ async def get_sessions():
 async def create_session(session: SessionCreate):
     session_id = SessionRepository.create_session(
         session.name, session.game_type, session.max_teams,
-        session.total_rounds, session.time_limit
+        session.total_rounds, session.time_limit, session.scoring_mode
     )
     created_session = SessionRepository.get_session_by_id(session_id)
 
@@ -689,15 +689,16 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     # Create score record
     score_id = SessionScoreRepository.create_score(
         score.session_id, score.team_id, score.points,
-        score.reason, score.round_number
+        score.reason, score.round_number, score.player_id
     )
     created_score = SessionScoreRepository.get_score_by_id(score_id)
 
     # Emit real-time update for score
-    print(f"Emitting session_score_update event: session_id={session_id}, team_id={score.team_id}, points={score.points}")
+    print(f"Emitting session_score_update event: session_id={session_id}, team_id={score.team_id}, points={score.points}, player_id={score.player_id}")
     await sio.emit('session_score_update', {
         'session_id': session_id,
         'team_id': score.team_id,
+        'player_id': score.player_id,
         'points': score.points,
         'reason': score.reason,
         'round_number': score.round_number,

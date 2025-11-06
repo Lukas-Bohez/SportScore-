@@ -441,7 +441,7 @@ class SessionRepository:
 
     @staticmethod
     def create_session(name: str, game_type: str = "custom", max_teams: int = 10,
-                      total_rounds: int = 1, time_limit: Optional[int] = None) -> int:
+                      total_rounds: int = 1, time_limit: Optional[int] = None, scoring_mode: str = "team") -> int:
         # Sessies worden opgeslagen als games, sport_id = Teambuilding (ID 4)
         # Probeer teambuilding sport te vinden, anders gebruik custom (ID 5)
         sport_result = Database.get_one_row("SELECT id FROM sports WHERE name = 'Teambuilding' LIMIT 1")
@@ -452,14 +452,14 @@ class SessionRepository:
         # Sla max_teams op in settings JSON
         settings = json.dumps({"max_teams": max_teams})
         
-        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings])
+        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings, scoring_mode)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings, scoring_mode])
 
     @staticmethod
     def get_all_sessions() -> List[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.created_at, g.updated_at,
+                        g.scoring_mode, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
                  WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
@@ -479,7 +479,7 @@ class SessionRepository:
     @staticmethod
     def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.created_at, g.updated_at,
+                        g.scoring_mode, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g WHERE g.id = %s"""
         session = Database.get_one_row(sql, [session_id])
@@ -495,7 +495,7 @@ class SessionRepository:
     @staticmethod
     def get_active_session() -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.created_at, g.updated_at,
+                        g.scoring_mode, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
                  WHERE g.status IN ('setup', 'active', 'paused')
@@ -515,7 +515,7 @@ class SessionRepository:
     def update_session(session_id: int, name: Optional[str] = None, game_type: Optional[str] = None,
                       status: Optional[str] = None, max_teams: Optional[int] = None,
                       current_round: Optional[int] = None, total_rounds: Optional[int] = None,
-                      time_limit: Optional[int] = None) -> bool:
+                      time_limit: Optional[int] = None, scoring_mode: Optional[str] = None) -> bool:
         updates = []
         params = []
         
@@ -537,6 +537,9 @@ class SessionRepository:
         if time_limit is not None:
             updates.append("time_limit = %s")
             params.append(time_limit)
+        if scoring_mode is not None:
+            updates.append("scoring_mode = %s")
+            params.append(scoring_mode)
         
         # max_teams gaat in settings JSON
         if max_teams is not None:
@@ -670,17 +673,19 @@ class SessionScoreRepository:
 
     @staticmethod
     def create_score(session_id: int, team_id: int, points: int, reason: Optional[str] = None,
-                    round_number: int = 1) -> int:
-        sql = """INSERT INTO scores (game_id, team_id, points, score_type, reason, round_number)
-                 VALUES (%s, %s, %s, %s, %s, %s)"""
-        return Database.execute_sql(sql, [session_id, team_id, points, 'point', reason, round_number])
+                    round_number: int = 1, player_id: Optional[int] = None) -> int:
+        sql = """INSERT INTO scores (game_id, team_id, player_id, points, score_type, reason, round_number)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+        return Database.execute_sql(sql, [session_id, team_id, player_id, points, 'point', reason, round_number])
 
     @staticmethod
     def get_scores_by_session(session_id: int) -> List[Dict[str, Any]]:
-        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.points, s.reason, s.round_number, s.timestamp,
-                        t.name as team_name, t.color as team_color
+        sql = """SELECT s.id, s.game_id as session_id, s.team_id, s.player_id, s.points, s.reason, s.round_number, s.timestamp,
+                        t.name as team_name, t.color as team_color,
+                        p.name as player_name
                  FROM scores s
                  JOIN teams t ON s.team_id = t.id
+                 LEFT JOIN players p ON s.player_id = p.id
                  WHERE s.game_id = %s
                  ORDER BY s.timestamp DESC"""
         return Database.get_rows(sql, [session_id])
