@@ -379,6 +379,23 @@ body {
     100% { transform: scale(1); }
 }
 
+@keyframes scoreFlash {
+    0%, 100% { 
+        background-color: transparent;
+        transform: scale(1);
+    }
+    50% { 
+        background-color: #4CAF50;
+        color: white;
+        transform: scale(1.2);
+        font-weight: bold;
+    }
+}
+
+.score-flash {
+    animation: scoreFlash 0.5s ease-in-out;
+}
+
 .score-updated {
     animation: pulse 0.5s ease-in-out;
 }

@@ -124,14 +124,67 @@ class ScoreInput {
     if (this.roundInfo) {
       this.roundInfo.textContent = `Ronde ${this.session.current_round}/${this.session.total_rounds}`;
     }
+    
+    // Disable player select in team mode, disable team-only scoring in player mode
+    this.updateScoringModeUI();
+    
     this.updateTimerDisplay();
+  }
+  
+  updateScoringModeUI() {
+    if (!this.session) return;
+    
+    if (this.session.scoring_mode === 'team') {
+      // Team mode: disable player selection
+      if (this.playerSelect) {
+        this.playerSelect.disabled = true;
+        this.playerSelect.innerHTML = '<option value="">Team modus - spelers uitgeschakeld</option>';
+        this.playerSelect.title = 'In team modus kunnen alleen punten aan teams worden gegeven';
+      }
+    } else if (this.session.scoring_mode === 'player') {
+      // Player mode: enable player selection and show warning for team-only scoring
+      if (this.playerSelect) {
+        this.playerSelect.disabled = false;
+        this.playerSelect.title = 'Selecteer een speler om punten toe te kennen';
+      }
+      
+      // Add validation hint
+      if (!document.getElementById('player-mode-hint')) {
+        const hint = document.createElement('div');
+        hint.id = 'player-mode-hint';
+        hint.className = 'alert alert-info';
+        hint.style.cssText = 'margin: 10px 0; padding: 10px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;';
+        hint.innerHTML = '<strong>👤 Speler Modus:</strong> Punten moeten aan individuele spelers worden toegekend. Selecteer eerst een speler.';
+        
+        if (this.playerSelect && this.playerSelect.parentNode) {
+          this.playerSelect.parentNode.insertBefore(hint, this.playerSelect.nextSibling);
+        }
+      }
+    }
   }
 
   async loadTeams() {
     try {
+      // Save current selections
+      const currentTeamId = this.teamSelect.value;
+      const currentPlayerId = this.playerSelect.value;
+      
       const response = await api.get(`/api/v1/sessions/${this.sessionId}/teams`);
       this.teams = response.teams || [];
       this.populateTeamSelect();
+      
+      // Restore selections if they still exist
+      if (currentTeamId) {
+        this.teamSelect.value = currentTeamId;
+        // Reload players for the selected team
+        if (currentTeamId) {
+          await this.loadPlayersForTeam(currentTeamId);
+          // Restore player selection if it still exists
+          if (currentPlayerId) {
+            this.playerSelect.value = currentPlayerId;
+          }
+        }
+      }
     } catch (error) {
       api.handleError(error, 'loading teams');
     }
@@ -439,6 +492,16 @@ class ScoreInput {
       return;
     }
 
+    // Validate scoring mode
+    if (this.session.scoring_mode === 'player' && !playerId) {
+      alert('⚠️ Speler Modus: Je moet een specifieke speler selecteren om punten toe te kennen.');
+      this.playerSelect.focus();
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
     if (isNaN(points)) {
       alert('Voer een geldig aantal punten in.');
       this.pointsInput.focus();
@@ -502,12 +565,14 @@ class ScoreInput {
     // Show animation
     this.showScoreAnimation(teamId, points);
 
-    // Reset form
+    // Reset form (but keep team and player selected for quick re-entry)
     this.reasonInput.value = '';
     this.pointsInput.value = 1;
 
-    // Reload data (these will also be refreshed by realtime events, but keep it deterministic)
+    // Reload leaderboard to show updated scores
     this.loadLeaderboard();
+    
+    // Reload teams to update scores in dropdown, but preserve selection
     this.loadTeams();
 
     // Load recent scores with a small delay to ensure the score is saved
@@ -643,9 +708,13 @@ class ScoreInput {
 
   handleScoreUpdate(data) {
     if (data.session_id == this.sessionId) {
+      // Only reload leaderboard and recent scores, don't reload teams (preserves dropdown selection)
       this.loadLeaderboard();
       this.loadRecentScores();
-      this.loadTeams();
+      // Only reload teams if no team is currently selected
+      if (!this.teamSelect.value) {
+        this.loadTeams();
+      }
     }
   }
 

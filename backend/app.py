@@ -693,19 +693,30 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     )
     created_score = SessionScoreRepository.get_score_by_id(score_id)
 
-    # Emit real-time update for score
-    print(f"Emitting session_score_update event: session_id={session_id}, team_id={score.team_id}, points={score.points}, player_id={score.player_id}")
-    await sio.emit('session_score_update', {
+    # Get player name if player_id is provided
+    player_name = None
+    if score.player_id:
+        try:
+            player = PlayerRepository.get_player_by_id(score.player_id)
+            if player:
+                player_name = player['name']
+        except:
+            pass
+
+    # Emit real-time update for score with player info
+    print(f"Emitting session_score_update event: session_id={session_id}, team_id={score.team_id}, points={score.points}, player_id={score.player_id}, player_name={player_name}")
+    await sio.emit('session_score_update', _jsonable({
         'session_id': session_id,
         'team_id': score.team_id,
         'player_id': score.player_id,
+        'player_name': player_name,
         'points': score.points,
         'reason': score.reason,
         'round_number': score.round_number,
-        'timestamp': created_score['timestamp'].isoformat()
-    })
+        'timestamp': created_score['timestamp']
+    }))
 
-    # Also emit team update since score changed
+    # Also emit team update since score changed - with updated total score
     updated_team = SessionTeamRepository.get_team_by_id(score.team_id)
     total_score = SessionScoreRepository.get_team_total_score(session_id, score.team_id)
     print(f"Emitting team_update event for score change: session_id={session_id}, team_id={score.team_id}, total_score={total_score}")

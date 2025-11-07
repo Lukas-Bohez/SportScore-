@@ -327,10 +327,61 @@ class BigScreenDisplay {
   }
 
   updateScore(data) {
-    // For score updates, we need the total score which isn't in the event
-    // So we do a full refresh to get accurate data
-    console.log('Score update received, refreshing leaderboard');
-    this.loadInitialData();
+    // For player scoring mode, we need to recalculate individual player scores
+    // so we do a full refresh. For team mode, we can update incrementally.
+    console.log('Score update received:', data);
+    
+    if (!this.currentSession || !this.teamsContainer) {
+      // If no session loaded yet, do full refresh
+      this.loadInitialData();
+      return;
+    }
+    
+    // Check if this is player mode - if so, need full refresh for player scores
+    const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
+    
+    if (isPlayerMode && data.player_id) {
+      // Player score update - need to refresh to recalculate all player scores
+      console.log('Player score update, refreshing to recalculate player scores');
+      this.loadInitialData();
+      return;
+    }
+    
+    // Team mode or team-level update - update incrementally
+    const teamId = data.team_id;
+    const pointsChange = data.points || 0;
+    
+    // Find team element by team_id
+    const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
+    let updated = false;
+    
+    for (const teamElement of teamElements) {
+      const teamIdAttr = teamElement.getAttribute('data-team-id');
+      if (teamIdAttr && parseInt(teamIdAttr) === teamId) {
+        const scoreElement = teamElement.querySelector('.team-score');
+        if (scoreElement) {
+          const currentScore = parseInt(scoreElement.textContent) || 0;
+          const newScore = currentScore + pointsChange;
+          scoreElement.textContent = newScore;
+          
+          // Add flash animation
+          scoreElement.classList.add('score-flash');
+          setTimeout(() => scoreElement.classList.remove('score-flash'), 500);
+          
+          updated = true;
+          break;
+        }
+      }
+    }
+    
+    // If we couldn't find/update the team, do a full refresh
+    if (!updated) {
+      console.log('Could not find team element, doing full refresh');
+      this.loadInitialData();
+    } else {
+      // Re-sort teams after score update
+      this.sortTeams();
+    }
   }
 
   updateTeam(data) {
@@ -483,6 +534,11 @@ class BigScreenDisplay {
     const teamDiv = document.createElement('div');
     teamDiv.className = `leaderboard-team ${team.is_eliminated ? 'eliminated' : ''}`;
     teamDiv.style.borderLeftColor = team.team_color || '#333';
+    
+    // Add data attribute for team ID to enable updates
+    if (team.team_id) {
+      teamDiv.setAttribute('data-team-id', team.team_id);
+    }
 
     // Check if session is in player scoring mode
     const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
@@ -523,6 +579,29 @@ class BigScreenDisplay {
     `;
 
     return teamDiv;
+  }
+  
+  sortTeams() {
+    // Re-sort teams by score
+    if (!this.teamsContainer) return;
+    
+    const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
+    
+    // Sort by score (descending)
+    teamElements.sort((a, b) => {
+      const scoreA = parseInt(a.querySelector('.team-score')?.textContent || '0');
+      const scoreB = parseInt(b.querySelector('.team-score')?.textContent || '0');
+      return scoreB - scoreA;
+    });
+    
+    // Re-append in sorted order and update positions
+    teamElements.forEach((el, index) => {
+      const positionEl = el.querySelector('.team-position');
+      if (positionEl) {
+        positionEl.textContent = index + 1;
+      }
+      this.teamsContainer.appendChild(el);
+    });
   }
 
   updateLastUpdateTime() {
