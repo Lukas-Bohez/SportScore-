@@ -266,6 +266,10 @@ class ScoreInput {
 
       // Calculate leaderboard from teams and scores
       const leaderboard = this.calculateLeaderboard(allScores);
+      
+      // Cache leaderboard data for incremental updates
+      this.leaderboardData = leaderboard;
+      
       this.displayLeaderboard(leaderboard);
     } catch (error) {
       api.handleError(error, 'loading leaderboard');
@@ -357,8 +361,8 @@ class ScoreInput {
                 ${team.players.map(p => {
                   const playerScore = team.playerScores[p.id] || 0;
                   return `
-                    <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
-                      ${p.position ? `${p.name} (${p.position})` : p.name}: <strong>${playerScore}</strong>
+                    <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
+                      ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}: <strong>${playerScore}</strong>
                     </button>
                   `;
                 }).join('')}
@@ -367,8 +371,8 @@ class ScoreInput {
               // Team mode: just show player names as clickable badges
               playersHtml = `<div class="team-players">
                 ${team.players.map(p => `
-                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
-                    ${p.position ? `${p.name} (${p.position})` : p.name}
+                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
+                    ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}
                   </button>
                 `).join('')}
               </div>`;
@@ -376,13 +380,13 @@ class ScoreInput {
           }
           
           return `
-            <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
+            <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" data-team-id="${team.id}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
               <div class="rank">#${index + 1}</div>
               <div class="team-info">
                 <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
-                <div class="team-name">${team.name}</div>
+                <div class="team-name">${this.escapeHtml(team.name)}</div>
               </div>
-              <div class="team-score">${team.score}</div>
+              <div class="team-score" data-team-score="${team.id}">${team.score}</div>
               ${playersHtml}
             </div>
           `;
@@ -391,6 +395,39 @@ class ScoreInput {
       .join('');
 
     this.leaderboard.innerHTML = leaderboardHtml;
+  }
+  
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  // Update scores without re-rendering entire leaderboard (preserves player badges)
+  updateLeaderboardScores(leaderboard) {
+    if (!this.leaderboard || !leaderboard) return;
+    
+    leaderboard.forEach(team => {
+      const scoreElement = this.leaderboard.querySelector(`[data-team-score="${team.id}"]`);
+      if (scoreElement) {
+        scoreElement.textContent = team.score;
+      }
+      
+      // Update player scores if in player mode
+      if (this.session && this.session.scoring_mode === 'player' && team.players) {
+        team.players.forEach(player => {
+          const playerBadges = this.leaderboard.querySelectorAll('.player-badge');
+          playerBadges.forEach(badge => {
+            const badgeText = badge.textContent;
+            const playerScore = team.playerScores[player.id] || 0;
+            const playerName = player.position ? `${player.name} (${player.position})` : player.name;
+            if (badgeText.includes(playerName)) {
+              badge.innerHTML = `${this.escapeHtml(playerName)}: <strong>${playerScore}</strong>`;
+            }
+          });
+        });
+      }
+    });
   }
 
   async loadRecentScores() {
@@ -708,9 +745,34 @@ class ScoreInput {
 
   handleScoreUpdate(data) {
     if (data.session_id == this.sessionId) {
-      // Only reload leaderboard and recent scores, don't reload teams (preserves dropdown selection)
-      this.loadLeaderboard();
+      // Update the cached leaderboard data
+      if (this.leaderboardData) {
+        const teamIndex = this.leaderboardData.findIndex(t => t.id === data.team_id);
+        if (teamIndex !== -1) {
+          this.leaderboardData[teamIndex].score = data.total_score;
+          
+          // Update player scores if available
+          if (data.player_scores) {
+            this.leaderboardData[teamIndex].playerScores = data.player_scores;
+          }
+          
+          // Sort leaderboard by score
+          this.leaderboardData.sort((a, b) => b.score - a.score);
+          
+          // Update scores in place without full re-render (preserves player badges)
+          this.updateLeaderboardScores(this.leaderboardData);
+        } else {
+          // Team not in leaderboard yet, do full reload
+          this.loadLeaderboard();
+        }
+      } else {
+        // No cached data, do full reload
+        this.loadLeaderboard();
+      }
+      
+      // Load recent scores to show the new score entry
       this.loadRecentScores();
+      
       // Only reload teams if no team is currently selected
       if (!this.teamSelect.value) {
         this.loadTeams();

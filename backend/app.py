@@ -546,7 +546,7 @@ async def create_session_team(session_id: int, request: Request):
 
     # Create team
     team_id = SessionTeamRepository.create_team(session_id, name, color, icon)
-    created_team = SessionTeamRepository.get_team_by_id(team_id)
+    created_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
 
     # Emit real-time update for new team creation
     print(f"Emitting team_update event for team creation: session_id={session_id}, team_id={team_id}")
@@ -572,9 +572,9 @@ async def create_session_team(session_id: int, request: Request):
     summary="List players for a session team"
 )
 async def get_players_for_team(session_id: int, team_id: int):
-    # Validate team exists and belongs to session
-    team = SessionTeamRepository.get_team_by_id(team_id)
-    if not team or int(team.get('session_id') or 0) != int(session_id):
+    # Validate team exists in this session using get_team_in_session
+    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    if not team:
         raise HTTPException(status_code=404, detail="Team not found in session")
     players = PlayerRepository.get_players_by_team(team_id)
     return PlayerListResponse(players=[PlayerResponse(**p) for p in players])
@@ -587,9 +587,9 @@ async def get_players_for_team(session_id: int, team_id: int):
     summary="Create player for a session team"
 )
 async def create_player_for_team(session_id: int, team_id: int, player: PlayerCreate):
-    # Validate team exists and belongs to session
-    team = SessionTeamRepository.get_team_by_id(team_id)
-    if not team or int(team.get('session_id') or 0) != int(session_id):
+    # Validate team exists in this session using get_team_in_session
+    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    if not team:
         raise HTTPException(status_code=404, detail="Team not found in session")
 
     # Ensure team_id matches path
@@ -769,6 +769,148 @@ async def test_socket():
         'connected_clients': len(connected_clients)
     })
     return {"message": "Test event sent", "connected_clients": len(connected_clients)}
+
+# ----------------------------------------------------
+# Standalone Teams Management Endpoints
+# ----------------------------------------------------
+
+@app.get(
+    f"{ENDPOINT}/standalone-teams",
+    tags=["Standalone Teams"],
+    summary="List all teams (independent of sessions)"
+)
+async def get_all_standalone_teams():
+    """Get all teams that can be reused across sessions."""
+    teams = SessionTeamRepository.get_all_teams()
+    return {"teams": teams}
+
+@app.post(
+    f"{ENDPOINT}/standalone-teams",
+    tags=["Standalone Teams"],
+    summary="Create a new standalone team"
+)
+async def create_standalone_team(request: Request):
+    """Create a new team that can be reused in multiple sessions."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    name = (payload.get('name') or '').strip()
+    color = payload.get('color') or '#3B82F6'
+    icon = payload.get('icon') or 'team'
+    description = payload.get('description') or None
+    
+    if not name:
+        raise HTTPException(status_code=422, detail="Field 'name' is required")
+    
+    # Create team zonder sessie koppeling
+    # We gebruiken een dummy session_id 0 en verwijderen later de koppeling
+    from database.database import Database
+    
+    # Check of team al bestaat
+    existing = Database.get_one_row("SELECT id FROM teams WHERE name = ?", [name])
+    if existing:
+        raise HTTPException(status_code=400, detail="Team with this name already exists")
+    
+    sql = "INSERT INTO teams (name, color, icon, description) VALUES (?, ?, ?, ?)"
+    team_id = Database.execute_sql(sql, [name, color, icon, description])
+    
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    return {"team": team}
+
+@app.put(
+    f"{ENDPOINT}/standalone-teams/{{team_id}}",
+    tags=["Standalone Teams"],
+    summary="Update a standalone team"
+)
+async def update_standalone_team(team_id: int, request: Request):
+    """Update team properties (affects all sessions using this team)."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    name = payload.get('name')
+    color = payload.get('color')
+    icon = payload.get('icon')
+    description = payload.get('description')
+    
+    success = SessionTeamRepository.update_team(
+        team_id, name=name, color=color, icon=icon, description=description
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update team")
+    
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    return {"team": team}
+
+@app.delete(
+    f"{ENDPOINT}/standalone-teams/{{team_id}}",
+    tags=["Standalone Teams"],
+    summary="Delete a standalone team"
+)
+async def delete_standalone_team(team_id: int):
+    """Permanently delete a team (removes from all sessions)."""
+    success = SessionTeamRepository.delete_team(team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete team")
+    return {"message": "Team deleted successfully"}
+
+@app.post(
+    f"{ENDPOINT}/sessions/{{session_id}}/add-team",
+    tags=["Session Teams"],
+    summary="Add an existing team to a session"
+)
+async def add_existing_team_to_session(session_id: int, request: Request):
+    """Add an existing team to a session."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    team_id = payload.get('team_id')
+    if not team_id:
+        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
+    
+    success = SessionTeamRepository.add_existing_team_to_session(session_id, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to add team to session (may already be added)")
+    
+    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    
+    # Emit real-time update
+    await sio.emit('team_update', _jsonable({
+        'session_id': session_id,
+        'team_id': team_id,
+        'team': team,
+        'action': 'added',
+        'timestamp': datetime.now().isoformat()
+    }))
+    
+    return {"team": team}
+
+@app.delete(
+    f"{ENDPOINT}/sessions/{{session_id}}/remove-team/{{team_id}}",
+    tags=["Session Teams"],
+    summary="Remove a team from a session (team stays available)"
+)
+async def remove_team_from_session(session_id: int, team_id: int):
+    """Remove a team from a session without deleting the team itself."""
+    success = SessionTeamRepository.remove_team_from_session(session_id, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to remove team from session")
+    
+    # Emit real-time update
+    await sio.emit('team_update', {
+        'session_id': session_id,
+        'team_id': team_id,
+        'action': 'removed',
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    return {"message": "Team removed from session"}
 
 # ----------------------------------------------------
 # Main

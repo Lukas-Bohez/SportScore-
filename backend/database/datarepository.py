@@ -60,23 +60,24 @@ class TeamRepository:
 
     @staticmethod
     def get_all_teams() -> List[Dict[str, Any]]:
-        # Geef alle teams terug (uit alle games)
-        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+        # Geef alle teams terug (uit alle games) - LEGACY, gebruik SessionTeamRepository.get_all_teams()
+        sql = """SELECT t.id, t.name, t.created_at, t.updated_at
                  FROM teams t ORDER BY t.id ASC"""
         return Database.get_rows(sql)
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
-        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+        sql = """SELECT t.id, t.name, t.created_at, t.updated_at
                  FROM teams t WHERE t.id = ?"""
         return Database.get_one_row(sql, [team_id])
 
     @staticmethod
     def get_teams_by_sport(sport_id: int) -> List[Dict[str, Any]]:
         # Geef teams voor alle games van deze sport
-        sql = """SELECT t.id, t.name, t.game_id as sport_id, t.created_at, t.updated_at
+        sql = """SELECT t.id, t.name, t.created_at, t.updated_at
                  FROM teams t
-                 JOIN games g ON t.game_id = g.id
+                 JOIN game_teams gt ON gt.team_id = t.id
+                 JOIN games g ON g.id = gt.game_id
                  WHERE g.sport_id = ? ORDER BY t.id ASC"""
         return Database.get_rows(sql, [sport_id])
 
@@ -569,43 +570,85 @@ class SessionRepository:
 
 class SessionTeamRepository:
     """
-    Session team repository - nu geïmplementeerd met de teams tabel.
+    Session team repository - beheer van teams in sessies.
+    Teams zijn nu herbruikbaar en worden gekoppeld via game_teams.
     """
 
     @staticmethod
     def create_team(session_id: int, name: str, color: str = "#333333", icon: str = "team") -> int:
-        sql = """INSERT INTO teams (game_id, name, color, icon)
-                 VALUES (?, ?, ?, ?)"""
-        return Database.execute_sql(sql, [session_id, name, color, icon])
+        """Maak een nieuw team aan en voeg het toe aan de sessie."""
+        # Eerst: check of team al bestaat met deze naam
+        existing_team = Database.get_one_row("SELECT id FROM teams WHERE name = ?", [name])
+        
+        if existing_team:
+            team_id = existing_team['id']
+            # Update kleur en icoon van bestaand team
+            Database.execute_sql("UPDATE teams SET color = ?, icon = ? WHERE id = ?", [color, icon, team_id])
+        else:
+            # Maak nieuw team aan
+            sql = """INSERT INTO teams (name, color, icon) VALUES (?, ?, ?)"""
+            team_id = Database.execute_sql(sql, [name, color, icon])
+        
+        # Koppel team aan sessie via game_teams (als nog niet gekoppeld)
+        sql_link = """INSERT OR IGNORE INTO game_teams (game_id, team_id) VALUES (?, ?)"""
+        Database.execute_sql(sql_link, [session_id, team_id])
+        
+        return team_id
+
+    @staticmethod
+    def add_existing_team_to_session(session_id: int, team_id: int) -> bool:
+        """Voeg een bestaand team toe aan een sessie."""
+        sql = """INSERT OR IGNORE INTO game_teams (game_id, team_id) VALUES (?, ?)"""
+        result = Database.execute_sql(sql, [session_id, team_id])
+        return result is not None
+
+    @staticmethod
+    def remove_team_from_session(session_id: int, team_id: int) -> bool:
+        """Verwijder een team uit een sessie (niet het team zelf)."""
+        sql = """DELETE FROM game_teams WHERE game_id = ? AND team_id = ?"""
+        return Database.execute_sql(sql, [session_id, team_id]) is not None
 
     @staticmethod
     def get_teams_by_session(session_id: int) -> List[Dict[str, Any]]:
-        # Bereken score per team vanuit scores tabel
-        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
-                        t.created_at, t.updated_at,
+        """Haal alle teams op die deelnemen aan een specifieke sessie."""
+        sql = """SELECT t.id, ? as session_id, t.name, t.color, t.icon, 
+                        gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
-                 FROM teams t
-                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
-                 WHERE t.game_id = ?
-                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, t.created_at, t.updated_at
+                 FROM game_teams gt
+                 JOIN teams t ON t.id = gt.team_id
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = gt.game_id
+                 WHERE gt.game_id = ?
+                 GROUP BY t.id, t.name, t.color, t.icon, gt.is_eliminated, t.created_at, t.updated_at
                  ORDER BY score DESC, t.name ASC"""
-        return Database.get_rows(sql, [session_id])
+        return Database.get_rows(sql, [session_id, session_id])
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
-        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
-                        t.created_at, t.updated_at,
-                        COALESCE(SUM(s.points), 0) as score
+        """Haal een specifiek team op (zonder sessie context)."""
+        sql = """SELECT t.id, t.name, t.color, t.icon, t.description,
+                        t.created_at, t.updated_at
                  FROM teams t
-                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
-                 WHERE t.id = ?
-                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, t.created_at, t.updated_at"""
+                 WHERE t.id = ?"""
         return Database.get_one_row(sql, [team_id])
 
     @staticmethod
+    def get_team_in_session(team_id: int, session_id: int) -> Optional[Dict[str, Any]]:
+        """Haal een team op binnen de context van een specifieke sessie."""
+        sql = """SELECT t.id, ? as session_id, t.name, t.color, t.icon, 
+                        gt.is_eliminated, t.created_at, t.updated_at,
+                        COALESCE(SUM(s.points), 0) as score
+                 FROM teams t
+                 JOIN game_teams gt ON gt.team_id = t.id AND gt.game_id = ?
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = ?
+                 WHERE t.id = ?
+                 GROUP BY t.id, t.name, t.color, t.icon, gt.is_eliminated, t.created_at, t.updated_at"""
+        return Database.get_one_row(sql, [session_id, session_id, session_id, team_id])
+
+    @staticmethod
     def update_team(team_id: int, name: Optional[str] = None, color: Optional[str] = None,
-                   icon: Optional[str] = None, score: Optional[int] = None,
-                   is_eliminated: Optional[bool] = None) -> bool:
+                   icon: Optional[str] = None, description: Optional[str] = None,
+                   score: Optional[int] = None, is_eliminated: Optional[bool] = None) -> bool:
+        """Update team eigenschappen."""
         updates = []
         params = []
         
@@ -618,12 +661,12 @@ class SessionTeamRepository:
         if icon is not None:
             updates.append("icon = ?")
             params.append(icon)
-        if is_eliminated is not None:
-            updates.append("is_eliminated = ?")
-            params.append(is_eliminated)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
         
-        # Score wordt niet meer direct opgeslagen, maar berekend uit scores tabel
-        # Als er toch een score update wordt gevraagd, negeren we die
+        # is_eliminated is nu in game_teams, niet in teams
+        # score wordt niet direct opgeslagen
         
         if not updates:
             return False
@@ -633,37 +676,84 @@ class SessionTeamRepository:
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
+    def update_team_in_session(team_id: int, session_id: int, is_eliminated: Optional[bool] = None) -> bool:
+        """Update team status binnen een specifieke sessie."""
+        if is_eliminated is None:
+            return False
+        
+        sql = "UPDATE game_teams SET is_eliminated = ? WHERE team_id = ? AND game_id = ?"
+        return Database.execute_sql(sql, [is_eliminated, team_id, session_id]) is not None
+
+    @staticmethod
     def update_team_score(team_id: int, points: int) -> bool:
-        # Score wordt niet meer direct bijgewerkt
-        # In plaats daarvan moet een score entry worden aangemaakt
-        # Dit is backwards compatibility - maak een score entry aan
-        team = Database.get_one_row("SELECT game_id FROM teams WHERE id = ?", [team_id])
-        if not team:
+        """
+        DEPRECATED: Score wordt niet meer direct bijgewerkt.
+        Gebruik SessionScoreRepository.add_score() in plaats daarvan.
+        Deze functie blijft voor backwards compatibility.
+        """
+        # We hebben de game_id nodig om een score toe te voegen
+        # Haal de eerste actieve game op waar dit team aan deelneemt
+        game = Database.get_one_row(
+            """SELECT gt.game_id FROM game_teams gt 
+               JOIN games g ON g.id = gt.game_id 
+               WHERE gt.team_id = ? AND g.status = 'active' 
+               LIMIT 1""", 
+            [team_id]
+        )
+        
+        if not game:
+            # Als geen actieve game, neem de meest recente game
+            game = Database.get_one_row(
+                """SELECT gt.game_id FROM game_teams gt 
+                   JOIN games g ON g.id = gt.game_id 
+                   WHERE gt.team_id = ? 
+                   ORDER BY g.created_at DESC 
+                   LIMIT 1""", 
+                [team_id]
+            )
+        
+        if not game:
             return False
         
         sql = """INSERT INTO scores (game_id, team_id, points, score_type, reason)
                  VALUES (?, ?, ?, ?, ?)"""
-        result = Database.execute_sql(sql, [team['game_id'], team_id, points, 'point', 'Score update'])
+        result = Database.execute_sql(sql, [game['game_id'], team_id, points, 'point', 'Score update'])
         return result is not None
 
     @staticmethod
     def delete_team(team_id: int) -> bool:
+        """Verwijder een team permanent (uit alle sessies)."""
         sql = "DELETE FROM teams WHERE id = ?"
         return Database.execute_sql(sql, [team_id]) is not None
 
     @staticmethod
-    def get_all_teams_with_session_info() -> List[Dict[str, Any]]:
-        sql = """SELECT t.id, t.game_id as session_id, t.name, t.color, t.icon, t.is_eliminated,
+    def get_all_teams() -> List[Dict[str, Any]]:
+        """Haal alle teams op (los van sessies)."""
+        sql = """SELECT t.id, t.name, t.color, t.icon, t.description,
                         t.created_at, t.updated_at,
+                        COUNT(DISTINCT gt.game_id) as sessions_count
+                 FROM teams t
+                 LEFT JOIN game_teams gt ON gt.team_id = t.id
+                 GROUP BY t.id, t.name, t.color, t.icon, t.description, t.created_at, t.updated_at
+                 ORDER BY t.name ASC"""
+        return Database.get_rows(sql)
+
+    @staticmethod
+    def get_all_teams_with_session_info() -> List[Dict[str, Any]]:
+        """Haal alle teams op met informatie over hun sessies."""
+        sql = """SELECT t.id, t.name, t.color, t.icon, t.description,
+                        t.created_at, t.updated_at,
+                        gt.game_id as session_id, gt.is_eliminated,
                         g.name as session_name, g.game_type, g.status as session_status,
                         COALESCE(SUM(s.points), 0) as score
                  FROM teams t
-                 JOIN games g ON t.game_id = g.id
-                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = t.game_id
-                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
-                 GROUP BY t.id, t.game_id, t.name, t.color, t.icon, t.is_eliminated, 
-                          t.created_at, t.updated_at, g.name, g.game_type, g.status
-                 ORDER BY g.created_at DESC, score DESC, t.name ASC"""
+                 LEFT JOIN game_teams gt ON gt.team_id = t.id
+                 LEFT JOIN games g ON g.id = gt.game_id
+                 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = gt.game_id
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament') OR g.game_type IS NULL
+                 GROUP BY t.id, t.name, t.color, t.icon, t.description, t.created_at, t.updated_at,
+                          gt.game_id, gt.is_eliminated, g.name, g.game_type, g.status
+                 ORDER BY t.name ASC, g.created_at DESC"""
         return Database.get_rows(sql)
 
 class SessionScoreRepository:
@@ -706,9 +796,10 @@ class SessionScoreRepository:
             t.icon as team_icon,
             COALESCE(SUM(s.points), 0) as total_score,
             COUNT(s.id) as score_count
-        FROM teams t
-        LEFT JOIN scores s ON t.id = s.team_id AND t.game_id = s.game_id
-        WHERE t.game_id = ? AND t.is_eliminated = FALSE
+        FROM game_teams gt
+        JOIN teams t ON t.id = gt.team_id
+        LEFT JOIN scores s ON t.id = s.team_id AND gt.game_id = s.game_id
+        WHERE gt.game_id = ? AND gt.is_eliminated = 0
         GROUP BY t.id, t.name, t.color, t.icon
         ORDER BY total_score DESC, t.name ASC
         """

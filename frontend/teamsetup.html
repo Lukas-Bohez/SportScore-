@@ -20,6 +20,22 @@
             <div class="teams-section">
                 <h2>Teams Beheren</h2>
 
+                <!-- Bestaande teams selecteren -->
+                <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
+                            <option value="">-- Selecteer een bestaand team --</option>
+                        </select>
+                        <button id="add-existing-team-btn" class="add-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                    </div>
+                    <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
+                        💡 Teams kunnen hergebruikt worden in meerdere sessies
+                    </p>
+                </div>
+
+                <!-- Of nieuw team maken -->
+                <h3>Of Nieuw Team Maken</h3>
                 <div class="add-team-form">
                     <input type="text" id="team-name" placeholder="Team naam" maxlength="50" aria-label="Team naam">
                     <select id="team-color" title="Kleur kiezen" aria-label="Team kleur">
