@@ -211,6 +211,178 @@ body {
     box-shadow: 0 3px 6px rgba(108, 117, 125, 0.3);
 }
 
+/* Team Management */
+.team-management {
+    background: #e0e0e0; /* 30% grey background */
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #cccccc; /* Light grey border */
+}
+
+.add-team-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.add-team-btn:hover {
+    background: linear-gradient(135deg, #218838 0%, #1aa179 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(40, 167, 69, 0.3);
+}
+
+.team-form-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 2px solid #cccccc;
+}
+
+.team-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.save-team-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #b8860b 0%, #daa520 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(184, 134, 11, 0.2);
+    flex: 1;
+}
+
+.save-team-btn:hover {
+    background: linear-gradient(135deg, #a0780a 0%, #c89510 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(184, 134, 11, 0.3);
+}
+
+.cancel-team-btn {
+    padding: 12px 24px;
+    background: #6c757d;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(108, 117, 125, 0.2);
+    flex: 1;
+}
+
+.cancel-team-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(108, 117, 125, 0.3);
+}
+
+.teams-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.team-card {
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 2px solid #cccccc;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.team-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.team-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.team-icon {
+    font-size: 2rem;
+}
+
+.team-color-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #cccccc;
+}
+
+.team-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333333;
+    flex: 1;
+}
+
+.team-description {
+    color: #666666;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.team-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.delete-team-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+    flex: 1;
+}
+
+.delete-team-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
+}
+
 #sessions-list {
     display: flex;
     flex-direction: column;
@@ -299,8 +471,17 @@ body {
 
     .session-setup,
     .active-session,
-    .recent-sessions {
+    .recent-sessions,
+    .team-management {
         padding: 20px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .teams-list {
+        grid-template-columns: 1fr;
     }
 
     .section-header {
@@ -309,7 +490,8 @@ body {
         align-items: flex-start;
     }
 
-    .view-all-btn {
+    .view-all-btn,
+    .add-team-btn {
         align-self: stretch;
         padding: 12px 16px;
         text-align: center;

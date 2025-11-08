@@ -9,6 +9,7 @@ class StartScreen {
     this.setupEventListeners();
     this.loadActiveSession();
     this.loadRecentSessions();
+    this.loadTeams();
   }
 
   bindElements() {
@@ -19,6 +20,13 @@ class StartScreen {
     this.endBtn = document.getElementById('end-session');
     this.sessionsList = document.getElementById('sessions-list');
     this.viewAllSessionsBtn = document.getElementById('view-all-sessions-btn');
+
+    // Team management elements
+    this.addTeamBtn = document.getElementById('add-team-btn');
+    this.teamFormContainer = document.getElementById('team-form-container');
+    this.teamForm = document.getElementById('team-form');
+    this.cancelTeamBtn = document.getElementById('cancel-team-btn');
+    this.teamsList = document.getElementById('teams-list');
 
     // Log missing elements for debugging
     if (!this.sessionForm) console.warn('session-form element not found');
@@ -53,6 +61,26 @@ class StartScreen {
     if (this.viewAllSessionsBtn) {
       this.viewAllSessionsBtn.addEventListener('click', () => {
         this.viewAllSessions();
+      });
+    }
+
+    // Team management event listeners
+    if (this.addTeamBtn) {
+      this.addTeamBtn.addEventListener('click', () => {
+        this.showTeamForm();
+      });
+    }
+
+    if (this.cancelTeamBtn) {
+      this.cancelTeamBtn.addEventListener('click', () => {
+        this.hideTeamForm();
+      });
+    }
+
+    if (this.teamForm) {
+      this.teamForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.createTeam();
       });
     }
   }
@@ -236,9 +264,109 @@ class StartScreen {
     };
     return statusMap[status] || status;
   }
+
+  // Team Management Methods
+  showTeamForm() {
+    this.teamFormContainer.classList.remove('hidden');
+    this.teamForm.reset();
+  }
+
+  hideTeamForm() {
+    this.teamFormContainer.classList.add('hidden');
+    this.teamForm.reset();
+  }
+
+  async loadTeams() {
+    try {
+      const response = await api.getAllStandaloneTeams();
+      const teams = response.teams || [];
+      this.displayTeams(teams);
+    } catch (error) {
+      api.handleError(error, 'loading teams');
+      this.teamsList.innerHTML = 'Fout bij het laden van teams.';
+    }
+  }
+
+  displayTeams(teams) {
+    if (teams.length === 0) {
+      this.teamsList.innerHTML = '<p style="color: #666; text-align: center;">Nog geen teams aangemaakt.</p>';
+      return;
+    }
+
+    const iconMap = {
+      'team': '👥',
+      'star': '⭐',
+      'trophy': '🏆',
+      'fire': '🔥',
+      'rocket': '🚀',
+      'crown': '👑',
+      'lightning': '⚡',
+      'heart': '❤️'
+    };
+
+    const teamsHtml = teams.map((team) => `
+      <div class="team-card">
+        <div class="team-card-header">
+          <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
+          <div class="team-color-badge" style="background-color: ${team.color}"></div>
+          <span class="team-name">${team.name}</span>
+        </div>
+        ${team.description ? `<p class="team-description">${team.description}</p>` : ''}
+        <div class="team-actions">
+          <button class="delete-team-btn" onclick="startScreen.deleteTeam(${team.id}, '${team.name}')">
+            🗑️ Verwijderen
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    this.teamsList.innerHTML = teamsHtml;
+  }
+
+  async createTeam() {
+    const teamData = {
+      name: document.getElementById('team-name').value,
+      color: document.getElementById('team-color').value,
+      icon: document.getElementById('team-icon').value,
+      description: document.getElementById('team-description').value || null,
+    };
+
+    try {
+      const response = await api.createStandaloneTeam(teamData);
+      if (response) {
+        this.hideTeamForm();
+        this.loadTeams();
+        alert(`Team "${teamData.name}" succesvol aangemaakt!`);
+      }
+    } catch (error) {
+      api.handleError(error, 'creating team');
+      if (error.message && error.message.includes('already exists')) {
+        alert('Er bestaat al een team met deze naam. Kies een andere naam.');
+      } else {
+        alert('Fout bij het aanmaken van het team. Probeer opnieuw.');
+      }
+    }
+  }
+
+  async deleteTeam(teamId, teamName) {
+    if (!confirm(`Weet je zeker dat je team "${teamName}" wilt verwijderen? Dit verwijdert het team uit alle sessies.`)) {
+      return;
+    }
+
+    try {
+      await api.deleteStandaloneTeam(teamId);
+      this.loadTeams();
+      alert(`Team "${teamName}" succesvol verwijderd!`);
+    } catch (error) {
+      api.handleError(error, 'deleting team');
+      alert('Fout bij het verwijderen van het team. Probeer opnieuw.');
+    }
+  }
 }
 
 // Initialize the start screen when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   const startScreen = new StartScreen();
+  // Make startScreen globally accessible for onclick handlers
+  window.startScreen = startScreen;
 });
