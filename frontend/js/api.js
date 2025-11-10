@@ -629,6 +629,31 @@ class ScoreboardAPI {
     return this.request('/api/v1/live/leaderboard');
   }
 
+  // Standalone Teams Management
+  async getAllStandaloneTeams() {
+    return this.request('/api/v1/standalone-teams');
+  }
+
+  async createStandaloneTeam(data) {
+    return this.request('/api/v1/standalone-teams', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateStandaloneTeam(teamId, data) {
+    return this.request(`/api/v1/standalone-teams/${teamId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteStandaloneTeam(teamId) {
+    return this.request(`/api/v1/standalone-teams/${teamId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Utility methods
   formatDate(dateString) {
     const date = new Date(dateString);

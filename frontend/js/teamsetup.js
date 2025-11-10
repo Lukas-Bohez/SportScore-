@@ -4,6 +4,7 @@ class TeamSetup {
     this.sessionId = null;
     this.session = null;
     this.teams = [];
+    this.availableTeams = []; // Alle beschikbare teams (niet in deze sessie)
     this.pendingTeams = new Map();
     this.init();
   }
@@ -14,6 +15,7 @@ class TeamSetup {
     this.setupEventListeners();
     this.loadSession();
     this.loadTeams();
+    this.loadAvailableTeams();
   }
 
   getSessionIdFromUrl() {
@@ -39,6 +41,15 @@ class TeamSetup {
     this.teamsCount = document.getElementById('teams-count');
     this.maxTeams = document.getElementById('max-teams');
     this.gameType = document.getElementById('game-type');
+    
+    // Existing teams selection
+    this.existingTeamSelect = document.getElementById('existing-team-select');
+    this.addExistingTeamBtn = document.getElementById('add-existing-team-btn');
+    
+    // Scoring mode radio buttons
+    this.scoringModeTeam = document.getElementById('scoring-mode-team');
+    this.scoringModePlayer = document.getElementById('scoring-mode-player');
+    this.playerModeHint = document.getElementById('player-mode-hint');
 
     // Modal elements
     this.teamModal = document.getElementById('team-modal');
@@ -53,6 +64,7 @@ class TeamSetup {
 
   setupEventListeners() {
     this.addTeamBtn.addEventListener('click', () => this.addTeam());
+    this.addExistingTeamBtn.addEventListener('click', () => this.addExistingTeam());
     this.startSessionBtn.addEventListener('click', () => this.startSession());
     this.backBtn.addEventListener('click', () => {
       window.location.href = 'startscreen.html';
@@ -62,6 +74,14 @@ class TeamSetup {
     // Modal events
     this.saveTeamBtn.addEventListener('click', () => this.saveTeamEdit());
     this.cancelEditBtn.addEventListener('click', () => this.hideTeamModal());
+
+    // Scoring mode change event
+    if (this.scoringModeTeam) {
+      this.scoringModeTeam.addEventListener('change', () => this.updateScoringMode());
+    }
+    if (this.scoringModePlayer) {
+      this.scoringModePlayer.addEventListener('change', () => this.updateScoringMode());
+    }
 
   // players are handled inline on each team card
 
@@ -91,13 +111,23 @@ class TeamSetup {
       this.sessionName.textContent = this.session.name;
     }
     if (this.sessionStatus) {
-      this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}`;
+      const scoringModeText = this.session.scoring_mode === 'player' ? ' | Speler Scores' : ' | Team Scores';
+      this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}${scoringModeText}`;
     }
     if (this.maxTeams) {
       this.maxTeams.textContent = this.session.max_teams;
     }
     if (this.gameType) {
       this.gameType.textContent = this.getGameTypeText(this.session.game_type);
+    }
+    
+    // Set the radio buttons based on current scoring mode
+    if (this.session.scoring_mode === 'player') {
+      if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+      if (this.playerModeHint) this.playerModeHint.style.display = 'block';
+    } else {
+      if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+      if (this.playerModeHint) this.playerModeHint.style.display = 'none';
     }
   }
 
@@ -108,6 +138,8 @@ class TeamSetup {
         this.teams = response.teams;
         this.updateTeamsDisplay();
         this.updateTeamsCount();
+        // Update available teams when session teams change
+        await this.loadAvailableTeams();
       }
     } catch (error) {
       api.handleError(error, 'loading teams');
@@ -430,6 +462,98 @@ class TeamSetup {
     return false;
   }
 
+  async loadAvailableTeams() {
+    try {
+      const response = await api.get('/api/v1/standalone-teams');
+      if (response && response.teams) {
+        // Filter out teams already in this session
+        const currentTeamIds = this.teams.map(t => t.id);
+        this.availableTeams = response.teams.filter(t => !currentTeamIds.includes(t.id));
+        this.updateAvailableTeamsSelect();
+      }
+    } catch (error) {
+      console.warn('Could not load available teams:', error);
+      // Endpoint might not exist yet, just continue without existing teams feature
+    }
+  }
+
+  updateAvailableTeamsSelect() {
+    if (!this.existingTeamSelect) return;
+    
+    // Clear and rebuild options
+    this.existingTeamSelect.innerHTML = '<option value="">-- Selecteer een bestaand team --</option>';
+    
+    // Filter out teams already in session
+    const currentTeamIds = this.teams.map(t => t.id);
+    const available = this.availableTeams.filter(t => !currentTeamIds.includes(t.id));
+    
+    available.forEach(team => {
+      const option = document.createElement('option');
+      option.value = team.id;
+      option.textContent = `${this.getIconEmoji(team.icon)} ${team.name}`;
+      option.style.color = team.color;
+      this.existingTeamSelect.appendChild(option);
+    });
+    
+    // Disable button if no teams available
+    if (this.addExistingTeamBtn) {
+      this.addExistingTeamBtn.disabled = available.length === 0;
+    }
+  }
+
+  async addExistingTeam() {
+    const teamId = this.existingTeamSelect.value;
+    if (!teamId) {
+      alert('Selecteer eerst een team.');
+      return;
+    }
+
+    if (this.teams.length >= this.session.max_teams) {
+      alert(`Maximum aantal teams (${this.session.max_teams}) bereikt.`);
+      return;
+    }
+
+    try {
+      const response = await api.post(`/api/v1/sessions/${this.sessionId}/add-team`, {
+        team_id: parseInt(teamId)
+      });
+      
+      if (response && response.team) {
+        // Reload teams to show the added team
+        await this.loadTeams();
+        await this.loadAvailableTeams();
+        
+        // Reset selection
+        this.existingTeamSelect.value = '';
+      }
+    } catch (error) {
+      api.handleError(error, 'adding existing team');
+      alert('Fout bij het toevoegen van bestaand team.');
+    }
+  }
+
+  async deleteTeam(teamId) {
+    if (!confirm('Weet je zeker dat je dit team wilt verwijderen uit deze sessie?')) {
+      return;
+    }
+
+    try {
+      // Use the new endpoint to remove from session (doesn't delete the team itself)
+      await api.delete(`/api/v1/sessions/${this.sessionId}/remove-team/${teamId}`);
+      
+      // Remove from local teams array
+      this.teams = this.teams.filter((t) => t.id !== teamId);
+      this.updateTeamsDisplay();
+      this.updateTeamsCount();
+      
+      // Update available teams
+      await this.loadAvailableTeams();
+    } catch (error) {
+      api.handleError(error, 'removing team');
+      alert('Fout bij het verwijderen van het team.');
+    }
+  }
+
   editTeam(teamId) {
     const team = this.teams.find((t) => t.id === teamId);
     if (!team) return;
@@ -469,22 +593,6 @@ class TeamSetup {
     } catch (error) {
       api.handleError(error, 'updating team');
       alert('Fout bij het bijwerken van het team.');
-    }
-  }
-
-  async deleteTeam(teamId) {
-    if (!confirm('Weet je zeker dat je dit team wilt verwijderen?')) {
-      return;
-    }
-
-    try {
-      await api.delete(`/api/v1/sessions/${this.sessionId}/teams/${teamId}`);
-      this.teams = this.teams.filter((t) => t.id !== teamId);
-      this.updateTeamsDisplay();
-      this.updateTeamsCount();
-    } catch (error) {
-      api.handleError(error, 'deleting team');
-      alert('Fout bij het verwijderen van het team.');
     }
   }
 
@@ -532,6 +640,67 @@ class TeamSetup {
 
   hideTeamModal() {
     this.teamModal.classList.remove('show');
+  }
+
+  async updateScoringMode() {
+    const selectedMode = this.scoringModePlayer && this.scoringModePlayer.checked ? 'player' : 'team';
+    
+    // Check if session is already active - warn user
+    if (this.session && this.session.status !== 'setup') {
+      const confirmChange = confirm(
+        '⚠️ Waarschuwing: De sessie is al gestart!\n\n' +
+        'Het wijzigen van de score modus tijdens een actieve sessie kan leiden tot inconsistenties.\n\n' +
+        'Weet je zeker dat je wilt doorgaan?'
+      );
+      
+      if (!confirmChange) {
+        // Revert radio button
+        if (this.session.scoring_mode === 'player') {
+          if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else {
+          if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+        }
+        return;
+      }
+    }
+    
+    // Only update if mode actually changed
+    if (this.session && this.session.scoring_mode !== selectedMode) {
+      try {
+        const updateData = {
+          scoring_mode: selectedMode
+        };
+        
+        await api.put(`/api/v1/sessions/${this.sessionId}`, updateData);
+        
+        // Update local session object
+        this.session.scoring_mode = selectedMode;
+        
+        // Update display
+        this.updateSessionDisplay();
+        
+        // Show/hide player mode hint
+        if (this.playerModeHint) {
+          this.playerModeHint.style.display = selectedMode === 'player' ? 'block' : 'none';
+        }
+        
+        // Show feedback
+        const modeText = selectedMode === 'player' ? 'Speler Scores' : 'Team Scores';
+        const emoji = selectedMode === 'player' ? '👤' : '👥';
+        alert(`${emoji} Score modus gewijzigd naar: ${modeText}\n\n${selectedMode === 'player' ? 'Je kunt nu individuele speler scores bijhouden!' : 'Scores gaan nu direct naar teams.'}`);
+        
+      } catch (error) {
+        api.handleError(error, 'updating scoring mode');
+        alert('Fout bij het wijzigen van de score modus.');
+        
+        // Revert radio button to previous state
+        if (this.session.scoring_mode === 'player') {
+          if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else {
+          if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
+        }
+      }
+    }
   }
 
   getStatusText(status) {

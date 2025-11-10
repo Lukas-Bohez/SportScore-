@@ -117,6 +117,7 @@ class SessionBase(BaseModel):
     max_teams: int = 10
     total_rounds: int = 1
     time_limit: Optional[int] = None
+    scoring_mode: str = "team"  # "team" or "player"
 
 class SessionCreate(SessionBase):
     pass
@@ -129,6 +130,7 @@ class SessionUpdate(BaseModel):
     current_round: Optional[int] = None
     total_rounds: Optional[int] = None
     time_limit: Optional[int] = None
+    scoring_mode: Optional[str] = None
 
 class SessionResponse(SessionBase):
     id: int
@@ -168,6 +170,7 @@ class SessionScoreBase(BaseModel):
     points: int
     reason: Optional[str] = None
     round_number: int = 1
+    player_id: Optional[int] = None
 
 class SessionScoreCreate(SessionScoreBase):
     pass
@@ -176,6 +179,7 @@ class SessionScoreUpdate(BaseModel):
     points: Optional[int] = None
     reason: Optional[str] = None
     round_number: Optional[int] = None
+    player_id: Optional[int] = None
 
 class SessionScoreResponse(SessionScoreBase):
     id: int

@@ -117,19 +117,74 @@ class ScoreInput {
 
   updateSessionDisplay() {
     if (this.sessionName) {
-      this.sessionName.textContent = this.session.name;
+      const scoringModeIndicator = this.session.scoring_mode === 'player' ? ' 👤' : ' 👥';
+      const scoringModeTitle = this.session.scoring_mode === 'player' ? 'Speler Scores Modus' : 'Team Scores Modus';
+      this.sessionName.innerHTML = `${this.session.name} <span title="${scoringModeTitle}">${scoringModeIndicator}</span>`;
     }
     if (this.roundInfo) {
       this.roundInfo.textContent = `Ronde ${this.session.current_round}/${this.session.total_rounds}`;
     }
+    
+    // Disable player select in team mode, disable team-only scoring in player mode
+    this.updateScoringModeUI();
+    
     this.updateTimerDisplay();
+  }
+  
+  updateScoringModeUI() {
+    if (!this.session) return;
+    
+    if (this.session.scoring_mode === 'team') {
+      // Team mode: disable player selection
+      if (this.playerSelect) {
+        this.playerSelect.disabled = true;
+        this.playerSelect.innerHTML = '<option value="">Team modus - spelers uitgeschakeld</option>';
+        this.playerSelect.title = 'In team modus kunnen alleen punten aan teams worden gegeven';
+      }
+    } else if (this.session.scoring_mode === 'player') {
+      // Player mode: enable player selection and show warning for team-only scoring
+      if (this.playerSelect) {
+        this.playerSelect.disabled = false;
+        this.playerSelect.title = 'Selecteer een speler om punten toe te kennen';
+      }
+      
+      // Add validation hint
+      if (!document.getElementById('player-mode-hint')) {
+        const hint = document.createElement('div');
+        hint.id = 'player-mode-hint';
+        hint.className = 'alert alert-info';
+        hint.style.cssText = 'margin: 10px 0; padding: 10px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;';
+        hint.innerHTML = '<strong>👤 Speler Modus:</strong> Punten moeten aan individuele spelers worden toegekend. Selecteer eerst een speler.';
+        
+        if (this.playerSelect && this.playerSelect.parentNode) {
+          this.playerSelect.parentNode.insertBefore(hint, this.playerSelect.nextSibling);
+        }
+      }
+    }
   }
 
   async loadTeams() {
     try {
+      // Save current selections
+      const currentTeamId = this.teamSelect.value;
+      const currentPlayerId = this.playerSelect.value;
+      
       const response = await api.get(`/api/v1/sessions/${this.sessionId}/teams`);
       this.teams = response.teams || [];
       this.populateTeamSelect();
+      
+      // Restore selections if they still exist
+      if (currentTeamId) {
+        this.teamSelect.value = currentTeamId;
+        // Reload players for the selected team
+        if (currentTeamId) {
+          await this.loadPlayersForTeam(currentTeamId);
+          // Restore player selection if it still exists
+          if (currentPlayerId) {
+            this.playerSelect.value = currentPlayerId;
+          }
+        }
+      }
     } catch (error) {
       api.handleError(error, 'loading teams');
     }
@@ -211,6 +266,10 @@ class ScoreInput {
 
       // Calculate leaderboard from teams and scores
       const leaderboard = this.calculateLeaderboard(allScores);
+      
+      // Cache leaderboard data for incremental updates
+      this.leaderboardData = leaderboard;
+      
       this.displayLeaderboard(leaderboard);
     } catch (error) {
       api.handleError(error, 'loading leaderboard');
@@ -250,13 +309,26 @@ class ScoreInput {
         icon: team.icon,
         score: 0,
         players: team.players || [],
+        playerScores: {}, // Track individual player scores
       };
+      
+      // Initialize player scores to 0
+      if (team.players) {
+        team.players.forEach(player => {
+          teamScores[team.id].playerScores[player.id] = 0;
+        });
+      }
     });
 
     // Add up all scores
     allScores.forEach((score) => {
       if (teamScores[score.team_id]) {
         teamScores[score.team_id].score += score.points;
+        
+        // If this score is for a specific player, track it
+        if (score.player_id && teamScores[score.team_id].playerScores[score.player_id] !== undefined) {
+          teamScores[score.team_id].playerScores[score.player_id] += score.points;
+        }
       }
     });
 
@@ -274,27 +346,47 @@ class ScoreInput {
     // Sort by score descending
     leaderboard.sort((a, b) => b.score - a.score);
 
+    // Check if session uses player-based scoring
+    const isPlayerMode = this.session && this.session.scoring_mode === 'player';
+
     const leaderboardHtml = leaderboard
       .map(
         (team, index) => {
-          const playersHtml = team.players && team.players.length > 0
-            ? `<div class="team-players">
-                 ${team.players.map(p => `
-                   <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${p.name} te selecteren">
-                     ${p.position ? `${p.name} (${p.position})` : p.name}
-                   </button>
-                 `).join('')}
-               </div>`
-            : '';
+          let playersHtml = '';
+          
+          if (team.players && team.players.length > 0) {
+            if (isPlayerMode) {
+              // Player mode: show player names with their individual scores
+              playersHtml = `<div class="team-players">
+                ${team.players.map(p => {
+                  const playerScore = team.playerScores[p.id] || 0;
+                  return `
+                    <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
+                      ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}: <strong>${playerScore}</strong>
+                    </button>
+                  `;
+                }).join('')}
+              </div>`;
+            } else {
+              // Team mode: just show player names as clickable badges
+              playersHtml = `<div class="team-players">
+                ${team.players.map(p => `
+                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
+                    ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}
+                  </button>
+                `).join('')}
+              </div>`;
+            }
+          }
           
           return `
-            <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
+            <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" data-team-id="${team.id}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
               <div class="rank">#${index + 1}</div>
               <div class="team-info">
                 <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
-                <div class="team-name">${team.name}</div>
+                <div class="team-name">${this.escapeHtml(team.name)}</div>
               </div>
-              <div class="team-score">${team.score}</div>
+              <div class="team-score" data-team-score="${team.id}">${team.score}</div>
               ${playersHtml}
             </div>
           `;
@@ -303,6 +395,39 @@ class ScoreInput {
       .join('');
 
     this.leaderboard.innerHTML = leaderboardHtml;
+  }
+  
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  // Update scores without re-rendering entire leaderboard (preserves player badges)
+  updateLeaderboardScores(leaderboard) {
+    if (!this.leaderboard || !leaderboard) return;
+    
+    leaderboard.forEach(team => {
+      const scoreElement = this.leaderboard.querySelector(`[data-team-score="${team.id}"]`);
+      if (scoreElement) {
+        scoreElement.textContent = team.score;
+      }
+      
+      // Update player scores if in player mode
+      if (this.session && this.session.scoring_mode === 'player' && team.players) {
+        team.players.forEach(player => {
+          const playerBadges = this.leaderboard.querySelectorAll('.player-badge');
+          playerBadges.forEach(badge => {
+            const badgeText = badge.textContent;
+            const playerScore = team.playerScores[player.id] || 0;
+            const playerName = player.position ? `${player.name} (${player.position})` : player.name;
+            if (badgeText.includes(playerName)) {
+              badge.innerHTML = `${this.escapeHtml(playerName)}: <strong>${playerScore}</strong>`;
+            }
+          });
+        });
+      }
+    });
   }
 
   async loadRecentScores() {
@@ -329,9 +454,14 @@ class ScoreInput {
       .map((score) => {
         const team = this.teams.find((t) => t.id === score.team_id);
         const timeAgo = this.getTimeAgo(new Date(score.timestamp));
+        
+        // Check if there's a player name
+        const teamDisplay = team ? team.name : 'Onbekend team';
+        const playerDisplay = score.player_name ? ` - ${score.player_name}` : '';
+        
         return `
         <div class="score-item">
-          <div class="score-team">${team ? team.name : 'Onbekend team'}</div>
+          <div class="score-team">${teamDisplay}${playerDisplay}</div>
           <div class="score-change ${score.points >= 0 ? 'positive' : 'negative'}">
             ${score.points >= 0 ? '+' : ''}${score.points}
           </div>
@@ -393,6 +523,16 @@ class ScoreInput {
     if (!teamId) {
       alert('Selecteer een team.');
       this.teamSelect.focus();
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
+    // Validate scoring mode
+    if (this.session.scoring_mode === 'player' && !playerId) {
+      alert('⚠️ Speler Modus: Je moet een specifieke speler selecteren om punten toe te kennen.');
+      this.playerSelect.focus();
       this.isSubmitting = false;
       if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
       quickButtons.forEach((b) => (b.disabled = false));
@@ -462,12 +602,14 @@ class ScoreInput {
     // Show animation
     this.showScoreAnimation(teamId, points);
 
-    // Reset form
+    // Reset form (but keep team and player selected for quick re-entry)
     this.reasonInput.value = '';
     this.pointsInput.value = 1;
 
-    // Reload data (these will also be refreshed by realtime events, but keep it deterministic)
+    // Reload leaderboard to show updated scores
     this.loadLeaderboard();
+    
+    // Reload teams to update scores in dropdown, but preserve selection
     this.loadTeams();
 
     // Load recent scores with a small delay to ensure the score is saved
@@ -603,9 +745,38 @@ class ScoreInput {
 
   handleScoreUpdate(data) {
     if (data.session_id == this.sessionId) {
-      this.loadLeaderboard();
+      // Update the cached leaderboard data
+      if (this.leaderboardData) {
+        const teamIndex = this.leaderboardData.findIndex(t => t.id === data.team_id);
+        if (teamIndex !== -1) {
+          this.leaderboardData[teamIndex].score = data.total_score;
+          
+          // Update player scores if available
+          if (data.player_scores) {
+            this.leaderboardData[teamIndex].playerScores = data.player_scores;
+          }
+          
+          // Sort leaderboard by score
+          this.leaderboardData.sort((a, b) => b.score - a.score);
+          
+          // Update scores in place without full re-render (preserves player badges)
+          this.updateLeaderboardScores(this.leaderboardData);
+        } else {
+          // Team not in leaderboard yet, do full reload
+          this.loadLeaderboard();
+        }
+      } else {
+        // No cached data, do full reload
+        this.loadLeaderboard();
+      }
+      
+      // Load recent scores to show the new score entry
       this.loadRecentScores();
-      this.loadTeams();
+      
+      // Only reload teams if no team is currently selected
+      if (!this.teamSelect.value) {
+        this.loadTeams();
+      }
     }
   }
 

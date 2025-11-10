@@ -1,7 +1,7 @@
-from mysql import connector
+import sqlite3
 from typing import List, Dict, Any, Optional
 import threading
-from .config import DB_CONFIG
+from .config import DB_PATH
 
 class Database:
     # Thread-local storage prevents weak reference issues
@@ -12,16 +12,13 @@ class Database:
         """Open connection thread-safe"""
         try:
             if not hasattr(cls._local, 'db'):
-                db_config = DB_CONFIG.copy()
-                cls._local.db = connector.connect(**db_config)
-                cls._local.cursor = cls._local.db.cursor(dictionary=True, buffered=True)
-        except connector.Error as err:
-            if err.errno == connector.errorcode.ER_ACCESS_DENIED_ERROR:
-                print("Error: Database access denied. Check credentials.")
-            elif err.errno == connector.errorcode.ER_BAD_DB_ERROR:
-                print("Error: Database does not exist.")
-            else:
-                print(f"Database connection error: {err}")
+                # Connect to SQLite database
+                cls._local.db = sqlite3.connect(DB_PATH, check_same_thread=False)
+                # Enable dictionary-style row access
+                cls._local.db.row_factory = sqlite3.Row
+                cls._local.cursor = cls._local.db.cursor()
+        except sqlite3.Error as err:
+            print(f"Database connection error: {err}")
             raise
 
     @classmethod
@@ -39,8 +36,10 @@ class Database:
         """Get multiple rows"""
         try:
             cls.__open_connection()
-            cls._local.cursor.execute(sql_query, params)
-            return cls._local.cursor.fetchall()
+            cls._local.cursor.execute(sql_query, params or [])
+            # Convert Row objects to dictionaries
+            rows = cls._local.cursor.fetchall()
+            return [dict(row) for row in rows] if rows else []
         except Exception as error:
             print(f"Query error: {error}")
             return None
@@ -52,8 +51,10 @@ class Database:
         """Get single row"""
         try:
             cls.__open_connection()
-            cls._local.cursor.execute(sql_query, params)
-            return cls._local.cursor.fetchone()
+            cls._local.cursor.execute(sql_query, params or [])
+            row = cls._local.cursor.fetchone()
+            # Convert Row object to dictionary
+            return dict(row) if row else None
         except Exception as error:
             print(f"Query error: {error}")
             return None
@@ -65,19 +66,20 @@ class Database:
         """Execute SQL query"""
         try:
             cls.__open_connection()
-            cls._local.cursor.execute(sql_query, params)
+            cls._local.cursor.execute(sql_query, params or [])
 
             query_type = sql_query.strip().upper().split()[0]
 
             if query_type == 'SELECT':
-                return cls._local.cursor.fetchall()
+                rows = cls._local.cursor.fetchall()
+                return [dict(row) for row in rows] if rows else []
             else:
                 cls._local.db.commit()
                 if cls._local.cursor.lastrowid:
                     return cls._local.cursor.lastrowid
                 return cls._local.cursor.rowcount
 
-        except connector.Error as error:
+        except sqlite3.Error as error:
             if hasattr(cls._local, 'db'):
                 cls._local.db.rollback()
             print(f"Execute error: {error}")

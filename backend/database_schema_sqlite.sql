@@ -60,23 +60,19 @@ END;
 
 -- ===========================================
 -- 3. TEAMS
--- Teams die deelnemen aan spellen
+-- Herbruikbare teams die in meerdere sessies kunnen deelnemen
 -- ===========================================
 CREATE TABLE IF NOT EXISTS teams (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    game_id INTEGER NOT NULL,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     color VARCHAR(7) DEFAULT '#3B82F6',
     icon VARCHAR(50) DEFAULT 'team',
-    is_eliminated INTEGER DEFAULT 0,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_teams_game_id ON teams(game_id);
 CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name);
-CREATE INDEX IF NOT EXISTS idx_teams_eliminated ON teams(is_eliminated);
 
 -- Trigger voor updated_at in teams
 CREATE TRIGGER IF NOT EXISTS update_teams_timestamp 
@@ -84,6 +80,25 @@ AFTER UPDATE ON teams
 BEGIN
     UPDATE teams SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
+
+-- ===========================================
+-- 3B. GAME_TEAMS (Koppeltabel)
+-- Koppelt teams aan specifieke games/sessies
+-- ===========================================
+CREATE TABLE IF NOT EXISTS game_teams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    is_eliminated INTEGER DEFAULT 0,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    UNIQUE(game_id, team_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_teams_game_id ON game_teams(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_teams_team_id ON game_teams(team_id);
+CREATE INDEX IF NOT EXISTS idx_game_teams_eliminated ON game_teams(is_eliminated);
 
 -- ===========================================
 -- 4. SPELERS (Players)
@@ -160,14 +175,15 @@ SELECT
     t.name as team_name,
     t.color as team_color,
     t.icon as team_icon,
-    t.is_eliminated,
+    gt.is_eliminated,
     COALESCE(SUM(s.points), 0) as total_score,
     COUNT(s.id) as score_count,
     MAX(s.timestamp) as last_score_time
 FROM games g
-JOIN teams t ON t.game_id = g.id
+JOIN game_teams gt ON gt.game_id = g.id
+JOIN teams t ON t.id = gt.team_id
 LEFT JOIN scores s ON s.team_id = t.id AND s.game_id = g.id
-GROUP BY g.id, g.name, g.status, t.id, t.name, t.color, t.icon, t.is_eliminated
+GROUP BY g.id, g.name, g.status, t.id, t.name, t.color, t.icon, gt.is_eliminated
 ORDER BY g.id, total_score DESC, t.name;
 
 -- Speler statistieken
@@ -183,7 +199,8 @@ SELECT
     COALESCE(SUM(s.points), 0) as total_points
 FROM players p
 JOIN teams t ON p.team_id = t.id
-JOIN games g ON t.game_id = g.id
+JOIN game_teams gt ON gt.team_id = t.id
+JOIN games g ON gt.game_id = g.id
 LEFT JOIN scores s ON s.player_id = p.id
 GROUP BY p.id, p.name, t.id, t.name, g.id, g.name
 ORDER BY total_points DESC;
@@ -202,4 +219,4 @@ ORDER BY total_points DESC;
 -- SELECT * FROM v_player_stats WHERE game_id = 1 ORDER BY total_points DESC;
 
 -- Tel aantal actieve teams in een spel:
--- SELECT COUNT(*) FROM teams WHERE game_id = 1 AND is_eliminated = 0;
+-- SELECT COUNT(*) FROM game_teams WHERE game_id = 1 AND is_eliminated = 0;

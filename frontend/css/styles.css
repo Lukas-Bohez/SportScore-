@@ -48,6 +48,15 @@ body {
     color: #333333; /* Dark grey text - 10% primary color */
     text-shadow: none;
     line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.scoring-mode-icon {
+    font-size: 2rem;
+    opacity: 0.7;
+    font-style: normal;
 }
 
 .game-status {
@@ -370,6 +379,23 @@ body {
     100% { transform: scale(1); }
 }
 
+@keyframes scoreFlash {
+    0%, 100% { 
+        background-color: transparent;
+        transform: scale(1);
+    }
+    50% { 
+        background-color: #4CAF50;
+        color: white;
+        transform: scale(1.2);
+        font-weight: bold;
+    }
+}
+
+.score-flash {
+    animation: scoreFlash 0.5s ease-in-out;
+}
+
 .score-updated {
     animation: pulse 0.5s ease-in-out;
 }
@@ -580,6 +606,10 @@ body {
     flex-wrap: wrap;
 }
 
+.team-players-bigscreen.player-mode {
+    gap: 12px;
+}
+
 .player-badge-bigscreen {
     background: #e7f3ff;
     color: #0066cc;
@@ -589,6 +619,44 @@ body {
     font-size: 1rem;
     font-weight: 500;
     display: inline-block;
+}
+
+.player-badge-bigscreen.with-score {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px 8px 16px;
+    background: linear-gradient(135deg, #e7f3ff 0%, #d4e9ff 100%);
+    border: 2px solid #4ECDC4;
+}
+
+.player-badge-bigscreen .player-name-part {
+    font-weight: 500;
+    color: #333;
+}
+
+.player-badge-bigscreen .player-score-part {
+    background: #4ECDC4;
+    color: white;
+    font-weight: bold;
+    font-size: 1.1rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    min-width: 35px;
+    text-align: center;
+}
+
+.player-badge-bigscreen .player-score-part:before {
+    content: '';
+}
+
+/* Positive/negative score styling */
+.player-badge-bigscreen.negative .player-score-part {
+    background: #ff6b6b;
+}
+
+.player-badge-bigscreen.positive .player-score-part {
+    background: #51cf66;
 }
 
 .team-position {
@@ -619,7 +687,6 @@ body {
     display: flex;
     align-items: center;
     flex: 1;
-    margin-bottom: 20px;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -641,7 +708,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    height: 60px;
     font-variant-numeric: tabular-nums;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
