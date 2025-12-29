@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamScore - Nieuwe Sessie</title>
+    <link rel="stylesheet" href="css/startscreen.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧩 TeamScore</h1>
+            <p>Digitaal scorebord voor teambuildings</p>
+        </header>
+
+        <main class="main-content">
+            <div class="session-setup">
+                <h2>Nieuwe Sessie Aanmaken</h2>
+
+                <form id="session-form" class="setup-form">
+                    <div class="form-group">
+                        <label for="session-name">Sessie Naam:</label>
+                        <input type="text" id="session-name" placeholder="bijv. Team Building Dag 2025" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="game-type">Speltype:</label>
+                        <select id="game-type">
+                            <option value="custom">Aangepast</option>
+                            <option value="quiz">Quiz Modus</option>
+                            <option value="sport_challenge">Sport Challenge</option>
+                            <option value="random_bonus">Random Bonus</option>
+                            <option value="elimination">Eliminatie Modus</option>
+                            <option value="team_vs_time">Team vs Time</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="scoring-mode">Score Modus:</label>
+                        <select id="scoring-mode" name="scoring-mode">
+                            <option value="team">Team Scores (alleen totale punten per team)</option>
+                            <option value="player">Speler Scores (individuele punten per speler)</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 4px;">
+                            Bij speler scores worden punten per speler bijgehouden en geteld naar team totaal.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-teams">Maximum Aantal Teams:</label>
+                        <input type="number" id="max-teams" value="6" min="2" max="20">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="total-rounds">Aantal Rondes:</label>
+                        <input type="number" id="total-rounds" value="1" min="1" max="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="time-limit">Tijdslimiet per Ronde (minuten, optioneel):</label>
+                        <input type="number" id="time-limit" placeholder="Laat leeg voor geen limiet" min="1">
+                    </div>
+
+                    <button type="submit" class="create-btn">Sessie Aanmaken</button>
+                </form>
+            </div>
+
+            <div class="active-session hidden" id="active-session">
+                <h2>Actieve Sessie</h2>
+                <div id="active-session-info"></div>
+                <div class="session-actions">
+                    <button id="continue-session" class="continue-btn">Doorgaan met Sessie</button>
+                    <button id="end-session" class="end-btn">Sessie Beëindigen</button>
+                </div>
+            </div>
+
+            <div class="team-management" id="team-management">
+                <div class="section-header">
+                    <h2>Team Beheer</h2>
+                    <button id="add-team-btn" class="add-team-btn">+ Nieuw Team</button>
+                </div>
+                
+                <div id="team-form-container" class="team-form-container hidden">
+                    <form id="team-form" class="team-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="team-name">Team Naam:</label>
+                                <input type="text" id="team-name" placeholder="bijv. Team Blauw" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="team-color">Kleur:</label>
+                                <input type="color" id="team-color" value="#3B82F6">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="team-icon">Icoon:</label>
+                                <select id="team-icon">
+                                    <option value="team">👥 Team</option>
+                                    <option value="star">⭐ Ster</option>
+                                    <option value="trophy">🏆 Trofee</option>
+                                    <option value="fire">🔥 Vuur</option>
+                                    <option value="rocket">🚀 Raket</option>
+                                    <option value="crown">👑 Kroon</option>
+                                    <option value="lightning">⚡ Bliksem</option>
+                                    <option value="heart">❤️ Hart</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="team-description">Beschrijving (optioneel):</label>
+                                <input type="text" id="team-description" placeholder="bijv. De beste spelers">
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="save-team-btn">Team Opslaan</button>
+                            <button type="button" id="cancel-team-btn" class="cancel-team-btn">Annuleren</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div id="teams-list" class="teams-list">Laden...</div>
+            </div>
+
+            <div class="recent-sessions" id="recent-sessions">
+                <div class="section-header">
+                    <h2>Recente Sessies</h2>
+                    <button id="view-all-sessions-btn" class="view-all-btn">Alle Sessies Bekijken</button>
+                </div>
+                <div id="sessions-list">Laden...</div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 TeamScore - Digitaal Scorebord voor Teambuildings</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/startscreen.js"></script>
+</body>
+</html>
