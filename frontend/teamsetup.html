@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamScore - Team Instellen</title>
+    <link rel="stylesheet" href="css/teamsetup.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧩 TeamScore - Team Instellen</h1>
+            <div class="session-info">
+                <span id="session-name">Sessie laden...</span>
+                <span id="session-status">Status: Setup</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="teams-section">
+                <h2>Teams Beheren</h2>
+
+                <!-- Bestaande teams selecteren -->
+                <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
+                            <option value="">-- Selecteer een bestaand team --</option>
+                        </select>
+                        <button id="add-existing-team-btn" class="add-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                    </div>
+                    <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
+                        💡 Teams kunnen hergebruikt worden in meerdere sessies
+                    </p>
+                </div>
+
+                <!-- Of nieuw team maken -->
+                <h3>Of Nieuw Team Maken</h3>
+                <div class="add-team-form">
+                    <input type="text" id="team-name" placeholder="Team naam" maxlength="50" aria-label="Team naam">
+                    <select id="team-color" title="Kleur kiezen" aria-label="Team kleur">
+                        <option value="#FF6B6B">🔴 Rood</option>
+                        <option value="#4ECDC4">🔵 Turquoise</option>
+                        <option value="#45B7D1">🔵 Blauw</option>
+                        <option value="#96CEB4">🟢 Groen</option>
+                        <option value="#FFEAA7">🟡 Geel</option>
+                        <option value="#DDA0DD">🟣 Plum</option>
+                        <option value="#98D8C8">🟢 Mint</option>
+                        <option value="#F7DC6F">🟡 Goud</option>
+                        <option value="#BB8FCE">🟣 Paars</option>
+                        <option value="#85C1E9">🔵 Light Blue</option>
+                    </select>
+                    <select id="team-icon" title="Icoon kiezen" aria-label="Team icoon">
+                        <option value="team">👥 Team</option>
+                        <option value="star">⭐ Ster</option>
+                        <option value="fire">🔥 Vuur</option>
+                        <option value="rocket">🚀 Raket</option>
+                        <option value="trophy">🏆 Trofee</option>
+                        <option value="lightning">⚡ Bliksem</option>
+                        <option value="heart">❤️ Hart</option>
+                        <option value="diamond">💎 Diamant</option>
+                        <option value="crown">👑 Kroon</option>
+                        <option value="superhero">🦸 Superheld</option>
+                    </select>
+                    <button id="add-team-btn" class="add-btn">Toevoegen</button>
+                </div>
+
+                <div class="teams-grid" id="teams-grid">
+                    <!-- Teams will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="actions-section">
+                <div class="action-buttons">
+                    <button id="start-session-btn" class="start-btn">Start Sessie</button>
+                    <button id="delete-session-btn" class="delete-btn">Verwijder Sessie</button>
+                    <button id="back-btn" class="back-btn">Terug naar Start</button>
+                </div>
+
+                <div class="session-summary">
+                    <h3>Sessie Overzicht</h3>
+                    <div id="session-summary">
+                        <p>Aantal teams: <span id="teams-count">0</span></p>
+                        <p>Maximum teams: <span id="max-teams">6</span></p>
+                        <p>Speltype: <span id="game-type">Aangepast</span></p>
+                    </div>
+                    
+                    <h3 style="margin-top: 20px;">Score Modus</h3>
+                    <div class="scoring-mode-selector">
+                        <label>
+                            <input type="radio" name="scoring-mode" value="team" id="scoring-mode-team" checked>
+                            <span class="radio-label">
+                                <strong>👥 Team Scores</strong><br>
+                                <small>Punten gaan direct naar teams</small>
+                            </span>
+                        </label>
+                        <label>
+                            <input type="radio" name="scoring-mode" value="player" id="scoring-mode-player">
+                            <span class="radio-label">
+                                <strong>👤 Speler Scores</strong><br>
+                                <small>Punten per speler, geteld naar team totaal</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div id="player-mode-hint" style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
+                        <strong>💡 Tip voor Speler Scores:</strong><br>
+                        <small style="color: #856404;">Voeg spelers toe aan je teams om hun individuele scores bij te kunnen houden!</small>
+                    </div>
+                    <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                        <em>Bij speler scores zie je individuele bijdragen per speler in het scorebord</em>
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>TeamScore - Digitaal Scorebord voor Teambuildings</p>
+        </footer>
+    </div>
+
+    <!-- Team Edit Modal -->
+    <div class="modal" id="team-modal">
+        <div class="modal-content">
+            <h3>Team Bewerken</h3>
+            <input type="hidden" id="edit-team-id">
+            <div class="form-group">
+                <label for="edit-team-name">Team Naam:</label>
+                <input type="text" id="edit-team-name" maxlength="50">
+            </div>
+            <div class="form-group">
+                <label for="edit-team-color">Kleur:</label>
+                <select id="edit-team-color">
+                    <option value="#FF6B6B">Rood</option>
+                    <option value="#4ECDC4">Turquoise</option>
+                    <option value="#45B7D1">Blauw</option>
+                    <option value="#96CEB4">Groen</option>
+                    <option value="#FFEAA7">Geel</option>
+                    <option value="#DDA0DD">Plum</option>
+                    <option value="#98D8C8">Mint</option>
+                    <option value="#F7DC6F">Goud</option>
+                    <option value="#BB8FCE">Paars</option>
+                    <option value="#85C1E9">Light Blue</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-team-icon">Icoon:</label>
+                <select id="edit-team-icon">
+                    <option value="team">👥 Team</option>
+                    <option value="star">⭐ Ster</option>
+                    <option value="fire">🔥 Vuur</option>
+                    <option value="rocket">🚀 Raket</option>
+                    <option value="trophy">🏆 Trofee</option>
+                    <option value="lightning">⚡ Bliksem</option>
+                    <option value="heart">❤️ Hart</option>
+                    <option value="diamond">💎 Diamant</option>
+                    <option value="crown">👑 Kroon</option>
+                    <option value="superhero">🦸 Superheld</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button id="save-team-btn" class="save-btn">Opslaan</button>
+                <button id="cancel-edit-btn" class="cancel-btn">Annuleren</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Players are now rendered inline inside each team card (no modal) -->
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/teamsetup.js"></script>
+</body>
+</html>
