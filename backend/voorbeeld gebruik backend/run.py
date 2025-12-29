@@ -27,6 +27,17 @@ def main():
         venv_python = os.path.join(script_dir, "venv", "bin", "python")
         venv_pip = os.path.join(script_dir, "venv", "bin", "pip")
 
+    # Locate requirements.txt (search current and parent directories)
+    def find_requirements(start_dir):
+        candidates = [start_dir, os.path.dirname(start_dir), os.path.join(os.path.dirname(start_dir), '..')]
+        for d in candidates:
+            path = os.path.join(os.path.abspath(d), 'requirements.txt')
+            if os.path.exists(path):
+                return path
+        return None
+
+    requirements_path = find_requirements(script_dir)
+
     # Check if virtual environment exists
     if not os.path.exists(venv_python):
         print("Virtual environment not found. Creating one...")
@@ -36,23 +47,28 @@ def main():
         except subprocess.CalledProcessError as e:
             print(f"Failed to create virtual environment: {e}")
             return 1
-
-        # Install requirements
-        print("Installing requirements...")
-        try:
-            subprocess.check_call([venv_pip, "install", "-r", "requirements.txt"])
-            print("Requirements installed")
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to install requirements: {e}")
-            return 1
+        # Install requirements (use located requirements.txt if available)
+        if requirements_path:
+            print(f"Installing requirements from {requirements_path}...")
+            try:
+                subprocess.check_call([venv_pip, "install", "-r", requirements_path])
+                print("Requirements installed")
+            except subprocess.CalledProcessError as e:
+                print(f"Failed to install requirements: {e}")
+                return 1
+        else:
+            print("No requirements.txt found; skipping automatic install.")
 
     # Check if requirements are installed
     try:
         result = subprocess.run([venv_python, "-c", "import fastapi, uvicorn, socketio"], capture_output=True, text=True)
         if result.returncode != 0:
-            print("Installing missing requirements...")
-            subprocess.check_call([venv_pip, "install", "-r", "requirements.txt"])
-            print("Requirements installed")
+            if requirements_path:
+                print("Installing missing requirements...")
+                subprocess.check_call([venv_pip, "install", "-r", requirements_path])
+                print("Requirements installed")
+            else:
+                print("Requirements seem to be missing but no requirements.txt was found.")
     except subprocess.CalledProcessError as e:
         print(f"Failed to check/install requirements: {e}")
         return 1

@@ -1,11 +1,29 @@
 @echo off
-REM TeamScore Launch Script for Windows
+REM TeamScore Launch Script for Windows (adjusted to current folder layout)
 REM This script sets up the SQLite database, launches backend and frontend
 
 echo 🚀 Starting TeamScore Application Setup...
 
-REM Change to the project root directory
-cd /d "%~dp0"
+REM Determine script directory and repository root (tries a couple of parent locations)
+set "SCRIPT_DIR=%~dp0"
+set "ROOT=%SCRIPT_DIR%"
+
+if exist "%ROOT%backend\init_database.py" (
+    goto :FOUND_ROOT
+)
+set "ROOT=%SCRIPT_DIR%..\..\"
+if exist "%ROOT%backend\init_database.py" (
+    goto :FOUND_ROOT
+)
+set "ROOT=%SCRIPT_DIR%..\"
+if exist "%ROOT%backend\init_database.py" (
+    goto :FOUND_ROOT
+)
+echo ⚠️ Could not locate repository root automatically; using script directory as root
+:FOUND_ROOT
+
+REM Switch to resolved root for relative operations
+pushd "%ROOT%" >nul 2>&1 || cd /d "%ROOT%"
 
 REM ------------------------------------------------------------
 REM SQLite Database Setup
@@ -15,10 +33,15 @@ echo 📦 Checking SQLite database...
 REM Check if database exists
 if not exist "backend\scoreboard.db" (
     echo 🏗️ Database not found. Creating new SQLite database...
-    backend\venv\Scripts\python.exe backend\init_database.py
+    if exist "backend\venv\Scripts\python.exe" (
+        "backend\venv\Scripts\python.exe" backend\init_database.py
+    ) else (
+        python backend\init_database.py
+    )
     if %errorlevel% neq 0 (
         echo ❌ Failed to create database
         pause
+        popd
         exit /b 1
     )
     echo ✅ Database created successfully
@@ -30,14 +53,22 @@ echo ✅ SQLite database ready
 
 REM Start backend in a new window
 echo 🚀 Starting backend server...
-start "TeamScore Backend" cmd /k "cd /d "%~dp0backend" && venv\Scripts\python.exe run.py"
+if exist "backend\venv\Scripts\python.exe" (
+    start "TeamScore Backend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && venv\Scripts\python.exe run.py"
+) else (
+    start "TeamScore Backend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && python run.py"
+)
 
 REM Wait a moment for backend to start
 ping -n 4 127.0.0.1 >nul
 
 REM Start frontend server in a new window
 echo 🌐 Starting frontend server...
-start "TeamScore Frontend" cmd /k "cd /d "%~dp0" && backend\venv\Scripts\python.exe serve_frontend.py"
+if exist "backend\venv\Scripts\python.exe" (
+    start "TeamScore Frontend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && venv\Scripts\python.exe serve_frontend.py"
+) else (
+    start "TeamScore Frontend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && python serve_frontend.py"
+)
 
 REM Wait a moment for frontend to start
 ping -n 3 127.0.0.1 >nul
@@ -58,5 +89,6 @@ echo.
 echo ⚠️  Do NOT close the server windows! Close this window instead.
 echo    To stop the servers, press Ctrl+C in each server window.
 
-REM Keep the window open
+REM Restore original directory and keep the window open
+popd >nul 2>&1
 pause
