@@ -81,7 +81,12 @@ def main():
 
     try:
         # Run the app using the virtual environment's Python
-        subprocess.run([venv_python, "app.py"])
+        # `app.py` is located in the parent `backend` directory relative to this script
+        app_path = os.path.abspath(os.path.join(script_dir, '..', 'app.py'))
+        if not os.path.exists(app_path):
+            print(f"ERROR: app.py not found at {app_path}")
+            return 1
+        subprocess.run([venv_python, app_path])
     except KeyboardInterrupt:
         print("\nServer stopped")
         return 0

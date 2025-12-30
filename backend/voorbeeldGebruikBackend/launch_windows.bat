@@ -7,16 +7,20 @@ echo 🚀 Starting TeamScore Application Setup...
 REM Determine script directory and repository root (tries a couple of parent locations)
 set "SCRIPT_DIR=%~dp0"
 set "ROOT=%SCRIPT_DIR%"
+REM Normalize ROOT by removing a trailing backslash if present
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
-if exist "%ROOT%backend\init_database.py" (
+if exist "%ROOT%\backend\init_database.py" (
     goto :FOUND_ROOT
 )
 set "ROOT=%SCRIPT_DIR%..\..\"
-if exist "%ROOT%backend\init_database.py" (
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+if exist "%ROOT%\backend\init_database.py" (
     goto :FOUND_ROOT
 )
 set "ROOT=%SCRIPT_DIR%..\"
-if exist "%ROOT%backend\init_database.py" (
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+if exist "%ROOT%\backend\init_database.py" (
     goto :FOUND_ROOT
 )
 echo ⚠️ Could not locate repository root automatically; using script directory as root
@@ -53,22 +57,16 @@ echo ✅ SQLite database ready
 
 REM Start backend in a new window
 echo 🚀 Starting backend server...
-if exist "backend\venv\Scripts\python.exe" (
-    start "TeamScore Backend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && venv\Scripts\python.exe run.py"
-) else (
-    start "TeamScore Backend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && python run.py"
-)
+REM We're already in %ROOT% due to pushd above; use relative paths to avoid quoting issues
+start "TeamScore Backend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && run_server.bat"
 
 REM Wait a moment for backend to start
 ping -n 4 127.0.0.1 >nul
 
 REM Start frontend server in a new window
 echo 🌐 Starting frontend server...
-if exist "backend\venv\Scripts\python.exe" (
-    start "TeamScore Frontend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && venv\Scripts\python.exe serve_frontend.py"
-) else (
-    start "TeamScore Frontend" cmd /k "cd /d \"%ROOT%backend\voorbeeld gebruik backend\" && python serve_frontend.py"
-)
+REM Use relative path so cmd quoting stays simple
+start "TeamScore Frontend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && serve_frontend_server.bat"
 
 REM Wait a moment for frontend to start
 ping -n 3 127.0.0.1 >nul

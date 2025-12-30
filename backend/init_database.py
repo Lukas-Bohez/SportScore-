@@ -44,8 +44,8 @@ def init_database():
         conn.commit()
         conn.close()
         
-        print("✓ Database initialized successfully!")
-        print(f"✓ Database file created at: {DB_PATH}")
+        print("Database initialized successfully!")
+        print(f"Database file created at: {DB_PATH}")
         
         # Verify tables were created
         conn = sqlite3.connect(str(DB_PATH))
@@ -54,7 +54,7 @@ def init_database():
         tables = cursor.fetchall()
         conn.close()
         
-        print(f"✓ Created {len(tables)} tables:")
+        print(f"Created {len(tables)} tables:")
         for table in tables:
             print(f"  - {table[0]}")
         
