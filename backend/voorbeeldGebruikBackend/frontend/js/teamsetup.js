@@ -78,9 +78,8 @@ class TeamSetup {
 
     // Player manager elements
     this.newPlayerNameGlobal = document.getElementById('new-player-name-global');
-    this.newPlayerPositionGlobal = document.getElementById('new-player-position-global');
-    this.newPlayerDefaultTeam = document.getElementById('new-player-default-team');
     this.addPlayerGlobalBtn = document.getElementById('add-player-global-btn');
+      // position input removed: positions are assigned alphabetically on creation
     this.playersListGlobal = document.getElementById('players-list-global');
     if (this.addPlayerGlobalBtn) this.addPlayerGlobalBtn.addEventListener('click', () => this.createPlayerGlobal());
 
@@ -190,20 +189,15 @@ class TeamSetup {
         <div class="team-actions">
           <button class="edit-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
           <button class="delete-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
-          <button class="add-player-to-team-btn" title="Speler toewijzen aan dit team" onclick="teamSetup.toggleUnassignedPlayers(${team.id})">＋ Speler</button>
+          <button class="save-team-btn compact" title="Speler toewijzen aan dit team" onclick="teamSetup.toggleUnassignedPlayers(${team.id})">＋ Speler</button>
         </div>
       </div>
 
-      <div class="players-section" id="players-for-${team.id}">
+        <div class="players-section" id="players-for-${team.id}">
         <div class="players-list" id="players-list-${team.id}">Laden…</div>
         <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
           <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
           <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
-        </div>
-        <div class="add-player-inline">
-          <input type="text" id="new-player-name-${team.id}" placeholder="Speler naam" maxlength="100">
-          <input type="text" id="new-player-position-${team.id}" placeholder="Positie (optioneel)" maxlength="50">
-          <button class="add-player-inline-btn" onclick="teamSetup.addPlayerInline(${team.id})">Voeg speler toe</button>
         </div>
       </div>
     `;
@@ -222,23 +216,47 @@ class TeamSetup {
     try {
       listEl.innerHTML = '<p style="color:#666">Laden…</p>';
       const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
-      const players = resp && resp.players ? resp.players : [];
+      let players = resp && resp.players ? resp.players : [];
+      // enrich players with global data (position, full player object) when available
+      if (players && players.length > 0 && this.allPlayers) {
+        const byId = {};
+        (this.allPlayers || []).forEach(ap => { byId[ap.id] = ap; });
+        players = players.map(sp => {
+          const pid = sp.player_id || sp.id || sp.player_id;
+          const global = byId[pid] || null;
+          return Object.assign({}, sp, { id: pid, name: sp.player_name || (global && global.name), position: (global && global.position) || null });
+        });
+      }
       if (!players || players.length === 0) {
         listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
         return;
       }
       listEl.innerHTML = '';
-      players.forEach(p => {
-        const el = document.createElement('div');
-        el.className = 'player-row';
-        el.innerHTML = `
-          <span class="player-name">${this.escapeHtml(p.name)}</span>
-          <span class="player-pos">${p.position ? this.escapeHtml(p.position) : ''}</span>
-          <button class="delete-player-btn" onclick="teamSetup.deletePlayerInline(${p.id}, ${teamId})">Verwijderen</button>
-          <button class="unassign-player-btn" onclick="teamSetup.removeAssignment(${this.sessionId}, ${p.id})" title="Verwijder toewijzing">✖</button>
-        `;
-        listEl.appendChild(el);
-      });
+      // build taken positions map
+      const taken = new Set();
+      players.forEach(p => { if (p.position) taken.add(String(p.position)); });
+        players.forEach(p => {
+          const el = document.createElement('div');
+          el.className = 'player-row';
+          // left: name (and optional position)
+          const left = document.createElement('div');
+          left.className = 'player-left';
+          left.innerHTML = `<span class="player-name">${this.escapeHtml(p.name || p.player_name)}</span>` + (p.position ? ` <span class="player-pos">${this.escapeHtml(p.position)}</span>` : '');
+          // right: unassign button (styled like team delete)
+          const right = document.createElement('div');
+          right.className = 'player-actions';
+          const unassignBtn = document.createElement('button');
+          unassignBtn.className = 'delete-team-btn';
+          unassignBtn.textContent = 'Verwijderen';
+          unassignBtn.title = 'Verwijder toewijzing';
+          unassignBtn.onclick = () => this.removeAssignment(this.sessionId, p.id);
+          right.appendChild(unassignBtn);
+          el.appendChild(left);
+          el.appendChild(right);
+          listEl.appendChild(el);
+        });
+      // populate position select for inline add with available positions (1..12)
+      this.populatePositionSelect(teamId, taken);
     } catch (err) {
       // If the server returns 405 (endpoint not available) treat as "no players yet"
       const msg = err && err.message ? err.message : '';
@@ -253,14 +271,24 @@ class TeamSetup {
             return;
           }
           listEl.innerHTML = '';
+          // build taken positions
+          const taken2 = new Set();
+          players2.forEach(p => { if (p.position) taken2.add(String(p.position)); });
           players2.forEach(p => {
             const el = document.createElement('div');
             el.className = 'player-row';
-            el.innerHTML = `
-              <span class="player-name">${this.escapeHtml(p.name)}</span>
-              <span class="player-pos">${p.position ? this.escapeHtml(p.position) : ''}</span>
-              <button class="delete-player-btn" onclick="teamSetup.deletePlayerInline(${p.id}, ${teamId})">Verwijderen</button>
-            `;
+            const left = document.createElement('div');
+            left.className = 'player-left';
+            left.innerHTML = `<span class="player-name">${this.escapeHtml(p.name)}</span>` + (p.position ? ` <span class="player-pos">${this.escapeHtml(p.position)}</span>` : '');
+            const right = document.createElement('div');
+            right.className = 'player-actions';
+            const unassignBtn = document.createElement('button');
+            unassignBtn.className = 'delete-team-btn';
+            unassignBtn.textContent = 'Verwijderen';
+            unassignBtn.onclick = () => this.deletePlayerInline(p.id, teamId);
+            right.appendChild(unassignBtn);
+            el.appendChild(left);
+            el.appendChild(right);
             listEl.appendChild(el);
           });
         } catch (err2) {
@@ -275,16 +303,16 @@ class TeamSetup {
     }
   }
 
+  // populatePositionSelect removed: positions are now assigned alphabetically on create
+
   escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   async addPlayerInline(teamId) {
     const nameEl = document.getElementById(`new-player-name-${teamId}`);
-    const posEl = document.getElementById(`new-player-position-${teamId}`);
     if (!nameEl) return;
     const name = (nameEl.value || '').trim();
-    const position = posEl ? (posEl.value || '').trim() : undefined;
     if (!name) {
       alert('Voer een spelersnaam in.');
       nameEl.focus();
@@ -292,10 +320,8 @@ class TeamSetup {
     }
     try {
       const payload = { name: name, team_id: Number(teamId) };
-      if (position) payload.position = position;
       await api.postSilent(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`, payload);
       nameEl.value = '';
-      if (posEl) posEl.value = '';
       await this.loadPlayersForTeam(teamId);
       await this.loadPlayers();
     } catch (err) {
@@ -305,10 +331,8 @@ class TeamSetup {
       if (status405) {
         try {
           const payload = { name: name, team_id: Number(teamId) };
-          if (position) payload.position = position;
           await api.postSilent('/api/v1/players', payload);
           nameEl.value = '';
-          if (posEl) posEl.value = '';
           await this.loadPlayersForTeam(teamId);
           return;
         } catch (err2) {
@@ -427,7 +451,7 @@ class TeamSetup {
             sel.appendChild(o);
           });
           const assignBtn = document.createElement('button');
-          assignBtn.className = 'add-btn';
+          assignBtn.className = 'save-team-btn compact';
           assignBtn.textContent = 'Toewijzen';
           assignBtn.onclick = async () => {
             const teamId = sel.value;
@@ -462,7 +486,6 @@ class TeamSetup {
 
     async createPlayerGlobal() {
       const name = (this.newPlayerNameGlobal && this.newPlayerNameGlobal.value || '').trim();
-      const position = (this.newPlayerPositionGlobal && this.newPlayerPositionGlobal.value || '').trim();
       const defaultTeam = this.newPlayerDefaultTeam ? this.newPlayerDefaultTeam.value : '';
       if (!name) {
         alert('Voer een spelersnaam in.');
@@ -470,12 +493,12 @@ class TeamSetup {
       }
       try {
         const payload = { name };
-        if (position) payload.position = position;
         if (defaultTeam) payload.team_id = parseInt(defaultTeam);
         await api.post('/api/v1/players', payload);
         if (this.newPlayerNameGlobal) this.newPlayerNameGlobal.value = '';
-        if (this.newPlayerPositionGlobal) this.newPlayerPositionGlobal.value = '';
         if (this.newPlayerDefaultTeam) this.newPlayerDefaultTeam.value = '';
+        // Reindex positions alphabetically after creating a new player
+        await this.reindexPlayersAlphabetically();
         await this.loadPlayers();
         // also refresh teams listing in case assigned via default team
         await this.loadTeams();
@@ -500,8 +523,7 @@ class TeamSetup {
     promptEditPlayer(p) {
       const newName = prompt('Nieuwe naam voor speler:', p.name);
       if (newName === null) return; // cancelled
-      const newPosition = prompt('Nieuwe positie (leeg = geen wijziging):', p.position || '');
-      this.editPlayer(p.id, newName.trim(), (newPosition !== null ? newPosition.trim() : undefined));
+      this.editPlayer(p.id, newName.trim());
     }
 
     async editPlayer(playerId, name, position) {
@@ -518,9 +540,30 @@ class TeamSetup {
       }
     }
 
+    async reindexPlayersAlphabetically() {
+      try {
+        const resp = await api.get('/api/v1/players');
+        const players = resp && resp.players ? resp.players.slice() : [];
+        players.sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, { sensitivity: 'base' }));
+        for (let i=0;i<players.length;i++) {
+          const p = players[i];
+          try {
+            await api.put(`/api/v1/players/${p.id}`, { position: String(i+1) });
+          } catch (e) {
+            console.warn('Failed to update player position during reindex', p.id, e);
+          }
+        }
+        await this.loadPlayers();
+        await this.loadTeams();
+      } catch (e) {
+        console.warn('Reindexing players failed', e);
+      }
+    }
+
     async assignPlayerToTeam(sessionId, teamId, playerId) {
       try {
         await api.post(`/api/v1/sessions/${sessionId}/assign-player`, { player_id: parseInt(playerId), team_id: parseInt(teamId) });
+        // Do not set or modify positions during assignment; positions are managed separately in team beheer
         await this.loadPlayers();
         await this.loadPlayersForTeam(teamId);
         await this.loadAvailableTeams();
@@ -577,7 +620,7 @@ class TeamSetup {
         const left = document.createElement('div');
         left.textContent = p.name + (p.position ? ` (${p.position})` : '');
         const btn = document.createElement('button');
-        btn.className = 'add-btn';
+        btn.className = 'save-team-btn compact';
         btn.textContent = 'Voeg toe';
         btn.onclick = async () => {
           await this.assignPlayerToTeam(this.sessionId, teamId, p.id);
@@ -608,7 +651,6 @@ class TeamSetup {
       rocket: '🚀',
       trophy: '🏆',
       lightning: '⚡',
-      heart: '❤️',
       diamond: '💎',
       crown: '👑',
       superhero: '🦸',

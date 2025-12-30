@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TeamScore - Team Instellen</title>
     <link rel="stylesheet" href="css/teamsetup.css">
+    <link rel="stylesheet" href="css/buttons.css">
 </head>
 <body>
     <div class="container">
@@ -27,7 +28,7 @@
                         <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
                             <option value="">-- Selecteer een bestaand team --</option>
                         </select>
-                        <button id="add-existing-team-btn" class="add-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                        <button id="add-existing-team-btn" class="save-team-btn" style="white-space: nowrap;">Team Toevoegen</button>
                     </div>
                     <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
                         💡 Teams kunnen hergebruikt worden in meerdere sessies
@@ -62,7 +63,7 @@
                         <option value="crown">👑 Kroon</option>
                         <option value="superhero">🦸 Superheld</option>
                     </select>
-                    <button id="add-team-btn" class="add-btn">Toevoegen</button>
+                    <button id="add-team-btn" class="save-team-btn">Toevoegen</button>
                 </div>
 
                 <div class="teams-grid" id="teams-grid">
@@ -74,12 +75,9 @@
                 <div class="players-manager-section" style="margin-top: 24px;">
                     <h2>Spelers Beheren</h2>
                     <div class="player-create" style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
-                        <input type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100" style="flex:1; padding:8px;">
-                        <input type="text" id="new-player-position-global" placeholder="Positie (optioneel)" maxlength="50" style="width:200px; padding:8px;">
-                        <select id="new-player-default-team" style="width:180px; padding:8px;">
-                            <option value="">-- Standaard team (optioneel) --</option>
-                        </select>
-                        <button id="add-player-global-btn" class="add-btn">Speler aanmaken</button>
+                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100" style="flex:1; padding:8px;">
+                        <!-- Position removed: positions are assigned alphabetically on creation -->
+                        <button id="add-player-global-btn" class="save-team-btn">Speler aanmaken</button>
                     </div>
 
                     <div id="players-list-global" style="background:#fafafa; padding:12px; border-radius:8px;">

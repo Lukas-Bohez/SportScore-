@@ -12,6 +12,21 @@ class LeaderboardView {
     this.getSessionIdFromURL();
     this.bindElements();
     this.loadSessionData();
+    // react to realtime updates for teams or session so assignments reflect immediately
+    try {
+      api.on('team_update', (data) => {
+        if (data && Number(data.session_id) === Number(this.sessionId)) {
+          this.loadSessionData();
+        }
+      });
+      api.on('session_update', (data) => {
+        if (data && Number(data.id || data.session_id) === Number(this.sessionId)) {
+          this.loadSessionData();
+        }
+      });
+    } catch (e) {
+      // ignore if api not ready
+    }
   }
 
   getSessionIdFromURL() {
@@ -40,6 +55,8 @@ class LeaderboardView {
     try {
       // Load session details
       this.sessionData = await api.getSession(this.sessionId);
+      // Respect session flag whether to show players on scoreboard (default true)
+      this.showPlayers = (this.sessionData && typeof this.sessionData.show_players !== 'undefined') ? Boolean(this.sessionData.show_players) : true;
       this.displaySessionInfo();
 
       // Load teams and scores
@@ -78,8 +95,12 @@ class LeaderboardView {
   async loadPlayersForAllTeams() {
     for (const team of this.teamsData) {
       try {
-        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
-        team.players = resp && resp.players ? resp.players : [];
+        if (this.showPlayers) {
+          const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
+          team.players = resp && resp.players ? resp.players : [];
+        } else {
+          team.players = [];
+        }
       } catch (err) {
         // Try fallback to global players
         const msg = err && err.message ? err.message : '';
@@ -203,7 +224,7 @@ class LeaderboardView {
   createTeamCard(team) {
     const teamScore = this.calculateTeamScore(team.id);
     const players = team.players || [];
-    const playersHtml = players.length > 0
+    const playersHtml = (this.showPlayers && players.length > 0)
       ? `<div class="team-players">
            <span class="players-label">Spelers:</span>
            <span class="players-list">${players.map(p => p.position ? `${p.name} (${p.position})` : p.name).join(', ')}</span>

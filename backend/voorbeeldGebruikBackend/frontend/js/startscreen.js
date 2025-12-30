@@ -27,6 +27,15 @@ class StartScreen {
     this.teamForm = document.getElementById('team-form');
     this.cancelTeamBtn = document.getElementById('cancel-team-btn');
     this.teamsList = document.getElementById('teams-list');
+    // Player manager elements
+    this.showPlayersCheckbox = document.getElementById('show-players');
+    this.showPlayerManagerBtn = document.getElementById('show-player-manager');
+    this.playerManagerDiv = document.getElementById('player-manager');
+    this.pmPlayerName = document.getElementById('pm-player-name');
+    // position input removed: positions are assigned alphabetically on creation
+    this.pmPlayerDefaultTeam = document.getElementById('pm-player-default-team');
+    this.pmAddPlayerBtn = document.getElementById('pm-add-player');
+    this.pmPlayersList = document.getElementById('pm-players-list');
 
     // Log missing elements for debugging
     if (!this.sessionForm) console.warn('session-form element not found');
@@ -64,6 +73,10 @@ class StartScreen {
       });
     }
 
+    // Player manager events
+    if (this.showPlayerManagerBtn) this.showPlayerManagerBtn.addEventListener('click', () => this.togglePlayerManager());
+    if (this.pmAddPlayerBtn) this.pmAddPlayerBtn.addEventListener('click', () => this.createPlayerFromManager());
+
     // Team management event listeners
     if (this.addTeamBtn) {
       this.addTeamBtn.addEventListener('click', () => {
@@ -91,6 +104,7 @@ class StartScreen {
       name: document.getElementById('session-name').value,
       game_type: document.getElementById('game-type').value,
       scoring_mode: document.getElementById('scoring-mode').value,
+      show_players: this.showPlayersCheckbox ? Boolean(this.showPlayersCheckbox.checked) : true,
       max_teams: parseInt(document.getElementById('max-teams').value),
       total_rounds: parseInt(document.getElementById('total-rounds').value),
       time_limit: document.getElementById('time-limit').value ? parseInt(document.getElementById('time-limit').value) * 60 : null, // Convert to seconds
@@ -285,7 +299,114 @@ class StartScreen {
       api.handleError(error, 'loading teams');
       this.teamsList.innerHTML = 'Fout bij het laden van teams.';
     }
+    // populate player manager default team select if present
+    if (this.pmPlayerDefaultTeam) {
+      try {
+        const response = await api.getAllStandaloneTeams();
+        const teams = response.teams || [];
+        this.pmPlayerDefaultTeam.innerHTML = '<option value="">-- Standaard team (opt) --</option>';
+        teams.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name;
+          this.pmPlayerDefaultTeam.appendChild(opt);
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
   }
+
+  togglePlayerManager() {
+    if (!this.playerManagerDiv) return;
+    if (this.playerManagerDiv.style.display === 'none' || !this.playerManagerDiv.style.display) {
+      this.playerManagerDiv.style.display = 'block';
+      this.loadPlayersForManager();
+    } else {
+      this.playerManagerDiv.style.display = 'none';
+    }
+  }
+
+  async loadPlayersForManager() {
+    if (!this.pmPlayersList) return;
+    this.pmPlayersList.innerHTML = 'Laden spelers…';
+    try {
+      const resp = await api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players : [];
+      if (players.length === 0) {
+        this.pmPlayersList.innerHTML = '<p style="color:#666">Nog geen spelers.</p>';
+        return;
+      }
+      this.pmPlayersList.innerHTML = '';
+      players.forEach(p => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.padding = '6px 0';
+        row.innerHTML = `<div><strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}</div>`;
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '6px';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-team-btn';
+        deleteBtn.textContent = 'Verwijderen';
+        deleteBtn.onclick = async () => {
+          if (!confirm('Weet je zeker dat je deze speler wilt verwijderen?')) return;
+          try {
+            await api.delete(`/api/v1/players/${p.id}`);
+            await this.loadPlayersForManager();
+          } catch (err) {
+            api.handleError(err, 'deleting player');
+            alert('Fout bij het verwijderen van speler.');
+          }
+        };
+        actions.appendChild(deleteBtn);
+        row.appendChild(actions);
+        this.pmPlayersList.appendChild(row);
+      });
+    } catch (err) {
+      api.handleError(err, 'loading players for manager');
+      this.pmPlayersList.innerHTML = '<p style="color:#666">Kan spelers niet laden.</p>';
+    }
+  }
+
+  async createPlayerFromManager() {
+    const name = (this.pmPlayerName && this.pmPlayerName.value || '').trim();
+    if (!name) { alert('Voer een spelersnaam in.'); return; }
+    try {
+      const payload = { name };
+      await api.post('/api/v1/players', payload);
+      if (this.pmPlayerName) this.pmPlayerName.value = '';
+      // Reindex positions alphabetically after creating a new player
+      await this.reindexPlayersAlphabetically();
+      await this.loadPlayersForManager();
+    } catch (err) {
+      api.handleError(err, 'creating player from manager');
+      alert('Fout bij het aanmaken van speler.');
+    }
+  }
+
+  async reindexPlayersAlphabetically() {
+    try {
+      const resp = await api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players.slice() : [];
+      players.sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, { sensitivity: 'base' }));
+      for (let i=0;i<players.length;i++) {
+        const p = players[i];
+        try {
+          await api.put(`/api/v1/players/${p.id}`, { position: String(i+1) });
+        } catch (e) {
+          console.warn('Failed to update player position during reindex', p.id, e);
+        }
+      }
+      await this.loadPlayersForManager();
+    } catch (e) {
+      console.warn('Reindexing players failed', e);
+    }
+  }
+
+  escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
   displayTeams(teams) {
     if (teams.length === 0) {
@@ -305,7 +426,7 @@ class StartScreen {
     };
 
     const teamsHtml = teams.map((team) => `
-      <div class="team-card">
+      <div class="team-card" data-team-id="${team.id}">
         <div class="team-card-header">
           <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
           <div class="team-color-badge" style="background-color: ${team.color}"></div>
@@ -316,11 +437,127 @@ class StartScreen {
           <button class="delete-team-btn" onclick="startScreen.deleteTeam(${team.id}, '${team.name}')">
             🗑️ Verwijderen
           </button>
+          <button class="save-team-btn compact" onclick="startScreen.toggleUnassignedPlayers(${team.id})">Speler toewijzen</button>
+        </div>
+        <div class="players-section" id="players-for-${team.id}">
+          <div class="players-list" id="players-list-${team.id}">Laden spelers…</div>
+          <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
+            <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
+            <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
+          </div>
         </div>
       </div>
     `).join('');
 
     this.teamsList.innerHTML = teamsHtml;
+    // Load assigned players for each team and prepare unassigned lists
+    teams.forEach(t => {
+      this.loadAssignedPlayersForTeam(t.id);
+    });
+  }
+
+  async loadAssignedPlayersForTeam(teamId) {
+    const listEl = document.getElementById(`players-list-${teamId}`);
+    if (!listEl) return;
+    try {
+      listEl.innerHTML = '<p style="color:#666">Laden…</p>';
+      const resp = await api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players : [];
+      const assigned = players.filter(p => p.team_id && String(p.team_id) === String(teamId));
+      if (!assigned || assigned.length === 0) {
+        listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegewezen.</p>';
+        return;
+      }
+      listEl.innerHTML = '';
+      assigned.forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'player-row';
+        row.innerHTML = `<div class="player-left"><strong>${this.escapeHtml(p.name)}</strong></div>`;
+        const actions = document.createElement('div');
+        actions.className = 'player-actions';
+        const unassignBtn = document.createElement('button');
+        unassignBtn.className = 'delete-team-btn';
+        unassignBtn.textContent = 'Verwijderen';
+        unassignBtn.onclick = async () => {
+          if (!confirm('Weet je zeker dat je deze speler van het team wilt halen?')) return;
+          try {
+            await api.put(`/api/v1/players/${p.id}`, { team_id: null });
+            await this.loadAssignedPlayersForTeam(teamId);
+            await this.loadPlayersForManager();
+          } catch (err) {
+            api.handleError(err, 'unassigning player');
+            alert('Fout bij het verwijderen van speler uit team.');
+          }
+        };
+        actions.appendChild(unassignBtn);
+        row.appendChild(actions);
+        listEl.appendChild(row);
+      });
+    } catch (err) {
+      api.handleError(err, 'loading assigned players');
+      listEl.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
+    }
+  }
+
+  toggleUnassignedPlayers(teamId) {
+    const el = document.getElementById(`unassigned-players-${teamId}`);
+    if (!el) return;
+    if (el.style.display === 'none' || el.style.display === '') {
+      el.style.display = 'block';
+      this.loadUnassignedForTeam(teamId);
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  async loadUnassignedForTeam(teamId) {
+    const container = document.getElementById(`unassigned-list-${teamId}`);
+    if (!container) return;
+    try {
+      const resp = await api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players : [];
+      const unassigned = players.filter(p => !p.team_id || String(p.team_id) !== String(teamId));
+      if (!unassigned || unassigned.length === 0) {
+        container.innerHTML = '<p style="color:#666">Geen beschikbare spelers om toe te wijzen.</p>';
+        return;
+      }
+      container.innerHTML = '';
+      unassigned.forEach(p => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.marginBottom = '6px';
+        const left = document.createElement('div');
+        left.textContent = this.escapeHtml(p.name);
+        const btn = document.createElement('button');
+        btn.className = 'save-team-btn compact';
+        btn.textContent = 'Toewijzen';
+        btn.onclick = async () => {
+          await this.assignPlayerToTeam(teamId, p.id);
+        };
+        row.appendChild(left);
+        row.appendChild(btn);
+        container.appendChild(row);
+      });
+    } catch (err) {
+      api.handleError(err, 'loading unassigned players');
+      container.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
+    }
+  }
+
+  async assignPlayerToTeam(teamId, playerId) {
+    try {
+      await api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) });
+      // refresh lists
+      await this.loadAssignedPlayersForTeam(teamId);
+      await this.loadPlayersForManager();
+      const ul = document.getElementById(`unassigned-players-${teamId}`);
+      if (ul) ul.style.display = 'none';
+    } catch (err) {
+      api.handleError(err, 'assigning player to team');
+      alert('Fout bij het toewijzen van speler aan team.');
+    }
   }
 
   async createTeam() {

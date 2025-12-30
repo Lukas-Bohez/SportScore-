@@ -219,6 +219,8 @@ body {
     padding-top: 12px;
 }
 
+/* Compact button styles moved to css/buttons.css */
+
 .players-list {
     display: flex;
     flex-direction: column;

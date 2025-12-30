@@ -231,7 +231,8 @@ async def get_player(player_id: int):
 
 @app.put(f"{ENDPOINT}/players/{{player_id}}", response_model=PlayerResponse)
 async def update_player(player_id: int, player_update: PlayerUpdate):
-    success = PlayerRepository.update_player(player_id, player_update.name, player_update.team_id, player_update.position)
+    update_data = player_update.dict(exclude_unset=True)
+    success = PlayerRepository.update_player_fields(player_id, update_data)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update player")
     updated_player = PlayerRepository.get_player_by_id(player_id)

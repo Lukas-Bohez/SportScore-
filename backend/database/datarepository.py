@@ -142,6 +142,19 @@ class PlayerRepository:
         return Database.execute_sql(sql, params) is not None
 
     @staticmethod
+    def update_player_fields(player_id: int, fields: Dict[str, Any]) -> bool:
+        """
+        Update player using an explicit fields dict. Allows setting fields to NULL
+        by including the key with value None. Returns True on success.
+        """
+        if not fields:
+            return False
+        sql = "UPDATE players SET " + ", ".join(f"{k} = ?" for k in fields.keys()) + " WHERE id = ?"
+        params = list(fields.values())
+        params.append(player_id)
+        return Database.execute_sql(sql, params) is not None
+
+    @staticmethod
     def delete_player(player_id: int) -> bool:
         sql = "DELETE FROM players WHERE id = ?"
         params = [player_id]
