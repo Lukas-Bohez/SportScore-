@@ -16,6 +16,7 @@ class TeamSetup {
     this.loadSession();
     this.loadTeams();
     this.loadAvailableTeams();
+    this.loadPlayers();
   }
 
   getSessionIdFromUrl() {
@@ -74,6 +75,14 @@ class TeamSetup {
     // Modal events
     this.saveTeamBtn.addEventListener('click', () => this.saveTeamEdit());
     this.cancelEditBtn.addEventListener('click', () => this.hideTeamModal());
+
+    // Player manager elements
+    this.newPlayerNameGlobal = document.getElementById('new-player-name-global');
+    this.newPlayerPositionGlobal = document.getElementById('new-player-position-global');
+    this.newPlayerDefaultTeam = document.getElementById('new-player-default-team');
+    this.addPlayerGlobalBtn = document.getElementById('add-player-global-btn');
+    this.playersListGlobal = document.getElementById('players-list-global');
+    if (this.addPlayerGlobalBtn) this.addPlayerGlobalBtn.addEventListener('click', () => this.createPlayerGlobal());
 
     // Scoring mode change event
     if (this.scoringModeTeam) {
@@ -140,6 +149,8 @@ class TeamSetup {
         this.updateTeamsCount();
         // Update available teams when session teams change
         await this.loadAvailableTeams();
+        // refresh players UI because team list changed
+        await this.loadPlayers();
       }
     } catch (error) {
       api.handleError(error, 'loading teams');
@@ -179,11 +190,16 @@ class TeamSetup {
         <div class="team-actions">
           <button class="edit-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.editTeam(${team.id})">Bewerken</button>
           <button class="delete-btn" ${team._pending ? 'disabled' : ''} onclick="teamSetup.deleteTeam(${team.id})">Verwijderen</button>
+          <button class="add-player-to-team-btn" title="Speler toewijzen aan dit team" onclick="teamSetup.toggleUnassignedPlayers(${team.id})">＋ Speler</button>
         </div>
       </div>
 
       <div class="players-section" id="players-for-${team.id}">
         <div class="players-list" id="players-list-${team.id}">Laden…</div>
+        <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
+          <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
+          <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
+        </div>
         <div class="add-player-inline">
           <input type="text" id="new-player-name-${team.id}" placeholder="Speler naam" maxlength="100">
           <input type="text" id="new-player-position-${team.id}" placeholder="Positie (optioneel)" maxlength="50">
@@ -219,6 +235,7 @@ class TeamSetup {
           <span class="player-name">${this.escapeHtml(p.name)}</span>
           <span class="player-pos">${p.position ? this.escapeHtml(p.position) : ''}</span>
           <button class="delete-player-btn" onclick="teamSetup.deletePlayerInline(${p.id}, ${teamId})">Verwijderen</button>
+          <button class="unassign-player-btn" onclick="teamSetup.removeAssignment(${this.sessionId}, ${p.id})" title="Verwijder toewijzing">✖</button>
         `;
         listEl.appendChild(el);
       });
@@ -280,6 +297,7 @@ class TeamSetup {
       nameEl.value = '';
       if (posEl) posEl.value = '';
       await this.loadPlayersForTeam(teamId);
+      await this.loadPlayers();
     } catch (err) {
       // If the session-scoped players endpoint is not available (405), fallback to global players endpoint
       const msg = err && err.message ? err.message : '';
@@ -303,6 +321,273 @@ class TeamSetup {
       alert('Fout bij het toevoegen van speler.');
     }
   }
+
+    // --- Player manager and session assignment helpers ---
+
+    async loadPlayers() {
+      // Load global players and session-specific assignments
+      try {
+        const allResp = await api.get('/api/v1/players');
+        const sessionResp = await api.get(`/api/v1/sessions/${this.sessionId}/players`);
+        this.allPlayers = (allResp && allResp.players) ? allResp.players : [];
+        this.sessionAssignments = (sessionResp && sessionResp.players) ? sessionResp.players : [];
+        // Build quick map of assigned players
+        this.assignedMap = {};
+        this.sessionAssignments.forEach(a => {
+          // some endpoints return {player, team_id} or player objects with session_team
+          if (a.player_id && a.team_id) {
+            this.assignedMap[a.player_id] = a.team_id;
+          } else if (a.id && a.team_id) {
+            this.assignedMap[a.id] = a.team_id;
+          } else if (a.player && a.team_id) {
+            this.assignedMap[a.player.id] = a.team_id;
+          }
+        });
+        this.updatePlayerManagerDisplay();
+        this.updateDefaultTeamSelects();
+        // Also populate any visible unassigned lists for teams
+        this.updateUnassignedLists();
+      } catch (err) {
+        console.warn('Could not load players or session assignments', err);
+        // Try partial fallback: load global players only
+        try {
+          const allResp = await api.get('/api/v1/players');
+          this.allPlayers = (allResp && allResp.players) ? allResp.players : [];
+          this.sessionAssignments = [];
+          this.assignedMap = {};
+          this.updatePlayerManagerDisplay();
+          this.updateDefaultTeamSelects();
+        } catch (err2) {
+          console.warn('Fallback players load failed', err2);
+          if (this.playersListGlobal) this.playersListGlobal.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
+        }
+      }
+    }
+
+    updateDefaultTeamSelects() {
+      // Populate the default team select in player creation form
+      if (!this.newPlayerDefaultTeam) return;
+      this.newPlayerDefaultTeam.innerHTML = '<option value="">-- Standaard team (optioneel) --</option>';
+      const empty = document.createElement('option');
+      this.teams.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `${this.getIconEmoji(t.icon)} ${t.name}`;
+        this.newPlayerDefaultTeam.appendChild(opt);
+      });
+    }
+
+    updatePlayerManagerDisplay() {
+      if (!this.playersListGlobal) return;
+      if (!this.allPlayers || this.allPlayers.length === 0) {
+        this.playersListGlobal.innerHTML = '<p style="color:#666">Nog geen spelers aanwezig. Maak er één aan hierboven.</p>';
+        return;
+      }
+      this.playersListGlobal.innerHTML = '';
+      const ul = document.createElement('div');
+      ul.style.display = 'grid';
+      ul.style.gridTemplateColumns = '1fr 300px';
+      ul.style.gap = '8px';
+      this.allPlayers.forEach(p => {
+        const left = document.createElement('div');
+        left.innerHTML = `<strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}`;
+
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.gap = '6px';
+        right.style.justifyContent = 'flex-end';
+
+        const assignedTeamId = this.assignedMap[p.id];
+        if (assignedTeamId) {
+          const teamObj = this.teams.find(t => t.id === assignedTeamId);
+          const assignedLabel = document.createElement('span');
+          assignedLabel.style.marginRight = '10px';
+          assignedLabel.style.color = '#333';
+          assignedLabel.textContent = teamObj ? `Toegewezen: ${teamObj.name}` : `Toegewezen (team ${assignedTeamId})`;
+          right.appendChild(assignedLabel);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'delete-btn';
+          removeBtn.textContent = 'Verwijder toewijzing';
+          removeBtn.onclick = () => this.removeAssignment(this.sessionId, p.id);
+          right.appendChild(removeBtn);
+        } else {
+          // Show quick assign menu: select with teams
+          const sel = document.createElement('select');
+          sel.style.padding = '6px';
+          sel.style.minWidth = '180px';
+          const defaultOpt = document.createElement('option');
+          defaultOpt.value = '';
+          defaultOpt.textContent = '-- Toewijzen aan team --';
+          sel.appendChild(defaultOpt);
+          this.teams.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t.id;
+            o.textContent = `${this.getIconEmoji(t.icon)} ${t.name}`;
+            sel.appendChild(o);
+          });
+          const assignBtn = document.createElement('button');
+          assignBtn.className = 'add-btn';
+          assignBtn.textContent = 'Toewijzen';
+          assignBtn.onclick = async () => {
+            const teamId = sel.value;
+            if (!teamId) return alert('Selecteer eerst een team.');
+            await this.assignPlayerToTeam(this.sessionId, teamId, p.id);
+          };
+          right.appendChild(sel);
+          right.appendChild(assignBtn);
+        }
+
+        // Edit default team quick button
+        const editDefaultBtn = document.createElement('button');
+        editDefaultBtn.className = 'edit-btn';
+        editDefaultBtn.textContent = 'Bewerk';
+        editDefaultBtn.onclick = () => this.promptEditPlayer(p);
+        right.appendChild(editDefaultBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Verwijderen';
+        deleteBtn.onclick = () => this.deletePlayerConfirm(p.id);
+        right.appendChild(deleteBtn);
+
+        const row = document.createElement('div');
+        row.style.display = 'contents';
+        row.appendChild(left);
+        row.appendChild(right);
+        ul.appendChild(row);
+      });
+      this.playersListGlobal.appendChild(ul);
+    }
+
+    async createPlayerGlobal() {
+      const name = (this.newPlayerNameGlobal && this.newPlayerNameGlobal.value || '').trim();
+      const position = (this.newPlayerPositionGlobal && this.newPlayerPositionGlobal.value || '').trim();
+      const defaultTeam = this.newPlayerDefaultTeam ? this.newPlayerDefaultTeam.value : '';
+      if (!name) {
+        alert('Voer een spelersnaam in.');
+        return;
+      }
+      try {
+        const payload = { name };
+        if (position) payload.position = position;
+        if (defaultTeam) payload.team_id = parseInt(defaultTeam);
+        await api.post('/api/v1/players', payload);
+        if (this.newPlayerNameGlobal) this.newPlayerNameGlobal.value = '';
+        if (this.newPlayerPositionGlobal) this.newPlayerPositionGlobal.value = '';
+        if (this.newPlayerDefaultTeam) this.newPlayerDefaultTeam.value = '';
+        await this.loadPlayers();
+        // also refresh teams listing in case assigned via default team
+        await this.loadTeams();
+      } catch (err) {
+        api.handleError(err, 'creating player');
+        alert('Fout bij het aanmaken van speler.');
+      }
+    }
+
+    async deletePlayerConfirm(playerId) {
+      if (!confirm('Weet je zeker dat je deze speler wilt verwijderen?')) return;
+      try {
+        await api.delete(`/api/v1/players/${playerId}`);
+        await this.loadPlayers();
+        await this.loadTeams();
+      } catch (err) {
+        api.handleError(err, 'deleting player');
+        alert('Fout bij het verwijderen van speler.');
+      }
+    }
+
+    promptEditPlayer(p) {
+      const newName = prompt('Nieuwe naam voor speler:', p.name);
+      if (newName === null) return; // cancelled
+      const newPosition = prompt('Nieuwe positie (leeg = geen wijziging):', p.position || '');
+      this.editPlayer(p.id, newName.trim(), (newPosition !== null ? newPosition.trim() : undefined));
+    }
+
+    async editPlayer(playerId, name, position) {
+      try {
+        const payload = {};
+        if (name) payload.name = name;
+        if (position !== undefined) payload.position = position;
+        await api.put(`/api/v1/players/${playerId}`, payload);
+        await this.loadPlayers();
+        await this.loadTeams();
+      } catch (err) {
+        api.handleError(err, 'updating player');
+        alert('Fout bij het bijwerken van speler.');
+      }
+    }
+
+    async assignPlayerToTeam(sessionId, teamId, playerId) {
+      try {
+        await api.post(`/api/v1/sessions/${sessionId}/assign-player`, { player_id: parseInt(playerId), team_id: parseInt(teamId) });
+        await this.loadPlayers();
+        await this.loadPlayersForTeam(teamId);
+        await this.loadAvailableTeams();
+      } catch (err) {
+        api.handleError(err, 'assigning player');
+        alert('Fout bij het toewijzen van speler aan team.');
+      }
+    }
+
+    async removeAssignment(sessionId, playerId) {
+      if (!confirm('Verwijder speler uit deze sessie?')) return;
+      try {
+        await api.delete(`/api/v1/sessions/${sessionId}/assign-player/${playerId}`);
+        await this.loadPlayers();
+        // refresh team lists
+        await this.teams.forEach(async t => await this.loadPlayersForTeam(t.id));
+      } catch (err) {
+        api.handleError(err, 'removing assignment');
+        alert('Fout bij het verwijderen van toewijzing.');
+      }
+    }
+
+    toggleUnassignedPlayers(teamId) {
+      const el = document.getElementById(`unassigned-players-${teamId}`);
+      if (!el) return;
+      if (el.style.display === 'none' || el.style.display === '') {
+        el.style.display = 'block';
+        this.updateUnassignedListForTeam(teamId);
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    updateUnassignedLists() {
+      this.teams.forEach(t => this.updateUnassignedListForTeam(t.id));
+    }
+
+    updateUnassignedListForTeam(teamId) {
+      const container = document.getElementById(`unassigned-list-${teamId}`);
+      if (!container) return;
+      // Determine which players are not assigned to any team in this session
+      const unassigned = (this.allPlayers || []).filter(p => !this.assignedMap || !this.assignedMap[p.id]);
+      if (!unassigned || unassigned.length === 0) {
+        container.innerHTML = '<p style="color:#666">Geen onbezet spelers beschikbaar.</p>';
+        return;
+      }
+      container.innerHTML = '';
+      unassigned.forEach(p => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.marginBottom = '6px';
+        const left = document.createElement('div');
+        left.textContent = p.name + (p.position ? ` (${p.position})` : '');
+        const btn = document.createElement('button');
+        btn.className = 'add-btn';
+        btn.textContent = 'Voeg toe';
+        btn.onclick = async () => {
+          await this.assignPlayerToTeam(this.sessionId, teamId, p.id);
+          this.toggleUnassignedPlayers(teamId);
+        };
+        row.appendChild(left);
+        row.appendChild(btn);
+        container.appendChild(row);
+      });
+    }
 
   async deletePlayerInline(playerId, teamId) {
     if (!confirm('Weet je zeker dat je deze speler wilt verwijderen?')) return;

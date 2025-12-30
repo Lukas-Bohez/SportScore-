@@ -70,6 +70,23 @@
                 </div>
             </div>
 
+                <!-- Player Manager: create / edit / assign players -->
+                <div class="players-manager-section" style="margin-top: 24px;">
+                    <h2>Spelers Beheren</h2>
+                    <div class="player-create" style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+                        <input type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100" style="flex:1; padding:8px;">
+                        <input type="text" id="new-player-position-global" placeholder="Positie (optioneel)" maxlength="50" style="width:200px; padding:8px;">
+                        <select id="new-player-default-team" style="width:180px; padding:8px;">
+                            <option value="">-- Standaard team (optioneel) --</option>
+                        </select>
+                        <button id="add-player-global-btn" class="add-btn">Speler aanmaken</button>
+                    </div>
+
+                    <div id="players-list-global" style="background:#fafafa; padding:12px; border-radius:8px;">
+                        <p style="color:#666">Laden van spelers…</p>
+                    </div>
+                </div>
+
             <div class="actions-section">
                 <div class="action-buttons">
                     <button id="start-session-btn" class="start-btn">Start Sessie</button>
