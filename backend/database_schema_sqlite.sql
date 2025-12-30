@@ -101,17 +101,38 @@ CREATE INDEX IF NOT EXISTS idx_game_teams_team_id ON game_teams(team_id);
 CREATE INDEX IF NOT EXISTS idx_game_teams_eliminated ON game_teams(is_eliminated);
 
 -- ===========================================
+-- SESSION_PLAYERS (Session-specific player assignments)
+-- Maps players to teams for a specific session (game).
+-- Ensures a player can only be assigned to one team per session.
+-- ===========================================
+CREATE TABLE IF NOT EXISTS session_players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES games(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+    UNIQUE(session_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_players_session_id ON session_players(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_players_team_id ON session_players(team_id);
+CREATE INDEX IF NOT EXISTS idx_session_players_player_id ON session_players(player_id);
+
+-- ===========================================
 -- 4. SPELERS (Players)
 -- Spelers binnen teams
 -- ===========================================
 CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    team_id INTEGER NOT NULL,
+    team_id INTEGER NULL,
     name VARCHAR(100) NOT NULL,
     position VARCHAR(50) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_players_team_id ON players(team_id);

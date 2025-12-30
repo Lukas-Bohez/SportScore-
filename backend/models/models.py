@@ -35,7 +35,7 @@ class TeamResponse(TeamBase):
 # Player Models
 class PlayerBase(BaseModel):
     name: str
-    team_id: int
+    team_id: Optional[int] = None
     position: Optional[str] = None
 
 class PlayerCreate(PlayerBase):
@@ -48,6 +48,25 @@ class PlayerUpdate(BaseModel):
 
 class PlayerResponse(PlayerBase):
     id: int
+
+# Session player assignment models
+class SessionPlayerBase(BaseModel):
+    session_id: int
+    team_id: int
+    player_id: int
+
+class SessionPlayerCreate(SessionPlayerBase):
+    pass
+
+class SessionPlayerUpdate(BaseModel):
+    team_id: Optional[int] = None
+
+class SessionPlayerResponse(SessionPlayerBase):
+    id: int
+    assigned_at: Optional[datetime] = None
+
+class SessionPlayerListResponse(BaseModel):
+    assignments: List[SessionPlayerResponse]
 
 # ScoreType Models
 class ScoreTypeBase(BaseModel):

@@ -18,7 +18,8 @@ import logging
 from database.datarepository import (
     SportRepository, TeamRepository, PlayerRepository,
     ScoreTypeRepository, GameRepository, ScoreRepository,
-    SessionRepository, SessionTeamRepository, SessionScoreRepository
+    SessionRepository, SessionTeamRepository, SessionScoreRepository,
+    SessionPlayerRepository
 )
 
 # Import models
@@ -32,6 +33,7 @@ from models.models import (
     SessionBase, SessionCreate, SessionUpdate, SessionResponse, SessionListResponse,
     SessionTeamBase, SessionTeamCreate, SessionTeamUpdate, SessionTeamResponse, SessionTeamListResponse,
     SessionScoreBase, SessionScoreCreate, SessionScoreUpdate, SessionScoreResponse, SessionScoreListResponse,
+    SessionPlayerBase, SessionPlayerCreate, SessionPlayerUpdate, SessionPlayerResponse, SessionPlayerListResponse,
     ErrorMessage, ErrorNotFound, ScoreUpdateMessage, GameStatusUpdate
 )
 
@@ -241,6 +243,65 @@ async def delete_player(player_id: int):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete player")
     return {"message": "Player deleted successfully"}
+
+
+# Session player assignments endpoints
+@app.post(f"{ENDPOINT}/sessions/{{session_id}}/assign-player", response_model=SessionPlayerResponse)
+async def assign_player(session_id: int, assignment: SessionPlayerCreate):
+    # Ensure session exists
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Ensure player exists
+    player = PlayerRepository.get_player_by_id(assignment.player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # Ensure team is part of session
+    team_in_session = SessionTeamRepository.get_team_in_session(assignment.team_id, session_id)
+    if not team_in_session:
+        raise HTTPException(status_code=400, detail="Team is not part of this session")
+
+    assign_id = SessionPlayerRepository.assign_player_to_session(session_id, assignment.team_id, assignment.player_id)
+    created = SessionPlayerRepository.get_player_assignment(session_id, assignment.player_id)
+    return SessionPlayerResponse(**created)
+
+
+@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/assign-player/{{player_id}}")
+async def remove_player_assignment(session_id: int, player_id: int):
+    removed = SessionPlayerRepository.remove_player_from_session(session_id, player_id)
+    if not removed:
+        raise HTTPException(status_code=400, detail="Failed to remove assignment or assignment not found")
+    return {"message": "Assignment removed"}
+
+
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/players", response_model=SessionPlayerListResponse)
+async def get_session_players(session_id: int):
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    assignments = SessionPlayerRepository.get_players_by_session(session_id)
+    return SessionPlayerListResponse(assignments=[SessionPlayerResponse(**a) for a in assignments])
+
+
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players")
+async def get_session_team_players(session_id: int, team_id: int):
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    players = SessionPlayerRepository.get_players_by_session_team(session_id, team_id)
+    return {"players": players}
+
+
+@app.put(f"{ENDPOINT}/players/{{player_id}}/team", response_model=PlayerResponse)
+async def set_player_default_team(player_id: int, payload: PlayerUpdate):
+    # Update player's default team
+    success = PlayerRepository.update_player(player_id, None, payload.team_id, None)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update player's default team")
+    updated = PlayerRepository.get_player_by_id(player_id)
+    return PlayerResponse(**updated)
 
 # Score Types endpoints
 @app.get(f"{ENDPOINT}/score-types", response_model=ScoreTypeListResponse)

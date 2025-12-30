@@ -97,7 +97,7 @@ class TeamRepository:
 class PlayerRepository:
 
     @staticmethod
-    def create_player(name: str, team_id: int, position: Optional[str] = None) -> int:
+    def create_player(name: str, team_id: Optional[int] = None, position: Optional[str] = None) -> int:
         sql = "INSERT INTO players (name, team_id, position) VALUES (?, ?, ?)"
         params = [name, team_id, position]
         return Database.execute_sql(sql, params)
@@ -146,6 +146,45 @@ class PlayerRepository:
         sql = "DELETE FROM players WHERE id = ?"
         params = [player_id]
         return Database.execute_sql(sql, params) is not None
+
+
+class SessionPlayerRepository:
+    """
+    Manage per-session player assignments. A player can be assigned to at most
+    one team per session. The default team for a player remains `players.team_id`.
+    """
+
+    @staticmethod
+    def assign_player_to_session(session_id: int, team_id: int, player_id: int) -> int:
+        """Assign a player to a team for a specific session. Returns the assignment id."""
+        sql = "INSERT OR REPLACE INTO session_players (session_id, team_id, player_id) VALUES (?, ?, ?)"
+        return Database.execute_sql(sql, [session_id, team_id, player_id])
+
+    @staticmethod
+    def remove_player_from_session(session_id: int, player_id: int) -> bool:
+        sql = "DELETE FROM session_players WHERE session_id = ? AND player_id = ?"
+        return Database.execute_sql(sql, [session_id, player_id]) is not None
+
+    @staticmethod
+    def get_players_by_session(session_id: int) -> List[Dict[str, Any]]:
+        sql = """SELECT sp.id, sp.session_id, sp.team_id, sp.player_id, sp.assigned_at, p.name as player_name
+                 FROM session_players sp
+                 JOIN players p ON p.id = sp.player_id
+                 WHERE sp.session_id = ? ORDER BY p.name ASC"""
+        return Database.get_rows(sql, [session_id])
+
+    @staticmethod
+    def get_players_by_session_team(session_id: int, team_id: int) -> List[Dict[str, Any]]:
+        sql = """SELECT sp.id, sp.session_id, sp.team_id, sp.player_id, sp.assigned_at, p.name as player_name
+                 FROM session_players sp
+                 JOIN players p ON p.id = sp.player_id
+                 WHERE sp.session_id = ? AND sp.team_id = ? ORDER BY p.name ASC"""
+        return Database.get_rows(sql, [session_id, team_id])
+
+    @staticmethod
+    def get_player_assignment(session_id: int, player_id: int) -> Optional[Dict[str, Any]]:
+        sql = "SELECT * FROM session_players WHERE session_id = ? AND player_id = ?"
+        return Database.get_one_row(sql, [session_id, player_id])
 
 class ScoreTypeRepository:
     """
