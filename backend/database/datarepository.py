@@ -514,7 +514,7 @@ class SessionRepository:
                         g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
-                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.created_at DESC"""
         sessions = Database.get_rows(sql)
         
@@ -551,7 +551,7 @@ class SessionRepository:
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
                  WHERE g.status IN ('setup', 'active', 'paused')
-                 AND g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 AND g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.updated_at DESC LIMIT 1"""
         session = Database.get_one_row(sql)
         
@@ -905,7 +905,7 @@ class SessionScoreRepository:
                  FROM scores s
                  JOIN teams t ON s.team_id = t.id
                  JOIN games g ON s.game_id = g.id
-                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
+                 WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY s.timestamp DESC"""
         return Database.get_rows(sql)
 

@@ -51,12 +51,68 @@ body {
     gap: 30px;
 }
 
+.left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
 /* Teams Section */
 .teams-section {
     background: #e0e0e0; /* 30% grey background */
     padding: 30px;
     border-radius: 15px;
     border: 2px solid #cccccc; /* Light grey border */
+}
+
+/* Players Manager Section */
+.players-manager-section {
+    background: #e0e0e0;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #cccccc;
+}
+
+.players-manager-section h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333333;
+    font-size: 1.8rem;
+}
+
+.player-create {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.player-create input {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #ffffff;
+    color: #333333;
+}
+
+.player-create input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+#players-list-global {
+    background: #fafafa;
+    padding: 15px;
+    border-radius: 8px;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .teams-section h2 {

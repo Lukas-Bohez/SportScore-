@@ -674,22 +674,20 @@ async def create_player_for_team(session_id: int, team_id: int, player: PlayerCr
 async def update_session_team(session_id: int, team_id: int, team_update: SessionTeamUpdate):
     success = SessionTeamRepository.update_team(
         team_id, team_update.name, team_update.color, team_update.icon,
-        team_update.score, team_update.is_eliminated
+        None, team_update.score, team_update.is_eliminated
     )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update team")
-    updated_team = SessionTeamRepository.get_team_by_id(team_id)
+    updated_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    if not updated_team:
+        raise HTTPException(status_code=404, detail="Team not found in session")
 
     # Emit real-time update for team changes
     print(f"Emitting team_update event for team update: session_id={session_id}, team_id={team_id}")
-    total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
     await sio.emit('team_update', _jsonable({
         'session_id': session_id,
         'team_id': team_id,
-        'team': {
-            **updated_team,
-            'total_score': total_score
-        },
+        'team': updated_team,
         'timestamp': datetime.now().isoformat()
     }))
 

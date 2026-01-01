@@ -213,6 +213,13 @@ class TeamSetup {
   async loadPlayersForTeam(teamId) {
     const listEl = document.getElementById(`players-list-${teamId}`);
     if (!listEl) return;
+    
+    // Skip loading players for temporary team IDs (not yet saved to database)
+    if (String(teamId).startsWith('temp_')) {
+      listEl.innerHTML = '<p style="color:#888; font-size:0.85em;">Team nog niet opgeslagen. Spelers worden geladen na opslaan.</p>';
+      return;
+    }
+    
     try {
       listEl.innerHTML = '<p style="color:#666">Laden…</p>';
       const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
@@ -435,37 +442,54 @@ class TeamSetup {
       }
       this.playersListGlobal.innerHTML = '';
       const ul = document.createElement('div');
-      ul.style.display = 'grid';
-      ul.style.gridTemplateColumns = '1fr 300px';
-      ul.style.gap = '8px';
+      ul.style.display = 'flex';
+      ul.style.flexDirection = 'column';
+      ul.style.gap = '12px';
+      
       this.allPlayers.forEach(p => {
-        const left = document.createElement('div');
-        left.innerHTML = `<strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}`;
+        const playerCard = document.createElement('div');
+        playerCard.style.padding = '12px';
+        playerCard.style.background = '#fff';
+        playerCard.style.borderRadius = '8px';
+        playerCard.style.border = '1px solid #e9ecef';
 
-        const right = document.createElement('div');
-        right.style.display = 'flex';
-        right.style.gap = '6px';
-        right.style.justifyContent = 'flex-end';
+        const nameRow = document.createElement('div');
+        nameRow.style.marginBottom = '8px';
+        nameRow.innerHTML = `<strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}`;
+        playerCard.appendChild(nameRow);
 
         const assignedTeamId = this.assignedMap[p.id];
+        
+        // First row: Team assignment
+        const assignRow = document.createElement('div');
+        assignRow.style.display = 'flex';
+        assignRow.style.gap = '8px';
+        assignRow.style.alignItems = 'center';
+        assignRow.style.marginBottom = '8px';
+
         if (assignedTeamId) {
           const teamObj = this.teams.find(t => t.id === assignedTeamId);
           const assignedLabel = document.createElement('span');
-          assignedLabel.style.marginRight = '10px';
+          assignedLabel.style.flex = '1';
           assignedLabel.style.color = '#333';
-          assignedLabel.textContent = teamObj ? `Toegewezen: ${teamObj.name}` : `Toegewezen (team ${assignedTeamId})`;
-          right.appendChild(assignedLabel);
+          assignedLabel.style.fontWeight = '500';
+          assignedLabel.innerHTML = teamObj ? `✓ Toegewezen aan: <strong>${teamObj.name}</strong>` : `✓ Toegewezen (team ${assignedTeamId})`;
+          assignRow.appendChild(assignedLabel);
 
           const removeBtn = document.createElement('button');
           removeBtn.className = 'delete-btn';
+          removeBtn.style.padding = '6px 12px';
+          removeBtn.style.fontSize = '0.85em';
           removeBtn.textContent = 'Verwijder toewijzing';
           removeBtn.onclick = () => this.removeAssignment(this.sessionId, p.id);
-          right.appendChild(removeBtn);
+          assignRow.appendChild(removeBtn);
         } else {
           // Show quick assign menu: select with teams
           const sel = document.createElement('select');
-          sel.style.padding = '6px';
-          sel.style.minWidth = '180px';
+          sel.style.flex = '1';
+          sel.style.padding = '8px';
+          sel.style.borderRadius = '6px';
+          sel.style.border = '2px solid #e9ecef';
           const defaultOpt = document.createElement('option');
           defaultOpt.value = '';
           defaultOpt.textContent = '-- Toewijzen aan team --';
@@ -477,35 +501,44 @@ class TeamSetup {
             sel.appendChild(o);
           });
           const assignBtn = document.createElement('button');
-          assignBtn.className = 'save-team-btn compact';
+          assignBtn.className = 'save-team-btn';
+          assignBtn.style.padding = '8px 16px';
+          assignBtn.style.fontSize = '0.9em';
           assignBtn.textContent = 'Toewijzen';
           assignBtn.onclick = async () => {
             const teamId = sel.value;
             if (!teamId) return alert('Selecteer eerst een team.');
             await this.assignPlayerToTeam(this.sessionId, teamId, p.id);
           };
-          right.appendChild(sel);
-          right.appendChild(assignBtn);
+          assignRow.appendChild(sel);
+          assignRow.appendChild(assignBtn);
         }
+        playerCard.appendChild(assignRow);
 
-        // Edit default team quick button
-        const editDefaultBtn = document.createElement('button');
-        editDefaultBtn.className = 'edit-btn';
-        editDefaultBtn.textContent = 'Bewerk';
-        editDefaultBtn.onclick = () => this.promptEditPlayer(p);
-        right.appendChild(editDefaultBtn);
+        // Second row: Edit and Delete buttons
+        const actionRow = document.createElement('div');
+        actionRow.style.display = 'flex';
+        actionRow.style.gap = '8px';
+        actionRow.style.justifyContent = 'flex-end';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'edit-btn';
+        editBtn.style.padding = '6px 16px';
+        editBtn.style.fontSize = '0.9em';
+        editBtn.textContent = 'BEWERK';
+        editBtn.onclick = () => this.promptEditPlayer(p);
+        actionRow.appendChild(editBtn);
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-btn';
-        deleteBtn.textContent = 'Verwijderen';
+        deleteBtn.style.padding = '6px 16px';
+        deleteBtn.style.fontSize = '0.9em';
+        deleteBtn.textContent = 'VERWIJDEREN';
         deleteBtn.onclick = () => this.deletePlayerConfirm(p.id);
-        right.appendChild(deleteBtn);
+        actionRow.appendChild(deleteBtn);
 
-        const row = document.createElement('div');
-        row.style.display = 'contents';
-        row.appendChild(left);
-        row.appendChild(right);
-        ul.appendChild(row);
+        playerCard.appendChild(actionRow);
+        ul.appendChild(playerCard);
       });
       this.playersListGlobal.appendChild(ul);
     }
