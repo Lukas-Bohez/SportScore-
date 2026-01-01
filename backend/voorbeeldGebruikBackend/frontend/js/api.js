@@ -60,6 +60,9 @@ class ScoreboardAPI {
   // Start polling fallback when Socket.IO fails
   startPollingFallback() {
     if (this.pollingFallbackActive) return;
+    
+    // Don't start polling if Socket.IO is still connecting
+    if (this.socket && this.socket.connected) return;
 
     console.log('API: Starting polling fallback for real-time updates');
     this.pollingFallbackActive = true;

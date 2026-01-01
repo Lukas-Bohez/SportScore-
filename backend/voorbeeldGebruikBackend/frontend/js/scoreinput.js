@@ -101,11 +101,65 @@ class ScoreInput {
     // Real-time updates
     api.on('session_score_update', (data) => this.handleScoreUpdate(data));
     api.on('session_status_update', (data) => this.handleStatusUpdate(data));
+    
+    // Keyboard shortcuts
+    this.setupKeyboardShortcuts();
+  }
+  
+  setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Ignore if user is typing in an input field (except for Enter)
+      const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+      
+      // Enter to submit (works in any input field)
+      if (e.key === 'Enter' && isInputField && e.target !== this.reasonInput) {
+        return; // Let reasonInput handle Enter normally
+      }
+      
+      // Ctrl/Cmd + Number keys for quick actions
+      if ((e.ctrlKey || e.metaKey) && !isInputField) {
+        switch(e.key) {
+          case '1':
+            e.preventDefault();
+            this.addQuickScore('Bonus +5', 5);
+            break;
+          case '2':
+            e.preventDefault();
+            this.addQuickScore('Penalty -2', -2);
+            break;
+          case '3':
+            e.preventDefault();
+            this.addQuickScore('Juist Antwoord +1', 1);
+            break;
+          case '4':
+            e.preventDefault();
+            this.addQuickScore('Verkeerd Antwoord -1', -1);
+            break;
+          case 's':
+            e.preventDefault();
+            this.submitScore();
+            break;
+        }
+      }
+      
+      // Arrow keys for point adjustment (when not in input)
+      if (!isInputField) {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          this.adjustPoints(1);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          this.adjustPoints(-1);
+        }
+      }
+    });
   }
 
   async loadSession() {
     try {
       this.session = await api.get(`/api/v1/sessions/${this.sessionId}`);
+      this.applyTheme();
+      this.loadSportQuickButtons();
       this.updateSessionDisplay();
       this.startTimer();
     } catch (error) {
@@ -113,6 +167,116 @@ class ScoreInput {
       alert('Fout bij het laden van de sessie.');
       window.location.href = 'startscreen.html';
     }
+  }
+
+  applyTheme() {
+    if (!this.session || !this.session.sport_type) return;
+    document.body.setAttribute('data-sport', this.session.sport_type);
+  }
+
+  loadSportQuickButtons() {
+    const container = document.getElementById('sport-quick-buttons');
+    if (!container || !this.session) return;
+
+    const sportType = this.session.sport_type || 'custom';
+    const quickButtons = this.getSportQuickButtons(sportType);
+
+    container.innerHTML = '';
+    quickButtons.forEach(btn => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `quick-btn ${btn.class}`;
+      button.textContent = btn.label;
+      button.onclick = () => this.addQuickScore(btn.reason, btn.points);
+      container.appendChild(button);
+    });
+  }
+
+  getSportQuickButtons(sportType) {
+    const buttons = {
+      'quiz': [
+        { label: '+1 Juist', points: 1, reason: 'Juist Antwoord', class: 'correct' },
+        { label: '-1 Verkeerd', points: -1, reason: 'Verkeerd Antwoord', class: 'wrong' },
+        { label: '+3 Bonus', points: 3, reason: 'Bonusvraag', class: 'bonus' },
+        { label: '+5 Perfect', points: 5, reason: 'Perfecte Ronde', class: 'bonus' }
+      ],
+      'voetbal': [
+        { label: '⚽ Doelpunt +1', points: 1, reason: 'Doelpunt', class: 'goal' },
+        { label: '🎯 Penalty +1', points: 1, reason: 'Penalty', class: 'penalty' },
+        { label: '🅰️ Assist +1', points: 1, reason: 'Assist', class: 'bonus' },
+        { label: '🟨 Gele Kaart -1', points: -1, reason: 'Gele Kaart', class: 'wrong' },
+        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' }
+      ],
+      'basketbal': [
+        { label: '🏀 Free Throw +1', points: 1, reason: 'Vrije Worp', class: 'correct' },
+        { label: '🎯 2-Pointer +2', points: 2, reason: '2-Punter', class: 'bonus' },
+        { label: '🌟 3-Pointer +3', points: 3, reason: '3-Punter', class: 'bonus' },
+        { label: '🚫 Fout -1', points: -1, reason: 'Fout', class: 'wrong' }
+      ],
+      'volleybal': [
+        { label: '🏐 Punt +1', points: 1, reason: 'Punt', class: 'correct' },
+        { label: '⚡ Ace +2', points: 2, reason: 'Service Ace', class: 'bonus' },
+        { label: '🛡️ Block +1', points: 1, reason: 'Blok', class: 'correct' },
+        { label: '❌ Fout -1', points: -1, reason: 'Fout', class: 'wrong' }
+      ],
+      'hockey': [
+        { label: '🏑 Doelpunt +1', points: 1, reason: 'Doelpunt', class: 'goal' },
+        { label: '🎯 Penalty +1', points: 1, reason: 'Strafcorner', class: 'penalty' },
+        { label: '🟨 Gele Kaart -1', points: -1, reason: 'Gele Kaart', class: 'wrong' },
+        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' }
+      ],
+      'tennis': [
+        { label: '🎾 Game +1', points: 1, reason: 'Game Gewonnen', class: 'correct' },
+        { label: '🏆 Set +5', points: 5, reason: 'Set Gewonnen', class: 'bonus' },
+        { label: '⚡ Ace +1', points: 1, reason: 'Ace', class: 'bonus' },
+        { label: '❌ Dubbelfout -1', points: -1, reason: 'Dubbelfout', class: 'wrong' }
+      ],
+      'atletiek': [
+        { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
+        { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
+        { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
+        { label: '⏱️ Record +5', points: 5, reason: 'Record Verbroken', class: 'bonus' }
+      ],
+      'zwemmen': [
+        { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
+        { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
+        { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
+        { label: '⏱️ Record +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' }
+      ],
+      'wielrennen': [
+        { label: '🥇 1e Plaats +5', points: 5, reason: 'Etappe Gewonnen', class: 'bonus' },
+        { label: '🥈 2e Plaats +3', points: 3, reason: '2e Plaats', class: 'correct' },
+        { label: '🥉 3e Plaats +2', points: 2, reason: '3e Plaats', class: 'correct' },
+        { label: '🚴 Sprint +1', points: 1, reason: 'Tussensprint', class: 'correct' }
+      ],
+      'hardlopen': [
+        { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
+        { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
+        { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
+        { label: '⏱️ PR +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' }
+      ],
+      'esports': [
+        { label: '💀 Kill +1', points: 1, reason: 'Elimination', class: 'correct' },
+        { label: '💥 Multi-Kill +3', points: 3, reason: 'Multi-Kill', class: 'bonus' },
+        { label: '🎯 Objective +2', points: 2, reason: 'Doelwit Behaald', class: 'correct' },
+        { label: '☠️ Death -1', points: -1, reason: 'Geëlimineerd', class: 'wrong' },
+        { label: '🏆 Victory +10', points: 10, reason: 'Victory Royale', class: 'bonus' }
+      ],
+      'bordspel': [
+        { label: '+1 Punt', points: 1, reason: 'Punt Verdiend', class: 'correct' },
+        { label: '+3 Bonus', points: 3, reason: 'Bonus', class: 'bonus' },
+        { label: '+5 Grote Zet', points: 5, reason: 'Grote Zet', class: 'bonus' },
+        { label: '-2 Penalty', points: -2, reason: 'Penalty', class: 'penalty' }
+      ],
+      'custom': [
+        { label: '+5 Bonus', points: 5, reason: 'Bonus', class: 'bonus' },
+        { label: '-2 Penalty', points: -2, reason: 'Penalty', class: 'penalty' },
+        { label: '+1 Punt', points: 1, reason: 'Punt', class: 'correct' },
+        { label: '-1 Aftrek', points: -1, reason: 'Aftrek', class: 'wrong' }
+      ]
+    };
+
+    return buttons[sportType] || buttons['custom'];
   }
 
   updateSessionDisplay() {
@@ -192,6 +356,27 @@ class ScoreInput {
 
   populateTeamSelect() {
     this.teamSelect.innerHTML = '<option value="">Kies een team...</option>';
+    
+    if (this.teams.length === 0) {
+      this.teamSelect.innerHTML = '<option value="">⚠️ Geen teams beschikbaar - Ga naar Team Setup</option>';
+      this.teamSelect.disabled = true;
+      
+      // Show helpful message
+      if (!document.getElementById('no-teams-warning')) {
+        const warning = document.createElement('div');
+        warning.id = 'no-teams-warning';
+        warning.className = 'alert alert-warning';
+        warning.style.cssText = 'margin: 15px 0; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; color: #856404;';
+        warning.innerHTML = '<strong>⚠️ Geen teams gevonden!</strong><br>Voeg eerst teams toe via de <a href="teamsetup.html?session=' + this.sessionId + '" style="color: #0056b3; text-decoration: underline;">Team Setup</a> pagina.';
+        this.teamSelect.parentNode.appendChild(warning);
+      }
+      return;
+    }
+    
+    this.teamSelect.disabled = false;
+    const warning = document.getElementById('no-teams-warning');
+    if (warning) warning.remove();
+    
     this.teams.forEach((team) => {
       const option = document.createElement('option');
       option.value = team.id;
@@ -531,7 +716,7 @@ class ScoreInput {
 
     // Validate scoring mode
     if (this.session.scoring_mode === 'player' && !playerId) {
-      alert('⚠️ Speler Modus: Je moet een specifieke speler selecteren om punten toe te kennen.');
+      this.showInlineError('player-select', '⚠️ Selecteer een specifieke speler in Speler Modus');
       this.playerSelect.focus();
       this.isSubmitting = false;
       if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
@@ -598,7 +783,30 @@ class ScoreInput {
     }
   }
 
+  showInlineError(fieldId, message) {
+    // Remove any existing error messages
+    const existingError = document.querySelector('.inline-error-message');
+    if (existingError) existingError.remove();
+    
+    const field = document.getElementById(fieldId);
+    if (!field || !field.parentNode) return;
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'inline-error-message';
+    errorDiv.style.cssText = 'color: #dc3545; font-size: 0.9em; margin-top: 4px; padding: 8px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;';
+    errorDiv.textContent = message;
+    
+    field.parentNode.insertBefore(errorDiv, field.nextSibling);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => errorDiv.remove(), 4000);
+  }
+  
   onScoreSubmitSuccess(teamId, points) {
+    // Remove any error messages on success
+    const existingError = document.querySelector('.inline-error-message');
+    if (existingError) existingError.remove();
+    
     // Show animation
     this.showScoreAnimation(teamId, points);
 
@@ -609,7 +817,8 @@ class ScoreInput {
     // Reload leaderboard to show updated scores
     this.loadLeaderboard();
     
-    // Reload teams to update scores in dropdown, but preserve selection
+    // Reload teams to update scores in dropdown
+    // Selection is now properly preserved in loadTeams() method
     this.loadTeams();
 
     // Load recent scores with a small delay to ensure the score is saved
@@ -619,6 +828,11 @@ class ScoreInput {
   }
 
   addQuickScore(reason, points) {
+    // Prevent double submission from quick actions
+    if (this.isSubmitting) {
+      return;
+    }
+    
     const teamId = parseInt(this.teamSelect.value);
     if (!teamId) {
       alert('Selecteer eerst een team.');
@@ -627,7 +841,7 @@ class ScoreInput {
 
     this.pointsInput.value = points;
     this.reasonInput.value = reason;
-    // Call submitScore (guarded by isSubmitting) - this diagnostic helps find duplicate callers
+    // Call submitScore (guarded by isSubmitting)
     this.submitScore();
   }
 
@@ -710,14 +924,26 @@ class ScoreInput {
   updateTimerDisplay() {
     if (!this.timer) return;
 
-    if (!this.session || !this.session.time_limit) {
-      this.timer.textContent = '--:--';
+    if (!this.session || !this.session.time_limit || this.session.time_limit === 0) {
+      this.timer.textContent = 'Geen tijdslimiet';
+      this.timer.style.color = '#6c757d';
+      this.timer.style.fontSize = '0.9em';
       return;
     }
 
     const minutes = Math.floor(this.timeRemaining / 60);
     const seconds = this.timeRemaining % 60;
     this.timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    this.timer.style.fontSize = '1em';
+    
+    // Color coding based on time remaining
+    if (this.timeRemaining < 60) {
+      this.timer.style.color = '#dc3545'; // Red for last minute
+    } else if (this.timeRemaining < 300) {
+      this.timer.style.color = '#ffc107'; // Yellow for last 5 minutes
+    } else {
+      this.timer.style.color = '#28a745'; // Green
+    }
   }
 
   handleTimeUp() {

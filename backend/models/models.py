@@ -132,17 +132,20 @@ class GameStatusUpdate(BaseModel):
 # Session Models (for teambuilding activities)
 class SessionBase(BaseModel):
     name: str
+    sport_type: str = "custom"  # Type of sport/activity for theming
     game_type: str = "custom"
     max_teams: int = 10
     total_rounds: int = 1
     time_limit: Optional[int] = None
-    scoring_mode: str = "team"  # "team" or "player"
+    scoring_mode: str = "team"  # "team", "team_with_players", or "player"
+    show_players: bool = True  # Whether to show players on scoreboard
 
 class SessionCreate(SessionBase):
     pass
 
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
+    sport_type: Optional[str] = None
     game_type: Optional[str] = None
     status: Optional[str] = None
     max_teams: Optional[int] = None
@@ -150,6 +153,7 @@ class SessionUpdate(BaseModel):
     total_rounds: Optional[int] = None
     time_limit: Optional[int] = None
     scoring_mode: Optional[str] = None
+    show_players: Optional[bool] = None
 
 class SessionResponse(SessionBase):
     id: int

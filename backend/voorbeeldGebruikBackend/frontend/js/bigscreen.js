@@ -4,6 +4,7 @@ class BigScreenDisplay {
     this.currentSession = null;
     this.lastUpdate = null;
     this.updateInterval = null;
+    this.sessionStatusBadge = null;
     this.init();
   }
 
@@ -254,6 +255,9 @@ class BigScreenDisplay {
     try {
       const liveData = await api.getLiveLeaderboard();
       if (liveData && liveData.session) {
+        // Apply theme based on sport_type
+        this.applyTheme(liveData.session.sport_type || 'custom');
+        
         // Load players for teams in the leaderboard
         if (liveData.leaderboard && liveData.leaderboard.length > 0) {
           await this.loadPlayersForLeaderboard(liveData.session.id, liveData.leaderboard);
@@ -266,6 +270,31 @@ class BigScreenDisplay {
       api.handleError(error, 'loading initial data');
       this.showNoSessionMessage();
     }
+  }
+  
+  applyTheme(sportType) {
+    // Set the data-sport attribute on body to trigger CSS theme
+    document.body.setAttribute('data-sport', sportType || 'custom');
+    
+    // Update page title with sport icon
+    const sportIcons = {
+      'quiz': '🧠',
+      'voetbal': '⚽',
+      'basketbal': '🏀',
+      'volleybal': '🏐',
+      'hockey': '🏑',
+      'tennis': '🎾',
+      'atletiek': '🏃',
+      'zwemmen': '🏊',
+      'fietsen': '🚴',
+      'hardlopen': '🏃',
+      'esports': '🎮',
+      'boardgame': '🎲',
+      'custom': '🎯'
+    };
+    
+    const icon = sportIcons[sportType] || '🎯';
+    document.title = `${icon} TeamScore - Live Scorebord`;
   }
 
   async loadPlayersForLeaderboard(sessionId, leaderboard) {
@@ -498,6 +527,33 @@ class BigScreenDisplay {
         this.sessionTitle.appendChild(iconSpan);
       }
     }
+    
+    // Update or create status badge
+    if (!this.sessionStatusBadge) {
+      this.sessionStatusBadge = document.getElementById('session-status-badge');
+      if (!this.sessionStatusBadge) {
+        // Create status badge if it doesn't exist
+        this.sessionStatusBadge = document.createElement('div');
+        this.sessionStatusBadge.id = 'session-status-badge';
+        this.sessionStatusBadge.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000;';
+        document.body.appendChild(this.sessionStatusBadge);
+      }
+    }
+    
+    // Update status badge based on session status
+    const statusText = this.getStatusText(session.status);
+    const statusColors = {
+      setup: { bg: '#6c757d', text: 'white', icon: '⚙️' },
+      active: { bg: '#28a745', text: 'white', icon: '▶️' },
+      paused: { bg: '#ffc107', text: '#000', icon: '⏸️' },
+      completed: { bg: '#007bff', text: 'white', icon: '🏁' }
+    };
+    
+    const statusStyle = statusColors[session.status] || statusColors.setup;
+    this.sessionStatusBadge.style.background = statusStyle.bg;
+    this.sessionStatusBadge.style.color = statusStyle.text;
+    this.sessionStatusBadge.textContent = `${statusStyle.icon} ${statusText}`;
+    
     if (this.sessionStatus) {
       this.sessionStatus.textContent = this.getStatusText(session.status);
       this.sessionStatus.className = `game-status status-${session.status}`;
@@ -540,14 +596,17 @@ class BigScreenDisplay {
       teamDiv.setAttribute('data-team-id', team.team_id);
     }
 
-    // Check if session is in player scoring mode
-    const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
+    // Check scoring mode
+    const scoringMode = this.currentSession ? this.currentSession.scoring_mode : 'team';
+    const isPlayerMode = scoringMode === 'player';
+    const isTeamWithPlayers = scoringMode === 'team_with_players';
+    const showPlayers = (this.currentSession && typeof this.currentSession.show_players !== 'undefined') ? Boolean(this.currentSession.show_players) : true;
     
     const players = team.players || [];
     const playerScores = team.playerScores || {};
     
     let playersHtml = '';
-    if (players.length > 0) {
+    if (players.length > 0 && showPlayers) {
       if (isPlayerMode) {
         // Player mode: show player names with their individual scores
         playersHtml = `<div class="team-players-bigscreen player-mode">
@@ -560,12 +619,13 @@ class BigScreenDisplay {
             </span>`;
           }).join('')}
         </div>`;
-      } else {
-        // Team mode: just show player names
-        playersHtml = `<div class="team-players-bigscreen">
+      } else if (isTeamWithPlayers) {
+        // Team with players mode: show player names without individual scores
+        playersHtml = `<div class="team-players-bigscreen team-with-players-mode">
           ${players.map(p => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
         </div>`;
       }
+      // else: pure team mode - don't show players at all
     }
 
     teamDiv.innerHTML = `

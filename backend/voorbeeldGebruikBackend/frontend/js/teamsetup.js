@@ -308,6 +308,32 @@ class TeamSetup {
   escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  
+  showSuccessMessage(message) {
+    const existing = document.querySelector('.success-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">✓</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 3000);
+  }
+  
+  showErrorMessage(message) {
+    const existing = document.querySelector('.error-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'error-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">⚠️</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 4000);
+  }
 
   async addPlayerInline(teamId) {
     const nameEl = document.getElementById(`new-player-name-${teamId}`);
@@ -748,6 +774,9 @@ class TeamSetup {
       this.updateTeamsDisplay();
       this.updateTeamsCount();
 
+      // Show success message
+      this.showSuccessMessage(`Team "${teamName}" is toegevoegd!`);
+
       // Clear form
       this.teamNameInput.value = '';
       this.teamNameInput.focus();
@@ -940,7 +969,15 @@ class TeamSetup {
   }
 
   async deleteSession() {
-    if (!confirm(`Weet je zeker dat je de sessie "${this.session.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) {
+    const confirmMessage = `⚠️ WAARSCHUWING: Sessie Verwijderen\n\nSessie: ${this.session.name}\nAantal teams: ${this.teams.length}\nStatus: ${this.getStatusText(this.session.status)}\n\nDeze actie kan NIET ongedaan worden gemaakt!\nAlle scores en gegevens gaan verloren.\n\nWeet je zeker dat je wilt doorgaan?`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    // Double confirmation for extra safety
+    const doubleConfirm = confirm('Laatste bevestiging: Weet je het ABSOLUUT zeker?');
+    if (!doubleConfirm) {
       return;
     }
 

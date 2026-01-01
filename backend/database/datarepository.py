@@ -494,7 +494,8 @@ class SessionRepository:
 
     @staticmethod
     def create_session(name: str, game_type: str = "custom", max_teams: int = 10,
-                      total_rounds: int = 1, time_limit: Optional[int] = None, scoring_mode: str = "team") -> int:
+                      total_rounds: int = 1, time_limit: Optional[int] = None, scoring_mode: str = "team",
+                      sport_type: str = "custom", show_players: bool = True) -> int:
         # Sessies worden opgeslagen als games, sport_id = Teambuilding (ID 4)
         # Probeer teambuilding sport te vinden, anders gebruik custom (ID 5)
         sport_result = Database.get_one_row("SELECT id FROM sports WHERE name = 'Teambuilding' LIMIT 1")
@@ -505,14 +506,12 @@ class SessionRepository:
         # Sla max_teams op in settings JSON
         settings = json.dumps({"max_teams": max_teams})
         
-        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings, scoring_mode)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings, scoring_mode])
-
-    @staticmethod
+        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings, scoring_mode, sport_type, show_players)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""  
+        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings, scoring_mode, sport_type, 1 if show_players else 0])
     def get_all_sessions() -> List[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.created_at, g.updated_at,
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
                  WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament')
@@ -532,7 +531,7 @@ class SessionRepository:
     @staticmethod
     def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.created_at, g.updated_at,
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g WHERE g.id = ?"""
         session = Database.get_one_row(sql, [session_id])
@@ -548,7 +547,7 @@ class SessionRepository:
     @staticmethod
     def get_active_session() -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.created_at, g.updated_at,
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
                         COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
                  FROM games g
                  WHERE g.status IN ('setup', 'active', 'paused')
@@ -568,7 +567,8 @@ class SessionRepository:
     def update_session(session_id: int, name: Optional[str] = None, game_type: Optional[str] = None,
                       status: Optional[str] = None, max_teams: Optional[int] = None,
                       current_round: Optional[int] = None, total_rounds: Optional[int] = None,
-                      time_limit: Optional[int] = None, scoring_mode: Optional[str] = None) -> bool:
+                      time_limit: Optional[int] = None, scoring_mode: Optional[str] = None,
+                      sport_type: Optional[str] = None, show_players: Optional[bool] = None) -> bool:
         updates = []
         params = []
         
@@ -593,6 +593,12 @@ class SessionRepository:
         if scoring_mode is not None:
             updates.append("scoring_mode = ?")
             params.append(scoring_mode)
+        if sport_type is not None:
+            updates.append("sport_type = ?")
+            params.append(sport_type)
+        if show_players is not None:
+            updates.append("show_players = ?")
+            params.append(1 if show_players else 0)
         
         # max_teams gaat in settings JSON
         if max_teams is not None:

@@ -102,6 +102,7 @@ class StartScreen {
     const formData = new FormData(this.sessionForm);
     const sessionData = {
       name: document.getElementById('session-name').value,
+      sport_type: document.getElementById('sport-type') ? document.getElementById('sport-type').value : 'custom',
       game_type: document.getElementById('game-type').value,
       scoring_mode: document.getElementById('scoring-mode').value,
       show_players: this.showPlayersCheckbox ? Boolean(this.showPlayersCheckbox.checked) : true,
@@ -113,13 +114,21 @@ class StartScreen {
     try {
       const response = await api.post('/api/v1/sessions', sessionData);
       if (response) {
-        alert('Nieuwe sessie aangemaakt! Ga nu naar de team setup.');
+        this.showSuccessMessage('Sessie aangemaakt!');
         // Redirect to team setup page
-        window.location.href = `teamsetup.html?session=${response.id}`;
+        setTimeout(() => {
+          window.location.href = `teamsetup.html?session=${response.id}`;
+        }, 500);
       }
     } catch (error) {
       api.handleError(error, 'creating session');
-      alert('Fout bij het aanmaken van de sessie. Probeer opnieuw.');
+      
+      // Show user-friendly error message
+      const errorMsg = error.message && error.message.includes('fetch') 
+        ? 'Kan geen verbinding maken met de backend server. Zorg dat de server draait op http://localhost:8000'
+        : 'Fout bij het aanmaken van de sessie. Probeer opnieuw.';
+      
+      this.showErrorMessage(errorMsg);
     }
   }
 
@@ -131,19 +140,42 @@ class StartScreen {
       }
     } catch (error) {
       // Distinguish between no active session and backend not reachable
-      if (error instanceof TypeError) {
-        // Network error likely means backend is down
-        const container = document.getElementById('recent-sessions');
-        if (container) {
-          const warn = document.createElement('div');
-          warn.className = 'warning-banner';
-          warn.textContent = 'Kan geen verbinding maken met de backend op http://localhost:8000. Start de backend server en vernieuw deze pagina.';
-          container.prepend(warn);
-        }
-        console.warn('Backend likely not running at API base URL.');
+      if (error instanceof TypeError || (error.message && error.message.includes('fetch'))) {
+        // Network error likely means backend is down - show prominent warning
+        this.showBackendConnectionError();
       } else {
         console.log('No active session found');
       }
+    }
+  }
+  
+  showBackendConnectionError() {
+    // Create prominent error banner at the top of the page
+    const banner = document.createElement('div');
+    banner.id = 'backend-error-banner';
+    banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #dc3545; color: white; padding: 15px 20px; text-align: center; z-index: 10000; box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
+    banner.innerHTML = `
+      <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">⚠️ Backend Server Niet Bereikbaar</div>
+      <div style="font-size: 0.95em;">Kan geen verbinding maken met de backend op http://localhost:8000</div>
+      <div style="font-size: 0.9em; margin-top: 5px;">Start de backend server en <a href="#" onclick="location.reload()" style="color: #fff; text-decoration: underline;">vernieuw deze pagina</a></div>
+    `;
+    
+    // Remove existing banner if present
+    const existing = document.getElementById('backend-error-banner');
+    if (existing) existing.remove();
+    
+    document.body.prepend(banner);
+    
+    // Also show in the UI where active session would be
+    if (this.activeSessionDiv) {
+      this.activeSessionDiv.style.display = 'block';
+      this.activeSessionDiv.innerHTML = `
+        <div style="background: #f8d7da; border: 2px solid #dc3545; padding: 15px; border-radius: 8px;">
+          <h3 style="color: #721c24; margin-top: 0;">⚠️ Verbindingsfout</h3>
+          <p style="color: #721c24;">De applicatie kan geen verbinding maken met de backend server.</p>
+          <p style="color: #721c24; margin-bottom: 0;"><strong>Oplossing:</strong> Start de backend server met <code>python app.py</code> en vernieuw deze pagina.</p>
+        </div>
+      `;
     }
   }
 
@@ -407,6 +439,32 @@ class StartScreen {
   }
 
   escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  
+  showSuccessMessage(message) {
+    const existing = document.querySelector('.success-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">✓</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 3000);
+  }
+  
+  showErrorMessage(message) {
+    const existing = document.querySelector('.error-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'error-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">⚠️</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 5000);
+  }
 
   displayTeams(teams) {
     if (teams.length === 0) {

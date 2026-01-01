@@ -1,0 +1,293 @@
+/* Dynamic Themes for SportScore - Based on Sport Type */
+
+/* Base theme variables */
+:root {
+    --theme-primary: #4a90e2;
+    --theme-secondary: #f39c12;
+    --theme-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --theme-text: #ffffff;
+    --theme-accent: #ffd700;
+}
+
+/* Quiz Theme */
+body[data-sport="quiz"] {
+    --theme-primary: #9b59b6;
+    --theme-secondary: #e74c3c;
+    --theme-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --theme-accent: #f1c40f;
+}
+
+body[data-sport="quiz"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="quiz"] .header h1::before {
+    content: "🧠 ";
+}
+
+/* Voetbal Theme */
+body[data-sport="voetbal"] {
+    --theme-primary: #2ecc71;
+    --theme-secondary: #27ae60;
+    --theme-background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+    --theme-accent: #f39c12;
+}
+
+body[data-sport="voetbal"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="voetbal"] .header h1::before {
+    content: "⚽ ";
+}
+
+/* Basketbal Theme */
+body[data-sport="basketbal"] {
+    --theme-primary: #e67e22;
+    --theme-secondary: #d35400;
+    --theme-background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    --theme-accent: #c0392b;
+}
+
+body[data-sport="basketbal"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="basketbal"] .header h1::before {
+    content: "🏀 ";
+}
+
+/* Volleybal Theme */
+body[data-sport="volleybal"] {
+    --theme-primary: #3498db;
+    --theme-secondary: #2980b9;
+    --theme-background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --theme-accent: #f39c12;
+}
+
+body[data-sport="volleybal"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="volleybal"] .header h1::before {
+    content: "🏐 ";
+}
+
+/* Hockey Theme */
+body[data-sport="hockey"] {
+    --theme-primary: #1abc9c;
+    --theme-secondary: #16a085;
+    --theme-background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --theme-accent: #f1c40f;
+}
+
+body[data-sport="hockey"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="hockey"] .header h1::before {
+    content: "🏑 ";
+}
+
+/* Tennis Theme */
+body[data-sport="tennis"] {
+    --theme-primary: #95a5a6;
+    --theme-secondary: #7f8c8d;
+    --theme-background: linear-gradient(135deg, #bdc3c7 0%, #2c3e50 100%);
+    --theme-accent: #f1c40f;
+}
+
+body[data-sport="tennis"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="tennis"] .header h1::before {
+    content: "🎾 ";
+}
+
+/* Atletiek Theme */
+body[data-sport="atletiek"] {
+    --theme-primary: #e74c3c;
+    --theme-secondary: #c0392b;
+    --theme-background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+    --theme-accent: #f1c40f;
+}
+
+body[data-sport="atletiek"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="atletiek"] .header h1::before {
+    content: "🏃 ";
+}
+
+/* Zwemmen Theme */
+body[data-sport="zwemmen"] {
+    --theme-primary: #3498db;
+    --theme-secondary: #2980b9;
+    --theme-background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    --theme-accent: #f39c12;
+}
+
+body[data-sport="zwemmen"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="zwemmen"] .header h1::before {
+    content: "🏊 ";
+}
+
+/* Wielrennen Theme */
+body[data-sport="fietsen"] {
+    --theme-primary: #f39c12;
+    --theme-secondary: #d68910;
+    --theme-background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    --theme-accent: #c0392b;
+}
+
+body[data-sport="fietsen"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="fietsen"] .header h1::before {
+    content: "🚴 ";
+}
+
+/* Hardlopen Theme */
+body[data-sport="hardlopen"] {
+    --theme-primary: #16a085;
+    --theme-secondary: #138d75;
+    --theme-background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+    --theme-accent: #f39c12;
+}
+
+body[data-sport="hardlopen"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="hardlopen"] .header h1::before {
+    content: "🏃 ";
+}
+
+/* E-Sports Theme */
+body[data-sport="esports"] {
+    --theme-primary: #9b59b6;
+    --theme-secondary: #8e44ad;
+    --theme-background: linear-gradient(135deg, #654ea3 0%, #eaafc8 100%);
+    --theme-accent: #00d4ff;
+}
+
+body[data-sport="esports"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="esports"] .header h1::before {
+    content: "🎮 ";
+}
+
+/* Bordspel Theme */
+body[data-sport="boardgame"] {
+    --theme-primary: #d35400;
+    --theme-secondary: #ba4a00;
+    --theme-background: linear-gradient(135deg, #c94b4b 0%, #4b134f 100%);
+    --theme-accent: #f1c40f;
+}
+
+body[data-sport="boardgame"] .container {
+    background: var(--theme-background);
+}
+
+body[data-sport="boardgame"] .header h1::before {
+    content: "🎲 ";
+}
+
+/* Custom/Default Theme */
+body[data-sport="custom"],
+body:not([data-sport]) {
+    --theme-primary: #667eea;
+    --theme-secondary: #764ba2;
+    --theme-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --theme-accent: #ffd700;
+}
+
+body[data-sport="custom"] .header h1::before,
+body:not([data-sport]) .header h1::before {
+    content: "🎯 ";
+}
+
+/* Apply theme colors to elements */
+.leaderboard-team {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.leaderboard-team:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.team-score {
+    color: var(--theme-accent);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.header {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.last-update {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+}
+
+/* Animated background effect for quiz */
+body[data-sport="quiz"] .container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+    animation: pulse 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* Sports field pattern for voetbal */
+body[data-sport="voetbal"] .container::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 50px,
+            rgba(255, 255, 255, 0.05) 50px,
+            rgba(255, 255, 255, 0.05) 100px
+        );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Ensure content stays above patterns */
+.container > * {
+    position: relative;
+    z-index: 1;
+}

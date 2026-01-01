@@ -25,6 +25,28 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="sport-type">Sport/Activiteit Type:</label>
+                        <select id="sport-type">
+                            <option value="custom">🎯 Aangepast</option>
+                            <option value="quiz">🧠 Quiz</option>
+                            <option value="voetbal">⚽ Voetbal</option>
+                            <option value="basketbal">🏀 Basketbal</option>
+                            <option value="volleybal">🏐 Volleybal</option>
+                            <option value="hockey">🏑 Hockey</option>
+                            <option value="tennis">🎾 Tennis</option>
+                            <option value="atletiek">🏃 Atletiek</option>
+                            <option value="zwemmen">🏊 Zwemmen</option>
+                            <option value="fietsen">🚴 Wielrennen</option>
+                            <option value="hardlopen">🏃 Hardlopen</option>
+                            <option value="esports">🎮 E-Sports</option>
+                            <option value="boardgame">🎲 Bordspel</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 4px;">
+                            Dit bepaalt het thema van het scorebord
+                        </small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="game-type">Speltype:</label>
                         <select id="game-type">
                             <option value="custom">Aangepast</option>
@@ -39,11 +61,12 @@
                     <div class="form-group">
                         <label for="scoring-mode">Score Modus:</label>
                         <select id="scoring-mode" name="scoring-mode">
-                            <option value="team">Team Scores (alleen totale punten per team)</option>
-                            <option value="player">Speler Scores (individuele punten per speler)</option>
+                            <option value="team">👥 Team Scores (alleen totale punten per team)</option>
+                            <option value="team_with_players">👥👤 Team met Spelers (team scores, spelers zichtbaar)</option>
+                            <option value="player">👤 Speler Scores (individuele punten per speler)</option>
                         </select>
                         <small style="color: #666; font-size: 0.85em; display: block; margin-top: 4px;">
-                            Bij speler scores worden punten per speler bijgehouden en geteld naar team totaal.
+                            Team: alleen team totalen | Team met Spelers: spelers zichtbaar zonder individuele scores | Speler: volledige individuele scores
                         </small>
                     </div>
 

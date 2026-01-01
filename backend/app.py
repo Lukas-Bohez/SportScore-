@@ -471,7 +471,8 @@ async def get_sessions():
 async def create_session(session: SessionCreate):
     session_id = SessionRepository.create_session(
         session.name, session.game_type, session.max_teams,
-        session.total_rounds, session.time_limit, session.scoring_mode
+        session.total_rounds, session.time_limit, session.scoring_mode,
+        session.sport_type, session.show_players
     )
     created_session = SessionRepository.get_session_by_id(session_id)
 
