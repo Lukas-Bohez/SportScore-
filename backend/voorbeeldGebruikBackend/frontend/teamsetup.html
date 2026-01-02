@@ -18,72 +18,73 @@
         </header>
 
         <main class="main-content">
-            <div class="teams-section">
-                <h2>Teams Beheren</h2>
+            <div class="left-column">
+                <div class="teams-section">
+                    <h2>Teams Beheren</h2>
 
-                <!-- Bestaande teams selecteren -->
-                <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
-                            <option value="">-- Selecteer een bestaand team --</option>
-                        </select>
-                        <button id="add-existing-team-btn" class="save-team-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                    <!-- Bestaande teams selecteren -->
+                    <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
+                                <option value="">-- Selecteer een bestaand team --</option>
+                            </select>
+                            <button id="add-existing-team-btn" class="save-team-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                        </div>
+                        <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
+                            💡 Teams kunnen hergebruikt worden in meerdere sessies
+                        </p>
                     </div>
-                    <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
-                        💡 Teams kunnen hergebruikt worden in meerdere sessies
-                    </p>
-                </div>
 
-                <!-- Of nieuw team maken -->
-                <h3>Of Nieuw Team Maken</h3>
-                <div class="add-team-form">
-                    <input type="text" id="team-name" placeholder="Team naam" maxlength="50" aria-label="Team naam">
-                    <select id="team-color" title="Kleur kiezen" aria-label="Team kleur">
-                        <option value="#FF6B6B">🔴 Rood</option>
-                        <option value="#4ECDC4">🔵 Turquoise</option>
-                        <option value="#45B7D1">🔵 Blauw</option>
-                        <option value="#96CEB4">🟢 Groen</option>
-                        <option value="#FFEAA7">🟡 Geel</option>
-                        <option value="#DDA0DD">🟣 Plum</option>
-                        <option value="#98D8C8">🟢 Mint</option>
-                        <option value="#F7DC6F">🟡 Goud</option>
-                        <option value="#BB8FCE">🟣 Paars</option>
-                        <option value="#85C1E9">🔵 Light Blue</option>
-                    </select>
-                    <select id="team-icon" title="Icoon kiezen" aria-label="Team icoon">
-                        <option value="team">👥 Team</option>
-                        <option value="star">⭐ Ster</option>
-                        <option value="fire">🔥 Vuur</option>
-                        <option value="rocket">🚀 Raket</option>
-                        <option value="trophy">🏆 Trofee</option>
-                        <option value="lightning">⚡ Bliksem</option>
-                        <option value="heart">❤️ Hart</option>
-                        <option value="diamond">💎 Diamant</option>
-                        <option value="crown">👑 Kroon</option>
-                        <option value="superhero">🦸 Superheld</option>
-                    </select>
-                    <button id="add-team-btn" class="save-team-btn">Toevoegen</button>
-                </div>
+                    <!-- Of nieuw team maken -->
+                    <h3>Of Nieuw Team Maken</h3>
+                    <div class="add-team-form">
+                        <input type="text" id="team-name" placeholder="Team naam" maxlength="50" aria-label="Team naam">
+                        <select id="team-color" title="Kleur kiezen" aria-label="Team kleur">
+                            <option value="#FF6B6B">🔴 Rood</option>
+                            <option value="#4ECDC4">🔵 Turquoise</option>
+                            <option value="#45B7D1">🔵 Blauw</option>
+                            <option value="#96CEB4">🟢 Groen</option>
+                            <option value="#FFEAA7">🟡 Geel</option>
+                            <option value="#DDA0DD">🟣 Plum</option>
+                            <option value="#98D8C8">🟢 Mint</option>
+                            <option value="#F7DC6F">🟡 Goud</option>
+                            <option value="#BB8FCE">🟣 Paars</option>
+                            <option value="#85C1E9">🔵 Light Blue</option>
+                        </select>
+                        <select id="team-icon" title="Icoon kiezen" aria-label="Team icoon">
+                            <option value="team">👥 Team</option>
+                            <option value="star">⭐ Ster</option>
+                            <option value="fire">🔥 Vuur</option>
+                            <option value="rocket">🚀 Raket</option>
+                            <option value="trophy">🏆 Trofee</option>
+                            <option value="lightning">⚡ Bliksem</option>
+                            <option value="heart">❤️ Hart</option>
+                            <option value="diamond">💎 Diamant</option>
+                            <option value="crown">👑 Kroon</option>
+                            <option value="superhero">🦸 Superheld</option>
+                        </select>
+                        <button id="add-team-btn" class="save-team-btn">Toevoegen</button>
+                    </div>
 
-                <div class="teams-grid" id="teams-grid">
-                    <!-- Teams will be dynamically added here -->
+                    <div class="teams-grid" id="teams-grid">
+                        <!-- Teams will be dynamically added here -->
+                    </div>
                 </div>
-            </div>
 
                 <!-- Player Manager: create / edit / assign players -->
-                <div class="players-manager-section" style="margin-top: 24px;">
+                <div class="players-manager-section">
                     <h2>Spelers Beheren</h2>
-                    <div class="player-create" style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
-                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100" style="flex:1; padding:8px;">
-                        <!-- Position removed: positions are assigned alphabetically on creation -->
+                    <div class="player-create">
+                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100">
                         <button id="add-player-global-btn" class="save-team-btn">Speler aanmaken</button>
                     </div>
 
-                    <div id="players-list-global" style="background:#fafafa; padding:12px; border-radius:8px;">
+                    <div id="players-list-global">
                         <p style="color:#666">Laden van spelers…</p>
                     </div>
                 </div>
+            </div>
 
             <div class="actions-section">
                 <div class="action-buttons">
