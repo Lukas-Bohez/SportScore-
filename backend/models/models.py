@@ -55,8 +55,10 @@ class SessionPlayerBase(BaseModel):
     team_id: int
     player_id: int
 
-class SessionPlayerCreate(SessionPlayerBase):
-    pass
+class SessionPlayerCreate(BaseModel):
+    """Request model for assigning a player to a team within a session"""
+    team_id: int
+    player_id: int
 
 class SessionPlayerUpdate(BaseModel):
     team_id: Optional[int] = None
