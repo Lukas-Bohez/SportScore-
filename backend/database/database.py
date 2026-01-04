@@ -9,11 +9,11 @@ class Database:
 
     @classmethod
     def __open_connection(cls):
-        """Open connection thread-safe"""
+        """Open connection thread-safe using thread-local storage"""
         try:
             if not hasattr(cls._local, 'db'):
-                # Connect to SQLite database
-                cls._local.db = sqlite3.connect(DB_PATH, check_same_thread=False)
+                # Connect to SQLite database with proper thread safety
+                cls._local.db = sqlite3.connect(DB_PATH, timeout=10.0)
                 # Enable dictionary-style row access
                 cls._local.db.row_factory = sqlite3.Row
                 cls._local.cursor = cls._local.db.cursor()
@@ -63,7 +63,7 @@ class Database:
 
     @classmethod
     def execute_sql(cls, sql_query, params=None):
-        """Execute SQL query"""
+        """Execute SQL query. Returns results for SELECT, rowid/count for INSERT/UPDATE/DELETE. Raises on error."""
         try:
             cls.__open_connection()
             cls._local.cursor.execute(sql_query, params or [])
@@ -83,6 +83,6 @@ class Database:
             if hasattr(cls._local, 'db'):
                 cls._local.db.rollback()
             print(f"Execute error: {error}")
-            return None
+            raise  # Re-raise so caller can handle appropriately
         finally:
             cls.__close_connection()

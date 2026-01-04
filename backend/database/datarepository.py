@@ -47,16 +47,14 @@ class SportRepository:
 
 class TeamRepository:
     """
-    LEGACY: Deze repository wordt niet meer gebruikt in de nieuwe structuur.
-    Teams zijn nu direct gekoppeld aan games, niet aan sports.
-    Gebruik SessionTeamRepository voor team beheer.
+    Manages teams that can be reused across multiple sessions/games.
     """
 
     @staticmethod
-    def create_team(name: str, sport_id: int) -> int:
-        # Legacy functie - niet gebruiken in nieuwe code
-        # Teams moeten nu via een game worden aangemaakt
-        return None
+    def create_team(name: str, sport_id: Optional[int] = None) -> int:
+        sql = "INSERT INTO teams (name) VALUES (?)"
+        params = [name]
+        return Database.execute_sql(sql, params)
 
     @staticmethod
     def get_all_teams() -> List[Dict[str, Any]]:

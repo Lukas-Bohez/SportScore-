@@ -1,16 +1,11 @@
 import socketio
 import asyncio
 import uvicorn
-import os
 from datetime import datetime
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status, Body, Header, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import time
-import traceback
 import threading
-from threading import Thread, Event, Lock
-import socket
+from threading import Lock
 import logging
 
 
@@ -78,12 +73,20 @@ def _jsonable(value):
         return [_jsonable(v) for v in value]
     return value
 
-# CORS middleware - allow all origins
+# CORS middleware - restrict to frontend origins for security
+# Update these URLs based on your deployment environment
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (as requested)
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -177,11 +180,18 @@ async def get_teams(sport_id: Optional[int] = Query(None)):
 
 @app.post(f"{ENDPOINT}/teams", response_model=TeamResponse)
 async def create_team(team: TeamCreate):
-    team_id = TeamRepository.create_team(team.name, team.sport_id)
-    if not team_id:
-        raise HTTPException(status_code=400, detail="Failed to create team")
-    created_team = TeamRepository.get_team_by_id(team_id)
-    return TeamResponse(**created_team)
+    try:
+        team_id = TeamRepository.create_team(team.name, team.sport_id)
+        if not team_id:
+            raise HTTPException(status_code=400, detail="Failed to create team")
+        created_team = TeamRepository.get_team_by_id(team_id)
+        if not created_team:
+            raise HTTPException(status_code=500, detail="Team created but could not be retrieved")
+        return TeamResponse(**created_team)
+    except Exception as e:
+        if "UNIQUE constraint failed" in str(e):
+            raise HTTPException(status_code=409, detail="Team with this name already exists")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.get(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
 async def get_team(team_id: int):
