@@ -1,7 +1,11 @@
 from .database import Database
 from datetime import datetime
+import pytz
 from typing import List, Optional, Dict, Any
 import json
+
+# Define CET/CEST timezone for Belgium
+CET = pytz.timezone('Europe/Brussels')
 
 class SportRepository:
 
@@ -168,13 +172,13 @@ class SessionPlayerRepository:
     @staticmethod
     def assign_player_to_session(session_id: int, team_id: int, player_id: int) -> int:
         """Assign a player to a team for a specific session. Returns the assignment id."""
-        sql = "INSERT OR REPLACE INTO session_players (session_id, team_id, player_id) VALUES (?, ?, ?)"
+        sql = "INSERT INTO session_players (session_id, team_id, player_id) VALUES (?, ?, ?)"
         return Database.execute_sql(sql, [session_id, team_id, player_id])
 
     @staticmethod
-    def remove_player_from_session(session_id: int, player_id: int) -> bool:
-        sql = "DELETE FROM session_players WHERE session_id = ? AND player_id = ?"
-        return Database.execute_sql(sql, [session_id, player_id]) is not None
+    def remove_player_from_session_team(session_id: int, team_id: int, player_id: int) -> bool:
+        sql = "DELETE FROM session_players WHERE session_id = ? AND team_id = ? AND player_id = ?"
+        return Database.execute_sql(sql, [session_id, team_id, player_id]) is not None
 
     @staticmethod
     def get_players_by_session(session_id: int) -> List[Dict[str, Any]]:
@@ -186,7 +190,7 @@ class SessionPlayerRepository:
 
     @staticmethod
     def get_players_by_session_team(session_id: int, team_id: int) -> List[Dict[str, Any]]:
-        sql = """SELECT sp.id, sp.session_id, sp.team_id, sp.player_id, sp.assigned_at, p.name as player_name
+        sql = """SELECT p.id, p.name, p.position
                  FROM session_players sp
                  JOIN players p ON p.id = sp.player_id
                  WHERE sp.session_id = ? AND sp.team_id = ? ORDER BY p.name ASC"""
@@ -264,7 +268,7 @@ class GameRepository:
         sql = """INSERT INTO games (name, sport_id, game_type, status, start_time)
                  VALUES (?, ?, ?, ?, ?)"""
         # Genereer naam op basis van team namen
-        game_name = f"Match {datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        game_name = f"Match {datetime.now(CET).strftime('%Y%m%d_%H%M%S')}"
         game_id = Database.execute_sql(sql, [game_name, sport_id, 'match', new_status, start_time])
         
         # Opmerking: team1_id en team2_id worden genegeerd omdat teams nu
@@ -649,14 +653,32 @@ class SessionTeamRepository:
         sql_link = """INSERT OR IGNORE INTO game_teams (game_id, team_id) VALUES (?, ?)"""
         Database.execute_sql(sql_link, [session_id, team_id])
         
+        # Copy default player assignments for this team to the session
+        sql_copy_players = """
+            INSERT OR IGNORE INTO session_players (session_id, team_id, player_id)
+            SELECT ?, ?, id FROM players WHERE team_id = ?
+        """
+        Database.execute_sql(sql_copy_players, [session_id, team_id, team_id])
+        
         return team_id
 
     @staticmethod
     def add_existing_team_to_session(session_id: int, team_id: int) -> bool:
         """Voeg een bestaand team toe aan een sessie."""
+        # First add the team to the session
         sql = """INSERT OR IGNORE INTO game_teams (game_id, team_id) VALUES (?, ?)"""
         result = Database.execute_sql(sql, [session_id, team_id])
-        return result is not None
+        if result is None:
+            return False
+
+        # Then copy default player assignments for this team
+        sql_copy_players = """
+            INSERT OR IGNORE INTO session_players (session_id, team_id, player_id)
+            SELECT ?, ?, id FROM players WHERE team_id = ?
+        """
+        Database.execute_sql(sql_copy_players, [session_id, team_id, team_id])
+
+        return True
 
     @staticmethod
     def remove_team_from_session(session_id: int, team_id: int) -> bool:
@@ -819,10 +841,12 @@ class SessionScoreRepository:
 
     @staticmethod
     def create_score(session_id: int, team_id: int, points: int, reason: Optional[str] = None,
-                    round_number: int = 1, player_id: Optional[int] = None) -> int:
-        sql = """INSERT INTO scores (game_id, team_id, player_id, points, score_type, reason, round_number)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"""
-        return Database.execute_sql(sql, [session_id, team_id, player_id, points, 'point', reason, round_number])
+                    round_number: int = 1, player_id: Optional[int] = None, timestamp: Optional[datetime] = None) -> int:
+        if timestamp is None:
+            timestamp = datetime.now(CET)
+        sql = """INSERT INTO scores (game_id, team_id, player_id, points, score_type, reason, round_number, timestamp)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        return Database.execute_sql(sql, [session_id, team_id, player_id, points, 'point', reason, round_number, timestamp])
 
     @staticmethod
     def get_scores_by_session(session_id: int) -> List[Dict[str, Any]]:

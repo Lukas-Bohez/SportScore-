@@ -61,7 +61,7 @@ def main():
 
     # Check if requirements are installed
     try:
-        result = subprocess.run([venv_python, "-c", "import fastapi, uvicorn, socketio"], capture_output=True, text=True)
+        result = subprocess.run([venv_python, "-c", "import fastapi, uvicorn, socketio, pytz"], capture_output=True, text=True)
         if result.returncode != 0:
             if requirements_path:
                 print("Installing missing requirements...")
