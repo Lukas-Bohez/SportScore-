@@ -786,3 +786,11 @@ body {
     color: #666;
     font-size: 0.9rem;
 }
+
+#players-list-global p {
+    color: #666;
+}
+
+.session-summary h3 {
+    margin-bottom: 10px;
+}
