@@ -23,15 +23,15 @@
                     <h2>Teams Beheren</h2>
 
                     <!-- Bestaande teams selecteren -->
-                    <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <select id="existing-team-select" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
+                    <div class="existing-teams-section">
+                        <h3>Bestaand Team Toevoegen</h3>
+                        <div class="flex-container">
+                            <select id="existing-team-select" title="Selecteer een bestaand team" aria-label="Bestaand team selecteren">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
-                            <button id="add-existing-team-btn" class="save-team-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                            <button id="add-existing-team-btn" class="save-team-btn">Team Toevoegen</button>
                         </div>
-                        <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
+                        <p>
                             💡 Teams kunnen hergebruikt worden in meerdere sessies
                         </p>
                     </div>
@@ -81,7 +81,7 @@
                     </div>
 
                     <div id="players-list-global">
-                        <p style="color:#666">Laden van spelers…</p>
+                        <p>Laden van spelers…</p>
                     </div>
                 </div>
             </div>
@@ -101,7 +101,7 @@
                         <p>Speltype: <span id="game-type">Aangepast</span></p>
                     </div>
                     
-                    <h3 style="margin-top: 20px;">Score Modus</h3>
+                    <h3>Score Modus</h3>
                     <div class="scoring-mode-selector">
                         <label>
                             <input type="radio" name="scoring-mode" value="team" id="scoring-mode-team" checked>
@@ -118,11 +118,11 @@
                             </span>
                         </label>
                     </div>
-                    <div id="player-mode-hint" style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
+                    <div id="player-mode-hint">
                         <strong>💡 Tip voor Speler Scores:</strong><br>
-                        <small style="color: #856404;">Voeg spelers toe aan je teams om hun individuele scores bij te kunnen houden!</small>
+                        <small>Voeg spelers toe aan je teams om hun individuele scores bij te kunnen houden!</small>
                     </div>
-                    <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                    <p>
                         <em>Bij speler scores zie je individuele bijdragen per speler in het scorebord</em>
                     </p>
                 </div>

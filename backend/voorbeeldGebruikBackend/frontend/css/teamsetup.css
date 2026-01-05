@@ -786,3 +786,68 @@ body {
     color: #666;
     font-size: 0.9rem;
 }
+
+/* Inline styles moved from HTML */
+.existing-teams-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.existing-teams-section h3 {
+    margin-top: 0;
+}
+
+.existing-teams-section .flex-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#existing-team-select {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+#add-existing-team-btn {
+    white-space: nowrap;
+}
+
+.existing-teams-section p {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+#player-mode-hint {
+    display: none;
+    margin-top: 10px;
+    padding: 10px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+}
+
+#player-mode-hint small {
+    color: #856404;
+}
+
+.session-summary p:last-child {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 10px;
+}
+
+/* Additional inline styles moved from HTML */
+#players-list-global p {
+    color: #666;
+}
+
+.session-summary h3 {
+    margin-top: 20px;
+}
