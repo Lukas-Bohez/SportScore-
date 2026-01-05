@@ -1,12 +1,17 @@
 import socketio
 import asyncio
 import uvicorn
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+import pytz
 from fastapi import FastAPI, HTTPException, status, Body, Header, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import threading
 from threading import Lock
 import logging
+
+
+# Define CET/CEST timezone for Belgium
+CET = pytz.timezone('Europe/Brussels')
 
 
 # Import repositories
@@ -120,7 +125,7 @@ async def connect(sid, environ):
     await sio.emit('welcome', {
         'message': 'Successfully connected to scoreboard server',
         'client_id': sid,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }, room=sid)
 
 @sio.event
@@ -286,6 +291,13 @@ async def remove_player_assignment(session_id: int, player_id: int):
         raise HTTPException(status_code=400, detail="Failed to remove assignment or assignment not found")
     return {"message": "Assignment removed"}
 
+@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players/{{player_id}}")
+async def remove_player_from_session_team(session_id: int, team_id: int, player_id: int):
+    removed = SessionPlayerRepository.remove_player_from_session_team(session_id, team_id, player_id)
+    if not removed:
+        raise HTTPException(status_code=400, detail="Failed to remove assignment or assignment not found")
+    return {"message": "Assignment removed"}
+
 
 @app.get(f"{ENDPOINT}/sessions/{{session_id}}/players", response_model=SessionPlayerListResponse)
 async def get_session_players(session_id: int):
@@ -423,7 +435,7 @@ async def create_score(score: ScoreCreate):
         score_type=score_type['name'] if score_type else 'Unknown',
         value=score.value,
         player_name=player_name,
-        timestamp=datetime.now()
+        timestamp=datetime.now(CET)
     )
     await sio.emit('score_update', update_message.dict())
 
@@ -490,7 +502,7 @@ async def create_session(session: SessionCreate):
     await sio.emit('session_created', _jsonable({
         'session_id': session_id,
         'session': created_session,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
 
     return SessionResponse(**created_session)
@@ -555,7 +567,7 @@ async def update_session(session_id: int, session_update: SessionUpdate):
     await sio.emit('session_update', _jsonable({
         'session_id': session_id,
         'session': updated_session,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
 
     return SessionResponse(**updated_session)
@@ -632,7 +644,7 @@ async def create_session_team(session_id: int, request: Request):
             'total_score': total_score
         },
         'action': 'created',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
 
     return SessionTeamResponse(**created_team)
@@ -698,7 +710,7 @@ async def update_session_team(session_id: int, team_id: int, team_update: Sessio
         'session_id': session_id,
         'team_id': team_id,
         'team': updated_team,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
 
     return SessionTeamResponse(**updated_team)
@@ -715,7 +727,7 @@ async def delete_session_team(session_id: int, team_id: int):
         'session_id': session_id,
         'team_id': team_id,
         'action': 'deleted',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     })
 
     return {"message": "Team deleted successfully"}
@@ -760,7 +772,8 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
     # Create score record
     score_id = SessionScoreRepository.create_score(
         score.session_id, score.team_id, score.points,
-        score.reason, score.round_number, score.player_id
+        score.reason, score.round_number, score.player_id,
+        datetime.now(CET)
     )
     created_score = SessionScoreRepository.get_score_by_id(score_id)
 
@@ -798,7 +811,7 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
             **updated_team,
             'total_score': total_score  # Add calculated total score
         },
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
 
     return SessionScoreResponse(**created_score)
@@ -836,7 +849,7 @@ async def test_socket():
     print(f"Sending test event to {len(connected_clients)} connected clients")
     await sio.emit('test_event', {
         'message': 'This is a test event',
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': datetime.now(CET).isoformat(),
         'connected_clients': len(connected_clients)
     })
     return {"message": "Test event sent", "connected_clients": len(connected_clients)}
@@ -957,7 +970,7 @@ async def add_existing_team_to_session(session_id: int, request: Request):
         'team_id': team_id,
         'team': team,
         'action': 'added',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     }))
     
     return {"team": team}
@@ -978,7 +991,7 @@ async def remove_team_from_session(session_id: int, team_id: int):
         'session_id': session_id,
         'team_id': team_id,
         'action': 'removed',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(CET).isoformat()
     })
     
     return {"message": "Team removed from session"}
@@ -990,7 +1003,7 @@ async def remove_team_from_session(session_id: int, team_id: int):
 # Health check endpoint (useful for uptime and debugging CORS/network issues)
 @app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
 async def health():
-    return {"status": "ok", "time": datetime.now().isoformat()}
+    return {"status": "ok", "time": datetime.now(CET).isoformat()}
 
 # Explicit CORS preflight handler (helps when running behind the Socket.IO ASGI wrapper)
 @app.options("/{full_path:path}")

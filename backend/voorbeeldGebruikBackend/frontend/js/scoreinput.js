@@ -8,7 +8,7 @@ class ScoreInput {
     this.timer = null;
     this.timeRemaining = 0;
     this.customQuickActions = [];
-  this.isSubmitting = false;
+    this.isSubmitting = false;
 
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
@@ -101,24 +101,24 @@ class ScoreInput {
     // Real-time updates
     api.on('session_score_update', (data) => this.handleScoreUpdate(data));
     api.on('session_status_update', (data) => this.handleStatusUpdate(data));
-    
+
     // Keyboard shortcuts
     this.setupKeyboardShortcuts();
   }
-  
+
   setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
       // Ignore if user is typing in an input field (except for Enter)
       const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
-      
+
       // Enter to submit (works in any input field)
       if (e.key === 'Enter' && isInputField && e.target !== this.reasonInput) {
         return; // Let reasonInput handle Enter normally
       }
-      
+
       // Ctrl/Cmd + Number keys for quick actions
       if ((e.ctrlKey || e.metaKey) && !isInputField) {
-        switch(e.key) {
+        switch (e.key) {
           case '1':
             e.preventDefault();
             this.addQuickScore('Bonus +5', 5);
@@ -141,7 +141,7 @@ class ScoreInput {
             break;
         }
       }
-      
+
       // Arrow keys for point adjustment (when not in input)
       if (!isInputField) {
         if (e.key === 'ArrowUp') {
@@ -182,7 +182,7 @@ class ScoreInput {
     const quickButtons = this.getSportQuickButtons(sportType);
 
     container.innerHTML = '';
-    quickButtons.forEach(btn => {
+    quickButtons.forEach((btn) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `quick-btn ${btn.class}`;
@@ -194,86 +194,86 @@ class ScoreInput {
 
   getSportQuickButtons(sportType) {
     const buttons = {
-      'quiz': [
+      quiz: [
         { label: '+1 Juist', points: 1, reason: 'Juist Antwoord', class: 'correct' },
         { label: '-1 Verkeerd', points: -1, reason: 'Verkeerd Antwoord', class: 'wrong' },
         { label: '+3 Bonus', points: 3, reason: 'Bonusvraag', class: 'bonus' },
-        { label: '+5 Perfect', points: 5, reason: 'Perfecte Ronde', class: 'bonus' }
+        { label: '+5 Perfect', points: 5, reason: 'Perfecte Ronde', class: 'bonus' },
       ],
-      'voetbal': [
+      voetbal: [
         { label: '⚽ Doelpunt +1', points: 1, reason: 'Doelpunt', class: 'goal' },
         { label: '🎯 Penalty +1', points: 1, reason: 'Penalty', class: 'penalty' },
         { label: '🅰️ Assist +1', points: 1, reason: 'Assist', class: 'bonus' },
         { label: '🟨 Gele Kaart -1', points: -1, reason: 'Gele Kaart', class: 'wrong' },
-        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' }
+        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' },
       ],
-      'basketbal': [
+      basketbal: [
         { label: '🏀 Free Throw +1', points: 1, reason: 'Vrije Worp', class: 'correct' },
         { label: '🎯 2-Pointer +2', points: 2, reason: '2-Punter', class: 'bonus' },
         { label: '🌟 3-Pointer +3', points: 3, reason: '3-Punter', class: 'bonus' },
-        { label: '🚫 Fout -1', points: -1, reason: 'Fout', class: 'wrong' }
+        { label: '🚫 Fout -1', points: -1, reason: 'Fout', class: 'wrong' },
       ],
-      'volleybal': [
+      volleybal: [
         { label: '🏐 Punt +1', points: 1, reason: 'Punt', class: 'correct' },
         { label: '⚡ Ace +2', points: 2, reason: 'Service Ace', class: 'bonus' },
         { label: '🛡️ Block +1', points: 1, reason: 'Blok', class: 'correct' },
-        { label: '❌ Fout -1', points: -1, reason: 'Fout', class: 'wrong' }
+        { label: '❌ Fout -1', points: -1, reason: 'Fout', class: 'wrong' },
       ],
-      'hockey': [
+      hockey: [
         { label: '🏑 Doelpunt +1', points: 1, reason: 'Doelpunt', class: 'goal' },
         { label: '🎯 Penalty +1', points: 1, reason: 'Strafcorner', class: 'penalty' },
         { label: '🟨 Gele Kaart -1', points: -1, reason: 'Gele Kaart', class: 'wrong' },
-        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' }
+        { label: '🟥 Rode Kaart -3', points: -3, reason: 'Rode Kaart', class: 'penalty' },
       ],
-      'tennis': [
+      tennis: [
         { label: '🎾 Game +1', points: 1, reason: 'Game Gewonnen', class: 'correct' },
         { label: '🏆 Set +5', points: 5, reason: 'Set Gewonnen', class: 'bonus' },
         { label: '⚡ Ace +1', points: 1, reason: 'Ace', class: 'bonus' },
-        { label: '❌ Dubbelfout -1', points: -1, reason: 'Dubbelfout', class: 'wrong' }
+        { label: '❌ Dubbelfout -1', points: -1, reason: 'Dubbelfout', class: 'wrong' },
       ],
-      'atletiek': [
+      atletiek: [
         { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
         { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
         { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
-        { label: '⏱️ Record +5', points: 5, reason: 'Record Verbroken', class: 'bonus' }
+        { label: '⏱️ Record +5', points: 5, reason: 'Record Verbroken', class: 'bonus' },
       ],
-      'zwemmen': [
+      zwemmen: [
         { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
         { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
         { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
-        { label: '⏱️ Record +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' }
+        { label: '⏱️ Record +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' },
       ],
-      'wielrennen': [
+      wielrennen: [
         { label: '🥇 1e Plaats +5', points: 5, reason: 'Etappe Gewonnen', class: 'bonus' },
         { label: '🥈 2e Plaats +3', points: 3, reason: '2e Plaats', class: 'correct' },
         { label: '🥉 3e Plaats +2', points: 2, reason: '3e Plaats', class: 'correct' },
-        { label: '🚴 Sprint +1', points: 1, reason: 'Tussensprint', class: 'correct' }
+        { label: '🚴 Sprint +1', points: 1, reason: 'Tussensprint', class: 'correct' },
       ],
-      'hardlopen': [
+      hardlopen: [
         { label: '🥇 1e Plaats +3', points: 3, reason: '1e Plaats', class: 'bonus' },
         { label: '🥈 2e Plaats +2', points: 2, reason: '2e Plaats', class: 'correct' },
         { label: '🥉 3e Plaats +1', points: 1, reason: '3e Plaats', class: 'correct' },
-        { label: '⏱️ PR +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' }
+        { label: '⏱️ PR +5', points: 5, reason: 'Persoonlijk Record', class: 'bonus' },
       ],
-      'esports': [
+      esports: [
         { label: '💀 Kill +1', points: 1, reason: 'Elimination', class: 'correct' },
         { label: '💥 Multi-Kill +3', points: 3, reason: 'Multi-Kill', class: 'bonus' },
         { label: '🎯 Objective +2', points: 2, reason: 'Doelwit Behaald', class: 'correct' },
         { label: '☠️ Death -1', points: -1, reason: 'Geëlimineerd', class: 'wrong' },
-        { label: '🏆 Victory +10', points: 10, reason: 'Victory Royale', class: 'bonus' }
+        { label: '🏆 Victory +10', points: 10, reason: 'Victory Royale', class: 'bonus' },
       ],
-      'bordspel': [
+      bordspel: [
         { label: '+1 Punt', points: 1, reason: 'Punt Verdiend', class: 'correct' },
         { label: '+3 Bonus', points: 3, reason: 'Bonus', class: 'bonus' },
         { label: '+5 Grote Zet', points: 5, reason: 'Grote Zet', class: 'bonus' },
-        { label: '-2 Penalty', points: -2, reason: 'Penalty', class: 'penalty' }
+        { label: '-2 Penalty', points: -2, reason: 'Penalty', class: 'penalty' },
       ],
-      'custom': [
+      custom: [
         { label: '+5 Bonus', points: 5, reason: 'Bonus', class: 'bonus' },
         { label: '-2 Penalty', points: -2, reason: 'Penalty', class: 'penalty' },
         { label: '+1 Punt', points: 1, reason: 'Punt', class: 'correct' },
-        { label: '-1 Aftrek', points: -1, reason: 'Aftrek', class: 'wrong' }
-      ]
+        { label: '-1 Aftrek', points: -1, reason: 'Aftrek', class: 'wrong' },
+      ],
     };
 
     return buttons[sportType] || buttons['custom'];
@@ -288,16 +288,16 @@ class ScoreInput {
     if (this.roundInfo) {
       this.roundInfo.textContent = `Ronde ${this.session.current_round}/${this.session.total_rounds}`;
     }
-    
+
     // Disable player select in team mode, disable team-only scoring in player mode
     this.updateScoringModeUI();
-    
+
     this.updateTimerDisplay();
   }
-  
+
   updateScoringModeUI() {
     if (!this.session) return;
-    
+
     if (this.session.scoring_mode === 'team') {
       // Team mode: disable player selection
       if (this.playerSelect) {
@@ -311,7 +311,7 @@ class ScoreInput {
         this.playerSelect.disabled = false;
         this.playerSelect.title = 'Selecteer een speler om punten toe te kennen';
       }
-      
+
       // Add validation hint
       if (!document.getElementById('player-mode-hint')) {
         const hint = document.createElement('div');
@@ -319,7 +319,7 @@ class ScoreInput {
         hint.className = 'alert alert-info';
         hint.style.cssText = 'margin: 10px 0; padding: 10px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;';
         hint.innerHTML = '<strong>👤 Speler Modus:</strong> Punten moeten aan individuele spelers worden toegekend. Selecteer eerst een speler.';
-        
+
         if (this.playerSelect && this.playerSelect.parentNode) {
           this.playerSelect.parentNode.insertBefore(hint, this.playerSelect.nextSibling);
         }
@@ -332,11 +332,35 @@ class ScoreInput {
       // Save current selections
       const currentTeamId = this.teamSelect.value;
       const currentPlayerId = this.playerSelect.value;
-      
+
       const response = await api.get(`/api/v1/sessions/${this.sessionId}/teams`);
-      this.teams = response.teams || [];
+      const newTeams = response.teams || [];
+
+      // Preserve existing player data if it exists
+      const existingPlayers = {};
+      this.teams.forEach((team) => {
+        if (team.players) {
+          existingPlayers[team.id] = team.players;
+        }
+      });
+
+      this.teams = newTeams;
+
+      // Restore player data for teams that had it
+      this.teams.forEach((team) => {
+        if (existingPlayers[team.id]) {
+          team.players = existingPlayers[team.id];
+        }
+      });
+
       this.populateTeamSelect();
-      
+
+      // Check if we need to load players for all teams (for team_with_players mode)
+      const showPlayers = this.session && (this.session.scoring_mode === 'player' || this.session.scoring_mode === 'team_with_players');
+      if (showPlayers) {
+        await this.loadPlayersForAllTeams();
+      }
+
       // Restore selections if they still exist
       if (currentTeamId) {
         this.teamSelect.value = currentTeamId;
@@ -356,11 +380,11 @@ class ScoreInput {
 
   populateTeamSelect() {
     this.teamSelect.innerHTML = '<option value="">Kies een team...</option>';
-    
+
     if (this.teams.length === 0) {
       this.teamSelect.innerHTML = '<option value="">⚠️ Geen teams beschikbaar - Ga naar Team Setup</option>';
       this.teamSelect.disabled = true;
-      
+
       // Show helpful message
       if (!document.getElementById('no-teams-warning')) {
         const warning = document.createElement('div');
@@ -372,11 +396,11 @@ class ScoreInput {
       }
       return;
     }
-    
+
     this.teamSelect.disabled = false;
     const warning = document.getElementById('no-teams-warning');
     if (warning) warning.remove();
-    
+
     this.teams.forEach((team) => {
       const option = document.createElement('option');
       option.value = team.id;
@@ -399,11 +423,13 @@ class ScoreInput {
       this.playerSelect.innerHTML = '<option value="">Laden...</option>';
       const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
       const players = resp && resp.players ? resp.players : [];
-      
+      // Sort players alphabetically by name
+      players.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
+
       this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
-      
+
       if (players && players.length > 0) {
-        players.forEach(p => {
+        players.forEach((p) => {
           const option = document.createElement('option');
           option.value = p.id;
           option.textContent = p.position ? `${p.name} (${p.position})` : p.name;
@@ -416,13 +442,15 @@ class ScoreInput {
       const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
       if (status405) {
         try {
-          const fallback = await api.get(`/api/v1/players?team_id=${teamId}`);
+          const fallback = await api.get(`/api/v1/players`);
           const players2 = fallback && fallback.players ? fallback.players : [];
-          
+          // Sort players alphabetically by name
+          players2.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
           this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
-          
+
           if (players2 && players2.length > 0) {
-            players2.forEach(p => {
+            players2.forEach((p) => {
               const option = document.createElement('option');
               option.value = p.id;
               option.textContent = p.position ? `${p.name} (${p.position})` : p.name;
@@ -451,10 +479,10 @@ class ScoreInput {
 
       // Calculate leaderboard from teams and scores
       const leaderboard = this.calculateLeaderboard(allScores);
-      
+
       // Cache leaderboard data for incremental updates
       this.leaderboardData = leaderboard;
-      
+
       this.displayLeaderboard(leaderboard);
     } catch (error) {
       api.handleError(error, 'loading leaderboard');
@@ -471,7 +499,7 @@ class ScoreInput {
         const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
         if (status405) {
           try {
-            const fallback = await api.get(`/api/v1/players?team_id=${team.id}`);
+            const fallback = await api.get(`/api/v1/players`);
             team.players = fallback && fallback.players ? fallback.players : [];
           } catch (err2) {
             team.players = [];
@@ -496,10 +524,10 @@ class ScoreInput {
         players: team.players || [],
         playerScores: {}, // Track individual player scores
       };
-      
+
       // Initialize player scores to 0
       if (team.players) {
-        team.players.forEach(player => {
+        team.players.forEach((player) => {
           teamScores[team.id].playerScores[player.id] = 0;
         });
       }
@@ -509,7 +537,7 @@ class ScoreInput {
     allScores.forEach((score) => {
       if (teamScores[score.team_id]) {
         teamScores[score.team_id].score += score.points;
-        
+
         // If this score is for a specific player, track it
         if (score.player_id && teamScores[score.team_id].playerScores[score.player_id] !== undefined) {
           teamScores[score.team_id].playerScores[score.player_id] += score.points;
@@ -531,40 +559,46 @@ class ScoreInput {
     // Sort by score descending
     leaderboard.sort((a, b) => b.score - a.score);
 
-    // Check if session uses player-based scoring
+    // Check if session uses player-based scoring or team_with_players mode
     const isPlayerMode = this.session && this.session.scoring_mode === 'player';
+    const showPlayers = isPlayerMode || (this.session && this.session.scoring_mode === 'team_with_players');
 
     const leaderboardHtml = leaderboard
-      .map(
-        (team, index) => {
-          let playersHtml = '';
-          
-          if (team.players && team.players.length > 0) {
-            if (isPlayerMode) {
-              // Player mode: show player names with their individual scores
-              playersHtml = `<div class="team-players">
-                ${team.players.map(p => {
-                  const playerScore = team.playerScores[p.id] || 0;
-                  return `
+      .map((team, index) => {
+        let playersHtml = '';
+
+        if (team.players && team.players.length > 0 && showPlayers) {
+          if (isPlayerMode) {
+            // Player mode: show player names with their individual scores
+            playersHtml = `<div class="team-players">
+                ${team.players
+                  .map((p) => {
+                    const playerScore = team.playerScores[p.id] || 0;
+                    return `
                     <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
                       ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}: <strong>${playerScore}</strong>
                     </button>
                   `;
-                }).join('')}
+                  })
+                  .join('')}
               </div>`;
-            } else {
-              // Team mode: just show player names as clickable badges
-              playersHtml = `<div class="team-players">
-                ${team.players.map(p => `
+          } else {
+            // Team with players mode: just show player names as clickable badges
+            playersHtml = `<div class="team-players">
+                ${team.players
+                  .map(
+                    (p) => `
                   <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
                     ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}
                   </button>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>`;
-            }
           }
-          
-          return `
+        }
+
+        return `
             <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" data-team-id="${team.id}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
               <div class="rank">#${index + 1}</div>
               <div class="team-info">
@@ -575,34 +609,33 @@ class ScoreInput {
               ${playersHtml}
             </div>
           `;
-        }
-      )
+      })
       .join('');
 
     this.leaderboard.innerHTML = leaderboardHtml;
   }
-  
+
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   }
-  
+
   // Update scores without re-rendering entire leaderboard (preserves player badges)
   updateLeaderboardScores(leaderboard) {
     if (!this.leaderboard || !leaderboard) return;
-    
-    leaderboard.forEach(team => {
+
+    leaderboard.forEach((team) => {
       const scoreElement = this.leaderboard.querySelector(`[data-team-score="${team.id}"]`);
       if (scoreElement) {
         scoreElement.textContent = team.score;
       }
-      
+
       // Update player scores if in player mode
       if (this.session && this.session.scoring_mode === 'player' && team.players) {
-        team.players.forEach(player => {
+        team.players.forEach((player) => {
           const playerBadges = this.leaderboard.querySelectorAll('.player-badge');
-          playerBadges.forEach(badge => {
+          playerBadges.forEach((badge) => {
             const badgeText = badge.textContent;
             const playerScore = team.playerScores[player.id] || 0;
             const playerName = player.position ? `${player.name} (${player.position})` : player.name;
@@ -639,11 +672,11 @@ class ScoreInput {
       .map((score) => {
         const team = this.teams.find((t) => t.id === score.team_id);
         const timeAgo = this.getTimeAgo(new Date(score.timestamp));
-        
+
         // Check if there's a player name
         const teamDisplay = team ? team.name : 'Onbekend team';
         const playerDisplay = score.player_name ? ` - ${score.player_name}` : '';
-        
+
         return `
         <div class="score-item">
           <div class="score-team">${teamDisplay}${playerDisplay}</div>
@@ -756,13 +789,13 @@ class ScoreInput {
         reason: reason || 'Handmatig',
         round_number: this.session.current_round,
       };
-      
+
       // Include player_id if a specific player was selected
       if (playerId) {
         scoreData.player_id = playerId;
       }
 
-  // posting score
+      // posting score
       await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
 
       // Treat as success
@@ -787,26 +820,26 @@ class ScoreInput {
     // Remove any existing error messages
     const existingError = document.querySelector('.inline-error-message');
     if (existingError) existingError.remove();
-    
+
     const field = document.getElementById(fieldId);
     if (!field || !field.parentNode) return;
-    
+
     const errorDiv = document.createElement('div');
     errorDiv.className = 'inline-error-message';
     errorDiv.style.cssText = 'color: #dc3545; font-size: 0.9em; margin-top: 4px; padding: 8px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;';
     errorDiv.textContent = message;
-    
+
     field.parentNode.insertBefore(errorDiv, field.nextSibling);
-    
+
     // Auto-remove after 4 seconds
     setTimeout(() => errorDiv.remove(), 4000);
   }
-  
+
   onScoreSubmitSuccess(teamId, points) {
     // Remove any error messages on success
     const existingError = document.querySelector('.inline-error-message');
     if (existingError) existingError.remove();
-    
+
     // Show animation
     this.showScoreAnimation(teamId, points);
 
@@ -814,12 +847,8 @@ class ScoreInput {
     this.reasonInput.value = '';
     this.pointsInput.value = 1;
 
-    // Reload leaderboard to show updated scores
+    // Reload leaderboard to show updated scores (this also loads players)
     this.loadLeaderboard();
-    
-    // Reload teams to update scores in dropdown
-    // Selection is now properly preserved in loadTeams() method
-    this.loadTeams();
 
     // Load recent scores with a small delay to ensure the score is saved
     setTimeout(() => {
@@ -832,7 +861,7 @@ class ScoreInput {
     if (this.isSubmitting) {
       return;
     }
-    
+
     const teamId = parseInt(this.teamSelect.value);
     if (!teamId) {
       alert('Selecteer eerst een team.');
@@ -935,7 +964,7 @@ class ScoreInput {
     const seconds = this.timeRemaining % 60;
     this.timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     this.timer.style.fontSize = '1em';
-    
+
     // Color coding based on time remaining
     if (this.timeRemaining < 60) {
       this.timer.style.color = '#dc3545'; // Red for last minute
@@ -956,35 +985,66 @@ class ScoreInput {
   }
 
   getTimeAgo(date) {
+    // Handle different timestamp formats
+    let timestamp;
+    if (typeof date === 'string') {
+      // Assume timestamps from server are in CET (with +01:00 or +02:00), treat as is
+      let dateString = date;
+      if (!dateString.includes('Z') && !dateString.includes('+') && !dateString.includes('-')) {
+        // If no timezone info, assume UTC and add 'Z'
+        if (dateString.includes('T')) {
+          dateString += 'Z';
+        }
+      }
+      timestamp = new Date(dateString);
+
+      // If that doesn't work, fallback to original parsing
+      if (isNaN(timestamp.getTime())) {
+        timestamp = new Date(date);
+      }
+    } else {
+      timestamp = new Date(date);
+    }
+
     const now = new Date();
-    const diffMs = now - date;
+    const diffMs = now - timestamp;
+
+    // Handle future timestamps (shouldn't happen for scores, but be robust)
+    if (diffMs < 0) {
+      return 'Zojuist';
+    }
+
     const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffMonths = Math.floor(diffDays / 30);
+    const diffYears = Math.floor(diffDays / 365);
 
     if (diffMins < 1) return 'Zojuist';
-    if (diffMins < 60) return `${diffMins}m geleden`;
-
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}u geleden`;
-
-    return date.toLocaleDateString('nl-NL');
+    if (diffMins < 60) return `${diffMins} min geleden`;
+    if (diffHours < 24) return `${diffHours} uur geleden`;
+    if (diffDays < 30) return `${diffDays} dag${diffDays > 1 ? 'en' : ''} geleden`;
+    if (diffMonths < 12) return `${diffMonths} maand${diffMonths > 1 ? 'en' : ''} geleden`;
+    return `${diffYears} jaar geleden`;
   }
 
   handleScoreUpdate(data) {
     if (data.session_id == this.sessionId) {
       // Update the cached leaderboard data
       if (this.leaderboardData) {
-        const teamIndex = this.leaderboardData.findIndex(t => t.id === data.team_id);
+        const teamIndex = this.leaderboardData.findIndex((t) => t.id === data.team_id);
         if (teamIndex !== -1) {
-          this.leaderboardData[teamIndex].score = data.total_score;
-          
+          // Update team score
+          this.leaderboardData[teamIndex].score += data.points;
+
           // Update player scores if available
           if (data.player_scores) {
             this.leaderboardData[teamIndex].playerScores = data.player_scores;
           }
-          
+
           // Sort leaderboard by score
           this.leaderboardData.sort((a, b) => b.score - a.score);
-          
+
           // Update scores in place without full re-render (preserves player badges)
           this.updateLeaderboardScores(this.leaderboardData);
         } else {
@@ -995,10 +1055,10 @@ class ScoreInput {
         // No cached data, do full reload
         this.loadLeaderboard();
       }
-      
+
       // Load recent scores to show the new score entry
       this.loadRecentScores();
-      
+
       // Only reload teams if no team is currently selected
       if (!this.teamSelect.value) {
         this.loadTeams();

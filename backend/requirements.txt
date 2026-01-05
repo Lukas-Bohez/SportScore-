@@ -22,6 +22,9 @@ Pillow==10.4.0
 reportlab==4.2.5
 python-multipart==0.0.19
 
+# Timezone support
+pytz==2024.1
+
 # Security additions
 slowapi==0.1.9
 
