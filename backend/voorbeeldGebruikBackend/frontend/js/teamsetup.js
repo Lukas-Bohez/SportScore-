@@ -49,6 +49,7 @@ class TeamSetup {
 
     // Scoring mode radio buttons
     this.scoringModeTeam = document.getElementById('scoring-mode-team');
+    this.scoringModeTeamPlayers = document.getElementById('scoring-mode-team-players');
     this.scoringModePlayer = document.getElementById('scoring-mode-player');
     this.playerModeHint = document.getElementById('player-mode-hint');
 
@@ -87,6 +88,9 @@ class TeamSetup {
     if (this.scoringModeTeam) {
       this.scoringModeTeam.addEventListener('change', () => this.updateScoringMode());
     }
+    if (this.scoringModeTeamPlayers) {
+      this.scoringModeTeamPlayers.addEventListener('change', () => this.updateScoringMode());
+    }
     if (this.scoringModePlayer) {
       this.scoringModePlayer.addEventListener('change', () => this.updateScoringMode());
     }
@@ -119,7 +123,7 @@ class TeamSetup {
       this.sessionName.textContent = this.session.name;
     }
     if (this.sessionStatus) {
-      const scoringModeText = this.session.scoring_mode === 'player' ? ' | Speler Scores' : ' | Team Scores';
+      const scoringModeText = this.session.scoring_mode === 'player' ? ' | Speler Scores' : this.session.scoring_mode === 'team_with_players' ? ' | Team Scores met Spelers' : ' | Team Scores';
       this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}${scoringModeText}`;
     }
     if (this.maxTeams) {
@@ -133,6 +137,9 @@ class TeamSetup {
     if (this.session.scoring_mode === 'player') {
       if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
       if (this.playerModeHint) this.playerModeHint.style.display = 'block';
+    } else if (this.session.scoring_mode === 'team_with_players') {
+      if (this.scoringModeTeamPlayers) this.scoringModeTeamPlayers.checked = true;
+      if (this.playerModeHint) this.playerModeHint.style.display = 'none';
     } else {
       if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
       if (this.playerModeHint) this.playerModeHint.style.display = 'none';
@@ -224,18 +231,9 @@ class TeamSetup {
       listEl.innerHTML = '<p style="color:#666">Laden…</p>';
       const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
       let players = resp && resp.players ? resp.players : [];
-      // enrich players with global data (position, full player object) when available
-      if (players && players.length > 0 && this.allPlayers) {
-        const byId = {};
-        (this.allPlayers || []).forEach((ap) => {
-          byId[ap.id] = ap;
-        });
-        players = players.map((sp) => {
-          const pid = sp.player_id || sp.id || sp.player_id;
-          const global = byId[pid] || null;
-          return Object.assign({}, sp, { id: pid, name: sp.player_name || (global && global.name), position: (global && global.position) || null });
-        });
-      }
+      // Sort players alphabetically by name
+      players.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
+      // players now have id, name, position directly
       if (!players || players.length === 0) {
         listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
         return;
@@ -260,7 +258,7 @@ class TeamSetup {
         unassignBtn.className = 'delete-team-btn';
         unassignBtn.textContent = 'Verwijderen';
         unassignBtn.title = 'Verwijder toewijzing';
-        unassignBtn.onclick = () => this.removeAssignment(this.sessionId, p.id);
+        unassignBtn.onclick = () => this.removePlayerFromTeam(this.sessionId, teamId, p.id);
         right.appendChild(unassignBtn);
         el.appendChild(left);
         el.appendChild(right);
@@ -275,6 +273,8 @@ class TeamSetup {
         try {
           const fallback = await api.get(`/api/v1/players?team_id=${teamId}`);
           const players2 = fallback && fallback.players ? fallback.players : [];
+          // Sort players alphabetically by name
+          players2.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           if (!players2 || players2.length === 0) {
             listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegevoegd.</p>';
             return;
@@ -391,6 +391,8 @@ class TeamSetup {
       const allResp = await api.get('/api/v1/players');
       const sessionResp = await api.get(`/api/v1/sessions/${this.sessionId}/players`);
       this.allPlayers = allResp && allResp.players ? allResp.players : [];
+      // Sort players alphabetically by name
+      this.allPlayers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       this.sessionAssignments = sessionResp && sessionResp.players ? sessionResp.players : [];
       // Build quick map of assigned players
       this.assignedMap = {};
@@ -414,6 +416,8 @@ class TeamSetup {
       try {
         const allResp = await api.get('/api/v1/players');
         this.allPlayers = allResp && allResp.players ? allResp.players : [];
+        // Sort players alphabetically by name
+        this.allPlayers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.sessionAssignments = [];
         this.assignedMap = {};
         this.updatePlayerManagerDisplay();
@@ -485,7 +489,7 @@ class TeamSetup {
         removeBtn.style.padding = '6px 12px';
         removeBtn.style.fontSize = '0.85em';
         removeBtn.textContent = 'Verwijder toewijzing';
-        removeBtn.onclick = () => this.removeAssignment(this.sessionId, p.id);
+        removeBtn.onclick = () => this.removePlayerFromSession(this.sessionId, p.id);
         assignRow.appendChild(removeBtn);
       } else {
         // Show quick assign menu: select with teams
@@ -636,16 +640,29 @@ class TeamSetup {
     }
   }
 
-  async removeAssignment(sessionId, playerId) {
+  async removePlayerFromTeam(sessionId, teamId, playerId) {
+    if (!confirm('Verwijder speler uit dit team?')) return;
+    try {
+      await api.delete(`/api/v1/sessions/${sessionId}/teams/${teamId}/players/${playerId}`);
+      await this.loadPlayers();
+      // refresh team lists
+      await this.loadPlayersForTeam(teamId);
+    } catch (err) {
+      api.handleError(err, 'removing player from team');
+      alert('Fout bij het verwijderen van speler uit team.');
+    }
+  }
+
+  async removePlayerFromSession(sessionId, playerId) {
     if (!confirm('Verwijder speler uit deze sessie?')) return;
     try {
       await api.delete(`/api/v1/sessions/${sessionId}/assign-player/${playerId}`);
       await this.loadPlayers();
-      // refresh team lists
-      await this.teams.forEach(async (t) => await this.loadPlayersForTeam(t.id));
+      // refresh all team lists
+      this.teams.forEach(async (t) => await this.loadPlayersForTeam(t.id));
     } catch (err) {
-      api.handleError(err, 'removing assignment');
-      alert('Fout bij het verwijderen van toewijzing.');
+      api.handleError(err, 'removing player from session');
+      alert('Fout bij het verwijderen van speler uit sessie.');
     }
   }
 
@@ -1038,7 +1055,9 @@ class TeamSetup {
   }
 
   async updateScoringMode() {
-    const selectedMode = this.scoringModePlayer && this.scoringModePlayer.checked ? 'player' : 'team';
+    let selectedMode = 'team';
+    if (this.scoringModePlayer && this.scoringModePlayer.checked) selectedMode = 'player';
+    else if (this.scoringModeTeamPlayers && this.scoringModeTeamPlayers.checked) selectedMode = 'team_with_players';
 
     // Check if session is already active - warn user
     if (this.session && this.session.status !== 'setup') {
@@ -1048,6 +1067,8 @@ class TeamSetup {
         // Revert radio button
         if (this.session.scoring_mode === 'player') {
           if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else if (this.session.scoring_mode === 'team_with_players') {
+          if (this.scoringModeTeamPlayers) this.scoringModeTeamPlayers.checked = true;
         } else {
           if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
         }
@@ -1076,9 +1097,18 @@ class TeamSetup {
         }
 
         // Show feedback
-        const modeText = selectedMode === 'player' ? 'Speler Scores' : 'Team Scores';
-        const emoji = selectedMode === 'player' ? '👤' : '👥';
-        alert(`${emoji} Score modus gewijzigd naar: ${modeText}\n\n${selectedMode === 'player' ? 'Je kunt nu individuele speler scores bijhouden!' : 'Scores gaan nu direct naar teams.'}`);
+        let modeText, emoji;
+        if (selectedMode === 'player') {
+          modeText = 'Speler Scores';
+          emoji = '👤';
+        } else if (selectedMode === 'team_with_players') {
+          modeText = 'Team Scores met Spelers';
+          emoji = '👥👤';
+        } else {
+          modeText = 'Team Scores';
+          emoji = '👥';
+        }
+        alert(`${emoji} Score modus gewijzigd naar: ${modeText}\n\n${selectedMode === 'player' ? 'Je kunt nu individuele speler scores bijhouden!' : selectedMode === 'team_with_players' ? 'Scores gaan naar teams, maar spelers zijn zichtbaar op het scorebord.' : 'Scores gaan nu direct naar teams.'}`);
       } catch (error) {
         api.handleError(error, 'updating scoring mode');
         alert('Fout bij het wijzigen van de score modus.');
@@ -1086,6 +1116,8 @@ class TeamSetup {
         // Revert radio button to previous state
         if (this.session.scoring_mode === 'player') {
           if (this.scoringModePlayer) this.scoringModePlayer.checked = true;
+        } else if (this.session.scoring_mode === 'team_with_players') {
+          if (this.scoringModeTeamPlayers) this.scoringModeTeamPlayers.checked = true;
         } else {
           if (this.scoringModeTeam) this.scoringModeTeam.checked = true;
         }
