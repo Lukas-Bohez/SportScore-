@@ -56,7 +56,7 @@ class LeaderboardView {
       // Load session details
       this.sessionData = await api.getSession(this.sessionId);
       // Respect session flag whether to show players on scoreboard (default true)
-      this.showPlayers = (this.sessionData && typeof this.sessionData.show_players !== 'undefined') ? Boolean(this.sessionData.show_players) : true;
+      this.showPlayers = this.sessionData && typeof this.sessionData.show_players !== 'undefined' ? Boolean(this.sessionData.show_players) : true;
       this.displaySessionInfo();
 
       // Load teams and scores
@@ -81,7 +81,7 @@ class LeaderboardView {
       // Load scores
       const scoresResponse = await api.getSessionScores(this.sessionId);
       this.scoresData = scoresResponse.scores || scoresResponse || [];
-      
+
       // Load players for all teams
       await this.loadPlayersForAllTeams();
     } catch (error) {
@@ -224,12 +224,13 @@ class LeaderboardView {
   createTeamCard(team) {
     const teamScore = this.calculateTeamScore(team.id);
     const players = team.players || [];
-    const playersHtml = (this.showPlayers && players.length > 0)
-      ? `<div class="team-players">
+    const playersHtml =
+      this.showPlayers && players.length > 0
+        ? `<div class="team-players">
            <span class="players-label">Spelers:</span>
-           <span class="players-list">${players.map(p => p.position ? `${p.name} (${p.position})` : p.name).join(', ')}</span>
+           <span class="players-list">${players.map((p) => (p.position ? `${p.name} (${p.position})` : p.name)).join(', ')}</span>
          </div>`
-      : '';
+        : '';
 
     return `
       <div class="team-card" style="border-color: ${team.color || '#333'}">
@@ -267,7 +268,7 @@ class LeaderboardView {
     }
 
     // Sort scores by timestamp descending (most recent first)
-    const sortedScores = this.scoresData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const sortedScores = this.scoresData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     const historyHtml = sortedScores
       .slice(0, 20) // Show last 20 scores
@@ -280,7 +281,7 @@ class LeaderboardView {
   createScoreHistoryItem(score) {
     const team = this.teamsData.find((t) => t.id === score.team_id);
     const teamName = team ? team.name : 'Onbekend team';
-    const timestamp = new Date(score.created_at).toLocaleString('nl-NL');
+    const timestamp = new Date(score.timestamp).toLocaleString('nl-NL');
 
     return `
       <div class="score-history-item">
