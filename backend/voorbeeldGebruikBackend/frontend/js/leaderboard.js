@@ -55,8 +55,10 @@ class LeaderboardView {
     try {
       // Load session details
       this.sessionData = await api.getSession(this.sessionId);
-      // Respect session flag whether to show players on scoreboard (default true)
-      this.showPlayers = this.sessionData && typeof this.sessionData.show_players !== 'undefined' ? Boolean(this.sessionData.show_players) : true;
+      // Respect session flag whether to show players on scoreboard (default true) and scoring mode
+      const showPlayersFlag = this.sessionData && typeof this.sessionData.show_players !== 'undefined' ? Boolean(this.sessionData.show_players) : true;
+      const scoringModeShowsPlayers = this.sessionData && (this.sessionData.scoring_mode === 'player' || this.sessionData.scoring_mode === 'team_with_players');
+      this.showPlayers = showPlayersFlag && scoringModeShowsPlayers;
       this.displaySessionInfo();
 
       // Load teams and scores
@@ -98,6 +100,8 @@ class LeaderboardView {
         if (this.showPlayers) {
           const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
           team.players = resp && resp.players ? resp.players : [];
+          // Sort players alphabetically by name
+          team.players.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
         } else {
           team.players = [];
         }
@@ -107,8 +111,10 @@ class LeaderboardView {
         const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
         if (status405) {
           try {
-            const fallback = await api.get(`/api/v1/players?team_id=${team.id}`);
+            const fallback = await api.get(`/api/v1/players`);
             team.players = fallback && fallback.players ? fallback.players : [];
+            // Sort players alphabetically by name
+            team.players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           } catch (err2) {
             team.players = [];
           }

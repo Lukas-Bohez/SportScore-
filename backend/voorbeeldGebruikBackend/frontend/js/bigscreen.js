@@ -257,7 +257,7 @@ class BigScreenDisplay {
       if (liveData && liveData.session) {
         // Apply theme based on sport_type
         this.applyTheme(liveData.session.sport_type || 'custom');
-        
+
         // Load players for teams in the leaderboard
         if (liveData.leaderboard && liveData.leaderboard.length > 0) {
           await this.loadPlayersForLeaderboard(liveData.session.id, liveData.leaderboard);
@@ -271,28 +271,28 @@ class BigScreenDisplay {
       this.showNoSessionMessage();
     }
   }
-  
+
   applyTheme(sportType) {
     // Set the data-sport attribute on body to trigger CSS theme
     document.body.setAttribute('data-sport', sportType || 'custom');
-    
+
     // Update page title with sport icon
     const sportIcons = {
-      'quiz': '🧠',
-      'voetbal': '⚽',
-      'basketbal': '🏀',
-      'volleybal': '🏐',
-      'hockey': '🏑',
-      'tennis': '🎾',
-      'atletiek': '🏃',
-      'zwemmen': '🏊',
-      'fietsen': '🚴',
-      'hardlopen': '🏃',
-      'esports': '🎮',
-      'boardgame': '🎲',
-      'custom': '🎯'
+      quiz: '🧠',
+      voetbal: '⚽',
+      basketbal: '🏀',
+      volleybal: '🏐',
+      hockey: '🏑',
+      tennis: '🎾',
+      atletiek: '🏃',
+      zwemmen: '🏊',
+      fietsen: '🚴',
+      hardlopen: '🏃',
+      esports: '🎮',
+      boardgame: '🎲',
+      custom: '🎯',
     };
-    
+
     const icon = sportIcons[sportType] || '🎯';
     document.title = `${icon} TeamScore - Live Scorebord`;
   }
@@ -311,15 +311,15 @@ class BigScreenDisplay {
       try {
         const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
         team.players = resp && resp.players ? resp.players : [];
-        
+        // Sort players alphabetically by name
+        team.players.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
+
         // Calculate individual player scores from the scores list
         team.playerScores = {};
         if (team.players && team.players.length > 0) {
-          team.players.forEach(player => {
+          team.players.forEach((player) => {
             // Sum up all scores for this player
-            const playerPoints = allScores
-              .filter(score => score.player_id === player.id)
-              .reduce((sum, score) => sum + score.points, 0);
+            const playerPoints = allScores.filter((score) => score.player_id === player.id).reduce((sum, score) => sum + score.points, 0);
             team.playerScores[player.id] = playerPoints;
           });
         }
@@ -330,6 +330,8 @@ class BigScreenDisplay {
           try {
             const fallback = await api.get(`/api/v1/players?team_id=${team.team_id}`);
             team.players = fallback && fallback.players ? fallback.players : [];
+            // Sort players alphabetically by name
+            team.players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             team.playerScores = {};
           } catch (err2) {
             team.players = [];
@@ -359,31 +361,31 @@ class BigScreenDisplay {
     // For player scoring mode, we need to recalculate individual player scores
     // so we do a full refresh. For team mode, we can update incrementally.
     console.log('Score update received:', data);
-    
+
     if (!this.currentSession || !this.teamsContainer) {
       // If no session loaded yet, do full refresh
       this.loadInitialData();
       return;
     }
-    
+
     // Check if this is player mode - if so, need full refresh for player scores
     const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
-    
+
     if (isPlayerMode && data.player_id) {
       // Player score update - need to refresh to recalculate all player scores
       console.log('Player score update, refreshing to recalculate player scores');
       this.loadInitialData();
       return;
     }
-    
+
     // Team mode or team-level update - update incrementally
     const teamId = data.team_id;
     const pointsChange = data.points || 0;
-    
+
     // Find team element by team_id
     const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
     let updated = false;
-    
+
     for (const teamElement of teamElements) {
       const teamIdAttr = teamElement.getAttribute('data-team-id');
       if (teamIdAttr && parseInt(teamIdAttr) === teamId) {
@@ -392,17 +394,17 @@ class BigScreenDisplay {
           const currentScore = parseInt(scoreElement.textContent) || 0;
           const newScore = currentScore + pointsChange;
           scoreElement.textContent = newScore;
-          
+
           // Add flash animation
           scoreElement.classList.add('score-flash');
           setTimeout(() => scoreElement.classList.remove('score-flash'), 500);
-          
+
           updated = true;
           break;
         }
       }
     }
-    
+
     // If we couldn't find/update the team, do a full refresh
     if (!updated) {
       console.log('Could not find team element, doing full refresh');
@@ -514,7 +516,7 @@ class BigScreenDisplay {
       // Add subtle icon for scoring mode
       const scoringModeIcon = session.scoring_mode === 'player' ? '👤' : '👥';
       this.sessionTitle.textContent = session.name || 'TeamScore Session';
-      
+
       // Add icon as separate element for better styling control
       const existingIcon = this.sessionTitle.querySelector('.scoring-mode-icon');
       if (existingIcon) {
@@ -527,7 +529,7 @@ class BigScreenDisplay {
         this.sessionTitle.appendChild(iconSpan);
       }
     }
-    
+
     // Update or create status badge
     if (!this.sessionStatusBadge) {
       this.sessionStatusBadge = document.getElementById('session-status-badge');
@@ -539,21 +541,21 @@ class BigScreenDisplay {
         document.body.appendChild(this.sessionStatusBadge);
       }
     }
-    
+
     // Update status badge based on session status
     const statusText = this.getStatusText(session.status);
     const statusColors = {
       setup: { bg: '#6c757d', text: 'white', icon: '⚙️' },
       active: { bg: '#28a745', text: 'white', icon: '▶️' },
       paused: { bg: '#ffc107', text: '#000', icon: '⏸️' },
-      completed: { bg: '#007bff', text: 'white', icon: '🏁' }
+      completed: { bg: '#007bff', text: 'white', icon: '🏁' },
     };
-    
+
     const statusStyle = statusColors[session.status] || statusColors.setup;
     this.sessionStatusBadge.style.background = statusStyle.bg;
     this.sessionStatusBadge.style.color = statusStyle.text;
     this.sessionStatusBadge.textContent = `${statusStyle.icon} ${statusText}`;
-    
+
     if (this.sessionStatus) {
       this.sessionStatus.textContent = this.getStatusText(session.status);
       this.sessionStatus.className = `game-status status-${session.status}`;
@@ -590,7 +592,7 @@ class BigScreenDisplay {
     const teamDiv = document.createElement('div');
     teamDiv.className = `leaderboard-team ${team.is_eliminated ? 'eliminated' : ''}`;
     teamDiv.style.borderLeftColor = team.team_color || '#333';
-    
+
     // Add data attribute for team ID to enable updates
     if (team.team_id) {
       teamDiv.setAttribute('data-team-id', team.team_id);
@@ -600,29 +602,31 @@ class BigScreenDisplay {
     const scoringMode = this.currentSession ? this.currentSession.scoring_mode : 'team';
     const isPlayerMode = scoringMode === 'player';
     const isTeamWithPlayers = scoringMode === 'team_with_players';
-    const showPlayers = (this.currentSession && typeof this.currentSession.show_players !== 'undefined') ? Boolean(this.currentSession.show_players) : true;
-    
+    const showPlayers = this.currentSession && typeof this.currentSession.show_players !== 'undefined' ? Boolean(this.currentSession.show_players) : true;
+
     const players = team.players || [];
     const playerScores = team.playerScores || {};
-    
+
     let playersHtml = '';
     if (players.length > 0 && showPlayers) {
       if (isPlayerMode) {
         // Player mode: show player names with their individual scores
         playersHtml = `<div class="team-players-bigscreen player-mode">
-          ${players.map(p => {
-            const score = playerScores[p.id] || 0;
-            const scoreClass = score > 0 ? 'positive' : score < 0 ? 'negative' : '';
-            return `<span class="player-badge-bigscreen with-score ${scoreClass}">
+          ${players
+            .map((p) => {
+              const score = playerScores[p.id] || 0;
+              const scoreClass = score > 0 ? 'positive' : score < 0 ? 'negative' : '';
+              return `<span class="player-badge-bigscreen with-score ${scoreClass}">
               <span class="player-name-part">${p.position ? `${p.name} (${p.position})` : p.name}</span>
               <span class="player-score-part">${score > 0 ? '+' : ''}${score}</span>
             </span>`;
-          }).join('')}
+            })
+            .join('')}
         </div>`;
       } else if (isTeamWithPlayers) {
         // Team with players mode: show player names without individual scores
         playersHtml = `<div class="team-players-bigscreen team-with-players-mode">
-          ${players.map(p => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
+          ${players.map((p) => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
         </div>`;
       }
       // else: pure team mode - don't show players at all
@@ -640,20 +644,20 @@ class BigScreenDisplay {
 
     return teamDiv;
   }
-  
+
   sortTeams() {
     // Re-sort teams by score
     if (!this.teamsContainer) return;
-    
+
     const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
-    
+
     // Sort by score (descending)
     teamElements.sort((a, b) => {
       const scoreA = parseInt(a.querySelector('.team-score')?.textContent || '0');
       const scoreB = parseInt(b.querySelector('.team-score')?.textContent || '0');
       return scoreB - scoreA;
     });
-    
+
     // Re-append in sorted order and update positions
     teamElements.forEach((el, index) => {
       const positionEl = el.querySelector('.team-position');

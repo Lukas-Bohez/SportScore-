@@ -4,9 +4,7 @@ class ScoreboardAPI {
     // Auto-detect backend base URL with sensible fallbacks
     // Priority: window.SCOREBOARD_API_BASE -> ?apiBase=... -> default localhost:8000
     const fromGlobal = typeof window !== 'undefined' && window.SCOREBOARD_API_BASE;
-    const fromQuery = typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('apiBase')
-      : null;
+    const fromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('apiBase') : null;
     const detected = fromGlobal || fromQuery;
 
     this.baseURL = (baseURL || detected || 'http://localhost:8000').replace(/\/$/, '');
@@ -60,7 +58,7 @@ class ScoreboardAPI {
   // Start polling fallback when Socket.IO fails
   startPollingFallback() {
     if (this.pollingFallbackActive) return;
-    
+
     // Don't start polling if Socket.IO is still connecting
     if (this.socket && this.socket.connected) return;
 
@@ -323,10 +321,7 @@ class ScoreboardAPI {
       // Provide clearer diagnostics for network vs HTTP errors
       if (!silent) {
         if (error instanceof TypeError) {
-          console.error(
-            `API network error: Failed to fetch ${url}. Is the backend running at ${this.baseURL}?`,
-            error
-          );
+          console.error(`API network error: Failed to fetch ${url}. Is the backend running at ${this.baseURL}?`, error);
         } else {
           console.error(`API request failed: ${endpoint}`, error);
         }
@@ -690,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Only initialize Socket.IO for pages that need it
   const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
   console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
-  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html'];
+  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'startscreen.html'];
 
   if (pagesNeedingSocket.includes(currentPage)) {
     console.log('API: Page needs Socket.IO, initializing...');

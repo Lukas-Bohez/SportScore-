@@ -111,6 +111,11 @@ class StartScreen {
       time_limit: document.getElementById('time-limit').value ? parseInt(document.getElementById('time-limit').value) * 60 : null, // Convert to seconds
     };
 
+    // Force show_players for team_with_players mode
+    if (sessionData.scoring_mode === 'team_with_players') {
+      sessionData.show_players = true;
+    }
+
     try {
       const response = await api.post('/api/v1/sessions', sessionData);
       if (response) {
@@ -122,12 +127,10 @@ class StartScreen {
       }
     } catch (error) {
       api.handleError(error, 'creating session');
-      
+
       // Show user-friendly error message
-      const errorMsg = error.message && error.message.includes('fetch') 
-        ? 'Kan geen verbinding maken met de backend server. Zorg dat de server draait op http://localhost:8000'
-        : 'Fout bij het aanmaken van de sessie. Probeer opnieuw.';
-      
+      const errorMsg = error.message && error.message.includes('fetch') ? 'Kan geen verbinding maken met de backend server. Zorg dat de server draait op http://localhost:8000' : 'Fout bij het aanmaken van de sessie. Probeer opnieuw.';
+
       this.showErrorMessage(errorMsg);
     }
   }
@@ -148,7 +151,7 @@ class StartScreen {
       }
     }
   }
-  
+
   showBackendConnectionError() {
     // Create prominent error banner at the top of the page
     const banner = document.createElement('div');
@@ -159,13 +162,13 @@ class StartScreen {
       <div style="font-size: 0.95em;">Kan geen verbinding maken met de backend op http://localhost:8000</div>
       <div style="font-size: 0.9em; margin-top: 5px;">Start de backend server en <a href="#" onclick="location.reload()" style="color: #fff; text-decoration: underline;">vernieuw deze pagina</a></div>
     `;
-    
+
     // Remove existing banner if present
     const existing = document.getElementById('backend-error-banner');
     if (existing) existing.remove();
-    
+
     document.body.prepend(banner);
-    
+
     // Also show in the UI where active session would be
     if (this.activeSessionDiv) {
       this.activeSessionDiv.style.display = 'block';
@@ -337,7 +340,7 @@ class StartScreen {
         const response = await api.getAllStandaloneTeams();
         const teams = response.teams || [];
         this.pmPlayerDefaultTeam.innerHTML = '<option value="">-- Standaard team (opt) --</option>';
-        teams.forEach(t => {
+        teams.forEach((t) => {
           const opt = document.createElement('option');
           opt.value = t.id;
           opt.textContent = t.name;
@@ -365,12 +368,14 @@ class StartScreen {
     try {
       const resp = await api.get('/api/v1/players');
       const players = resp && resp.players ? resp.players : [];
+      // Sort players alphabetically by name
+      players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (players.length === 0) {
         this.pmPlayersList.innerHTML = '<p style="color:#666">Nog geen spelers.</p>';
         return;
       }
       this.pmPlayersList.innerHTML = '';
-      players.forEach(p => {
+      players.forEach((p) => {
         const row = document.createElement('div');
         row.style.display = 'flex';
         row.style.justifyContent = 'space-between';
@@ -404,8 +409,11 @@ class StartScreen {
   }
 
   async createPlayerFromManager() {
-    const name = (this.pmPlayerName && this.pmPlayerName.value || '').trim();
-    if (!name) { alert('Voer een spelersnaam in.'); return; }
+    const name = ((this.pmPlayerName && this.pmPlayerName.value) || '').trim();
+    if (!name) {
+      alert('Voer een spelersnaam in.');
+      return;
+    }
     try {
       const payload = { name };
       await api.post('/api/v1/players', payload);
@@ -423,11 +431,11 @@ class StartScreen {
     try {
       const resp = await api.get('/api/v1/players');
       const players = resp && resp.players ? resp.players.slice() : [];
-      players.sort((a,b) => (a.name||'').localeCompare(b.name||'', undefined, { sensitivity: 'base' }));
-      for (let i=0;i<players.length;i++) {
+      players.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+      for (let i = 0; i < players.length; i++) {
         const p = players[i];
         try {
-          await api.put(`/api/v1/players/${p.id}`, { position: String(i+1) });
+          await api.put(`/api/v1/players/${p.id}`, { position: String(i + 1) });
         } catch (e) {
           console.warn('Failed to update player position during reindex', p.id, e);
         }
@@ -438,31 +446,33 @@ class StartScreen {
     }
   }
 
-  escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-  
+  escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   showSuccessMessage(message) {
     const existing = document.querySelector('.success-toast');
     if (existing) existing.remove();
-    
+
     const toast = document.createElement('div');
     toast.className = 'success-toast';
     toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
     toast.innerHTML = `<span style="font-size: 1.2em;">✓</span> ${this.escapeHtml(message)}`;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => toast.remove(), 3000);
   }
-  
+
   showErrorMessage(message) {
     const existing = document.querySelector('.error-toast');
     if (existing) existing.remove();
-    
+
     const toast = document.createElement('div');
     toast.className = 'error-toast';
     toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
     toast.innerHTML = `<span style="font-size: 1.2em;">⚠️</span> ${this.escapeHtml(message)}`;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => toast.remove(), 5000);
   }
 
@@ -473,17 +483,19 @@ class StartScreen {
     }
 
     const iconMap = {
-      'team': '👥',
-      'star': '⭐',
-      'trophy': '🏆',
-      'fire': '🔥',
-      'rocket': '🚀',
-      'crown': '👑',
-      'lightning': '⚡',
-      'heart': '❤️'
+      team: '👥',
+      star: '⭐',
+      trophy: '🏆',
+      fire: '🔥',
+      rocket: '🚀',
+      crown: '👑',
+      lightning: '⚡',
+      heart: '❤️',
     };
 
-    const teamsHtml = teams.map((team) => `
+    const teamsHtml = teams
+      .map(
+        (team) => `
       <div class="team-card" data-team-id="${team.id}">
         <div class="team-card-header">
           <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
@@ -505,11 +517,13 @@ class StartScreen {
           </div>
         </div>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     this.teamsList.innerHTML = teamsHtml;
     // Load assigned players for each team and prepare unassigned lists
-    teams.forEach(t => {
+    teams.forEach((t) => {
       this.loadAssignedPlayersForTeam(t.id);
     });
   }
@@ -521,13 +535,15 @@ class StartScreen {
       listEl.innerHTML = '<p style="color:#666">Laden…</p>';
       const resp = await api.get('/api/v1/players');
       const players = resp && resp.players ? resp.players : [];
-      const assigned = players.filter(p => p.team_id && String(p.team_id) === String(teamId));
+      const assigned = players.filter((p) => p.team_id && String(p.team_id) === String(teamId));
+      // Sort assigned players alphabetically by name
+      assigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!assigned || assigned.length === 0) {
         listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegewezen.</p>';
         return;
       }
       listEl.innerHTML = '';
-      assigned.forEach(p => {
+      assigned.forEach((p) => {
         const row = document.createElement('div');
         row.className = 'player-row';
         row.innerHTML = `<div class="player-left"><strong>${this.escapeHtml(p.name)}</strong></div>`;
@@ -574,13 +590,15 @@ class StartScreen {
     try {
       const resp = await api.get('/api/v1/players');
       const players = resp && resp.players ? resp.players : [];
-      const unassigned = players.filter(p => !p.team_id || String(p.team_id) !== String(teamId));
+      const unassigned = players.filter((p) => !p.team_id || String(p.team_id) !== String(teamId));
+      // Sort unassigned players alphabetically by name
+      unassigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!unassigned || unassigned.length === 0) {
         container.innerHTML = '<p style="color:#666">Geen beschikbare spelers om toe te wijzen.</p>';
         return;
       }
       container.innerHTML = '';
-      unassigned.forEach(p => {
+      unassigned.forEach((p) => {
         const row = document.createElement('div');
         row.style.display = 'flex';
         row.style.justifyContent = 'space-between';
