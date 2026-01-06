@@ -262,20 +262,21 @@ body {
     max-width: 900px;
     margin-left: auto;
     margin-right: auto;
-    background: #e3f2fd;
+    background: var(--card-bg);
     border-radius: 10px;
+    border: 1px solid var(--border-color);
 }
 
 .last-update {
     font-size: 0.8rem;
     font-weight: 400;
-    color: #333333;
+    color: var(--text-color);
     text-transform: uppercase;
     letter-spacing: 1px;
     padding: 6px 12px;
-    background: #cccccc;
+    background: var(--card-bg);
     border-radius: 20px;
-    border: 1px solid #aaaaaa;
+    border: 1px solid var(--border-color);
     display: inline-block;
     white-space: nowrap;
     margin-right: 10px;
@@ -287,22 +288,22 @@ body {
 }
 
 .admin-link a {
-    color: #b8860b;
+    color: var(--gold-color);
     text-decoration: none;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 1px;
     padding: 10px 20px;
-    background: #cccccc;
+    background: var(--card-bg);
     border-radius: 20px;
-    border: 1px solid #aaaaaa;
+    border: 1px solid var(--border-color);
     transition: all 0.3s ease;
     display: inline-block;
 }
 
 .admin-link a:hover {
-    background: #aaaaaa; /* Medium grey on hover */
-    color: #ffffff; /* White text on hover */
+    background: var(--gold-hover);
+    color: var(--text-color);
 }
 
 /* Admin Login Modal */
@@ -702,9 +703,9 @@ body {
 }
 
 .player-badge-bigscreen {
-    background: #e7f3ff;
-    color: #0066cc;
-    border: 1px solid #b3d9ff;
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     padding: 8px 14px;
     border-radius: 18px;
     font-size: 1rem;
@@ -717,17 +718,17 @@ body {
     align-items: center;
     gap: 10px;
     padding: 8px 12px 8px 16px;
-    background: linear-gradient(135deg, #e7f3ff 0%, #d4e9ff 100%);
-    border: 2px solid #4ECDC4;
+    background: var(--card-bg);
+    border: 2px solid var(--success-color);
 }
 
 .player-badge-bigscreen .player-name-part {
     font-weight: 500;
-    color: #333;
+    color: var(--text-color);
 }
 
 .player-badge-bigscreen .player-score-part {
-    background: #4ECDC4;
+    background: var(--success-color);
     color: white;
     font-weight: bold;
     font-size: 1.1rem;
@@ -743,17 +744,17 @@ body {
 
 /* Positive/negative score styling */
 .player-badge-bigscreen.negative .player-score-part {
-    background: #ff6b6b;
+    background: var(--danger-color);
 }
 
 .player-badge-bigscreen.positive .player-score-part {
-    background: #51cf66;
+    background: var(--success-color);
 }
 
 .team-position {
     font-size: 2.2rem;
     font-weight: bold;
-    color: #333333;
+    color: var(--text-color);
     min-width: 70px;
     text-align: center;
     margin-right: 25px;
@@ -773,7 +774,7 @@ body {
 .team-name {
     font-size: 1.8rem;
     font-weight: 600;
-    color: #333333;
+    color: var(--text-color);
     line-height: 1.2;
     display: flex;
     align-items: center;
@@ -792,7 +793,7 @@ body {
 .leaderboard-team .team-score {
     font-size: 2rem;
     font-weight: bold;
-    color: #000000;
+    color: var(--text-color);
     min-width: 120px;
     text-align: right;
     margin-left: 25px;
@@ -804,11 +805,11 @@ body {
 .no-session, .no-teams {
     text-align: center;
     padding: 60px 20px;
-    background: #f8f8f8;
-    border: 2px solid #cccccc;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
     border-radius: 10px;
     font-size: 1.5rem;
-    color: #666666;
+    color: var(--text-secondary);
     margin: 20px 0;
     display: flex;
     align-items: center;
