@@ -190,7 +190,7 @@ class TeamSetup {
         <span class="team-icon">${this.getIconEmoji(team.icon)}</span>
         <div class="team-meta">
           <div class="team-name">${team.name}</div>
-          <div class="team-color-indicator" style="background-color: ${team.color}"></div>
+          <div class="team-color-indicator" style="background-color: ${team.color} !important;"></div>
           <div class="team-score">${team._pending ? 'Toevoegen…' : team.score}</div>
         </div>
         <div class="team-actions">

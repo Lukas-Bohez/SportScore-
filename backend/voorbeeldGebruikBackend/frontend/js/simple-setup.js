@@ -1,0 +1,906 @@
+// Simple Setup JavaScript
+class SimpleSetup {
+  constructor() {
+    this.currentStep = 1;
+    this.sessionData = {};
+    this.teams = [];
+    this.players = [];
+    this.allPlayers = []; // All players from API
+    this.apiTeams = []; // Teams from API
+    this.assignedMap = new Map(); // Track player assignments
+    this.editingTeamIndex = null;
+    this.api = new ScoreboardAPI();
+    this.init();
+  }
+
+  init() {
+    // Wait for DOM to be fully loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        this.bindElements();
+        this.setupEventListeners();
+        this.loadTeamsFromAPI();
+        this.loadAllPlayers(); // Load players for team_with_players mode
+      });
+    } else {
+      this.bindElements();
+      this.setupEventListeners();
+      this.loadTeamsFromAPI();
+      this.loadAllPlayers(); // Load players for team_with_players mode
+    }
+  }
+
+  bindElements() {
+    // Step elements
+    this.steps = {};
+    for (let i = 1; i <= 4; i++) {
+      this.steps[i] = document.getElementById(`step-${i}`);
+    }
+
+    // Step 1 inputs
+    this.sessionNameInput = document.getElementById('session-name');
+    this.sportTypeSelect = document.getElementById('sport-type');
+    this.scoringModeSelect = document.getElementById('scoring-mode');
+    this.maxTeamsInput = document.getElementById('max-teams');
+    this.totalRoundsInput = document.getElementById('total-rounds');
+    this.timeLimitInput = document.getElementById('time-limit');
+
+    // Team management elements
+    this.addTeamBtn = document.getElementById('add-team-btn');
+    this.teamFormContainer = document.getElementById('team-form-container');
+    this.teamForm = document.getElementById('team-form');
+    this.teamNameInput = document.getElementById('team-name');
+    this.teamColorInput = document.getElementById('team-color');
+    this.teamIconSelect = document.getElementById('team-icon');
+    this.teamDescriptionInput = document.getElementById('team-description');
+    this.cancelTeamBtn = document.getElementById('cancel-team-btn');
+    this.teamsList = document.getElementById('teams-list');
+    this.teamButtonsContainer = document.getElementById('team-buttons-container');
+
+    // Existing teams selection
+    this.existingTeamSelect = document.getElementById('existing-team-select');
+    this.addExistingTeamBtn = document.getElementById('add-existing-team-btn');
+
+    // Player management elements
+    this.teamForPlayerSelect = document.getElementById('team-for-player');
+    this.playerNameInput = document.getElementById('player-name');
+    this.addPlayerBtn = document.getElementById('add-player');
+    this.playersList = document.getElementById('players-list');
+    this.playersSection = document.getElementById('players-section');
+
+    // Review elements
+    this.reviewSessionName = document.getElementById('review-session-name');
+    this.reviewSportType = document.getElementById('review-sport-type');
+    this.reviewScoringMode = document.getElementById('review-scoring-mode');
+    this.reviewTeams = document.getElementById('review-teams');
+    this.reviewPlayers = document.getElementById('review-players');
+
+    // Navigation
+    this.nextBtns = {};
+    this.prevBtns = {};
+    for (let i = 1; i <= 4; i++) {
+      this.nextBtns[i] = document.getElementById(`next-${i}`);
+      this.prevBtns[i] = document.getElementById(`prev-${i}`);
+    }
+    this.startScoringBtn = document.getElementById('start-scoring');
+  }
+
+  setupEventListeners() {
+    // Navigation
+    for (let i = 1; i <= 3; i++) {
+      if (this.nextBtns[i]) {
+        this.nextBtns[i].addEventListener('click', this.handleNextClick.bind(this));
+      }
+      if (this.prevBtns[i]) {
+        this.prevBtns[i].addEventListener('click', this.handlePrevClick.bind(this));
+      }
+    }
+    if (this.prevBtns[4]) {
+      this.prevBtns[4].addEventListener('click', this.handlePrevClick.bind(this));
+    }
+    if (this.startScoringBtn) {
+      this.startScoringBtn.addEventListener('click', this.handleStartClick.bind(this));
+    }
+
+    // Team management
+    if (this.addTeamBtn) {
+      this.addTeamBtn.addEventListener('click', this.handleAddTeamClick.bind(this));
+    }
+    if (this.teamForm) {
+      this.teamForm.addEventListener('submit', this.handleTeamFormSubmit.bind(this));
+    }
+    if (this.cancelTeamBtn) {
+      this.cancelTeamBtn.addEventListener('click', this.handleCancelTeam.bind(this));
+    }
+    if (this.teamColorInput) {
+      this.teamColorInput.addEventListener('input', this.handleColorChange.bind(this));
+    }
+
+    // Color preview click to open color picker
+    const colorPreview = document.getElementById('color-preview');
+    if (colorPreview) {
+      colorPreview.addEventListener('click', () => {
+        if (this.teamColorInput) {
+          this.teamColorInput.click();
+        }
+      });
+    }
+
+    // Existing teams selection
+    if (this.addExistingTeamBtn) {
+      this.addExistingTeamBtn.addEventListener('click', this.handleAddExistingTeam.bind(this));
+    }
+
+    // Add player
+    if (this.addPlayerBtn) {
+      this.addPlayerBtn.addEventListener('click', this.handleAddPlayer.bind(this));
+    }
+
+    // Scoring mode change
+    if (this.scoringModeSelect) {
+      this.scoringModeSelect.addEventListener('change', this.handleScoringModeChange.bind(this));
+    }
+  }
+
+  handleNextClick(e) {
+    e.preventDefault();
+    this.nextStep();
+  }
+
+  handlePrevClick(e) {
+    e.preventDefault();
+    this.prevStep();
+  }
+
+  handleStartClick(e) {
+    e.preventDefault();
+    this.createSession();
+  }
+
+  handleAddTeamClick(e) {
+    e.preventDefault();
+    this.showTeamForm();
+  }
+
+  handleTeamFormSubmit(e) {
+    e.preventDefault();
+    this.addTeam();
+  }
+
+  handleCancelTeam(e) {
+    e.preventDefault();
+    this.hideTeamForm();
+  }
+
+  handleAddTeam(e) {
+    e.preventDefault();
+    this.addTeam();
+  }
+
+  handleAddPlayer(e) {
+    e.preventDefault();
+    this.addPlayer();
+  }
+
+  handleAddExistingTeam(e) {
+    e.preventDefault();
+    this.addExistingTeam();
+  }
+
+  handleColorChange(e) {
+    const color = e.target.value;
+    const preview = document.getElementById('color-preview');
+    if (preview) {
+      preview.style.backgroundColor = color;
+      preview.textContent = color.toUpperCase();
+    }
+  }
+
+  handleScoringModeChange(e) {
+    // Store the selected scoring mode in session data
+    this.sessionData.scoring_mode = e.target.value;
+  }
+
+  nextStep() {
+    if (this.validateCurrentStep()) {
+      this.saveCurrentStepData();
+      this.currentStep++;
+
+      // Skip step 3 (players) if scoring mode is "team"
+      if (this.currentStep === 3 && this.scoringModeSelect.value === 'team') {
+        this.currentStep = 4;
+      }
+
+      this.showStep();
+    }
+  }
+
+  prevStep() {
+    this.currentStep--;
+
+    // Skip step 3 (players) if scoring mode is "team"
+    if (this.currentStep === 3 && this.scoringModeSelect.value === 'team') {
+      this.currentStep = 2;
+    }
+
+    this.showStep();
+  }
+
+  showStep() {
+    Object.values(this.steps).forEach((step) => step.classList.remove('active'));
+    this.steps[this.currentStep].classList.add('active');
+    if (this.currentStep === 2) {
+      this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
+    }
+    if (this.currentStep === 3) {
+      // Only update player section if scoring mode requires players
+      if (this.scoringModeSelect.value !== 'team') {
+        this.updatePlayerSection();
+      }
+    }
+    if (this.currentStep === 4) {
+      this.populateReview();
+    }
+  }
+
+  validateCurrentStep() {
+    // Clear previous error messages
+    for (let i = 1; i <= 4; i++) {
+      const errorDiv = document.getElementById(`step-${i}-error`);
+      if (errorDiv) {
+        errorDiv.textContent = '';
+        errorDiv.classList.remove('show');
+      }
+    }
+
+    let isValid = true;
+    let errorMessage = '';
+
+    switch (this.currentStep) {
+      case 1:
+        if (this.sessionNameInput.value.trim() === '') {
+          errorMessage = 'Voer een sessie naam in.';
+          isValid = false;
+        } else if (this.sportTypeSelect.value === '') {
+          errorMessage = 'Selecteer een sport type.';
+          isValid = false;
+        } else if (this.scoringModeSelect.value === '') {
+          errorMessage = 'Selecteer een scoring mode.';
+          isValid = false;
+        } else if (this.maxTeamsInput && (parseInt(this.maxTeamsInput.value) < 2 || parseInt(this.maxTeamsInput.value) > 20)) {
+          errorMessage = 'Max teams moet tussen 2 en 20 liggen.';
+          isValid = false;
+        } else if (this.totalRoundsInput && (parseInt(this.totalRoundsInput.value) < 1 || parseInt(this.totalRoundsInput.value) > 10)) {
+          errorMessage = 'Aantal rondes moet tussen 1 en 10 liggen.';
+          isValid = false;
+        }
+        break;
+      case 2:
+        if (this.teams.length === 0) {
+          errorMessage = 'Voeg minstens één team toe.';
+          isValid = false;
+        }
+        break;
+      case 3:
+        // Only validate players if scoring mode requires them
+        if (this.scoringModeSelect.value === 'team') {
+          // Skip validation for team-only mode
+          break;
+        }
+        if (this.scoringModeSelect.value === 'player' && this.players.length === 0) {
+          errorMessage = 'Voeg minstens één speler toe voor individuele scores.';
+          isValid = false;
+        } else if (this.scoringModeSelect.value === 'team_with_players' && this.players.length === 0) {
+          errorMessage = 'Voeg minstens één speler toe voor team scores met spelers.';
+          isValid = false;
+        }
+        break;
+      default:
+        return true;
+    }
+
+    if (!isValid) {
+      const errorDiv = document.getElementById(`step-${this.currentStep}-error`);
+      if (errorDiv) {
+        errorDiv.textContent = errorMessage;
+        errorDiv.classList.add('show');
+      }
+    }
+
+    return isValid;
+  }
+
+  saveCurrentStepData() {
+    switch (this.currentStep) {
+      case 1:
+        this.sessionData.name = this.sessionNameInput.value.trim();
+        this.sessionData.sportType = this.sportTypeSelect.value;
+        this.sessionData.scoringMode = this.scoringModeSelect.value;
+        break;
+    }
+  }
+
+  showTeamForm(team = null) {
+    this.teamFormContainer.classList.remove('hidden');
+    if (team) {
+      // Edit mode
+      this.teamNameInput.value = team.name;
+      this.teamColorInput.value = team.color || '#3B82F6';
+      this.teamIconSelect.value = team.icon || 'team';
+      this.teamDescriptionInput.value = team.description || '';
+      this.editingTeamIndex = this.teams.indexOf(team);
+    } else {
+      // Add mode
+      this.teamNameInput.value = '';
+      this.teamColorInput.value = '#3B82F6';
+      this.teamIconSelect.value = 'team';
+      this.teamDescriptionInput.value = '';
+      this.editingTeamIndex = null;
+    }
+    // Update color preview
+    this.handleColorChange({ target: { value: this.teamColorInput.value } });
+    this.teamNameInput.focus();
+  }
+
+  hideTeamForm() {
+    this.teamFormContainer.classList.add('hidden');
+    this.teamForm.reset();
+    this.editingTeamIndex = null;
+  }
+
+  async addTeam() {
+    const name = this.teamNameInput.value.trim();
+    const color = (this.teamColorInput.value || '').trim() || '#3B82F6';
+    const icon = this.teamIconSelect.value;
+    const description = this.teamDescriptionInput.value.trim();
+
+    if (name) {
+      try {
+        // Create team in API first
+        const apiTeamData = {
+          name: name,
+          color: color,
+          icon: icon,
+          description: description || `${name} team.`,
+        };
+
+        const createdTeam = await this.api.createStandaloneTeam(apiTeamData);
+
+        const teamData = {
+          id: createdTeam.id,
+          name: name,
+          color: color,
+          icon: this.getIconEmoji(icon),
+          description: description || `${name} team.`,
+          players: [],
+        };
+
+        if (this.editingTeamIndex !== null) {
+          // Update existing team
+          this.teams[this.editingTeamIndex] = teamData;
+        } else {
+          // Add new team
+          this.teams.push(teamData);
+        }
+
+        this.updateTeamsList();
+        this.hideTeamForm();
+        this.updateTeamSelect();
+        this.displayAvailableTeams(); // Refresh available teams
+        this.updateExistingTeamsSelect();
+      } catch (error) {
+        console.error('Error creating team:', error);
+        alert('Fout bij aanmaken team: ' + error.message);
+      }
+    }
+  }
+
+  getIconEmoji(iconValue) {
+    const iconMap = {
+      team: '👥',
+      star: '⭐',
+      trophy: '🏆',
+      fire: '🔥',
+      rocket: '🚀',
+      crown: '👑',
+      lightning: '⚡',
+      heart: '❤️',
+    };
+    return iconMap[iconValue] || '👥';
+  }
+
+  updateTeamsList() {
+    if (this.teams.length === 0) {
+      this.teamsList.innerHTML = '<div class="empty-state">Nog geen teams. Voeg je eerste team toe met "+ Nieuw Team".</div>';
+      return;
+    }
+
+    this.teamsList.innerHTML = this.teams
+      .map((team, index) => {
+        const teamColor = (team.color || '').trim() || '#3B82F6';
+        return `
+      <div class="team-card" data-team-id="${index + 1}" style="border-color: ${teamColor}; box-shadow: 0 10px 24px rgba(0,0,0,0.06);">
+        <div class="team-card-header">
+          <div class="team-color-badge" style="background-color: ${teamColor} !important;"></div>
+          <div class="team-title">
+            <span class="team-icon">${team.icon}</span>
+            <div class="team-name-wrap">
+              <span class="team-name">${team.name}</span>
+              <span class="team-color-hex">${teamColor.toUpperCase()}</span>
+            </div>
+          </div>
+        </div>
+        <p class="team-description">${team.description}</p>
+        <div class="team-actions">
+          <button class="delete-team-btn" onclick="simpleSetup.deleteTeam(${index})">
+            Verwijderen
+          </button>
+          <button class="save-team-btn compact" onclick="simpleSetup.editTeam(${index})">
+            Bewerken
+          </button>
+          ${
+            this.sessionData.scoringMode === 'team_with_players'
+              ? `
+          <button class="save-team-btn compact" title="Speler toewijzen aan dit team" onclick="simpleSetup.toggleUnassignedPlayers(${index})">+ Speler</button>
+          `
+              : ''
+          }
+        </div>
+        <div class="players-section" id="players-for-${index + 1}">
+          <div class="players-list" id="players-list-${index + 1}">
+            ${this.getTeamPlayersHtml(index)}
+          </div>
+          ${
+            this.sessionData.scoringMode === 'team_with_players'
+              ? `
+          <div class="unassigned-players-dropdown" id="unassigned-players-${index + 1}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
+            <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
+            <div class="unassigned-list" id="unassigned-list-${index + 1}">Laden...</div>
+          </div>
+          `
+              : ''
+          }
+        </div>
+      </div>
+    `;
+      })
+      .join('');
+  }
+
+  getTeamPlayersHtml(teamIndex) {
+    const teamPlayers = this.players.filter((player) => player.teamIndex === teamIndex);
+    if (teamPlayers.length === 0) {
+      return this.sessionData.scoringMode === 'team_with_players' ? '<em>Geen spelers toegewezen - klik op "+ Speler" om toe te voegen</em>' : '<em>Geen spelers toegewezen</em>';
+    }
+    return teamPlayers
+      .map(
+        (player, playerIndex) => `
+      <div class="player-row">
+        <div class="player-left"><strong>${this.escapeHtml(player.name)}</strong></div>
+        <div class="player-actions">
+          <button class="delete-team-btn" onclick="simpleSetup.removePlayerFromTeam(${this.players.indexOf(player)})">Verwijderen</button>
+        </div>
+      </div>
+    `
+      )
+      .join('');
+  }
+
+  removePlayerFromTeam(playerIndex) {
+    const player = this.players[playerIndex];
+    if (!player) return;
+
+    if (confirm(`Weet je zeker dat je ${player.name} wilt verwijderen uit dit team?`)) {
+      // Remove from assigned map if it was an API player
+      if (player.id) {
+        this.assignedMap.delete(player.id);
+      }
+
+      // Remove from local players list
+      this.players.splice(playerIndex, 1);
+
+      // Update displays
+      this.updatePlayersList();
+      this.updateTeamsList();
+    }
+  }
+
+  editTeam(index) {
+    const team = this.teams[index];
+    if (team) {
+      this.showTeamForm(team);
+    }
+  }
+
+  deleteTeam(index) {
+    if (confirm(`Weet je zeker dat je "${this.teams[index].name}" wilt verwijderen?`)) {
+      // Remove all players from this team
+      this.players = this.players.filter((player) => player.teamIndex !== index);
+      // Update team indices for remaining players
+      this.players.forEach((player) => {
+        if (player.teamIndex > index) {
+          player.teamIndex--;
+        }
+      });
+      this.teams.splice(index, 1);
+      this.updateTeamsList();
+      this.updateTeamSelect();
+    }
+  }
+
+  async loadTeamsFromAPI() {
+    try {
+      const response = await this.api.getAllStandaloneTeams();
+      const teams = response.teams || response || [];
+
+      // Map API teams to internal format
+      this.apiTeams = teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        color: team.color || '#3B82F6',
+        icon: team.icon || 'team',
+          description: team.description || '',
+          players: team.players || [],
+        };
+      });
+
+      // Do not auto-load teams - let user choose which ones to add
+      // if (this.teams.length === 0 && this.apiTeams.length > 0) {
+      //   // Load first 3 teams automatically, or fewer if there are less
+      //   const teamsToLoad = Math.min(3, this.apiTeams.length);
+      //   for (let i = 0; i < teamsToLoad; i++) {
+      //     this.addTeamFromAPI(this.apiTeams[i]);
+      //   }
+      // }
+
+      this.displayAvailableTeams();
+      this.updateExistingTeamsSelect();
+    } catch (error) {
+      console.error('Error loading teams:', error);
+      // Continue without API teams
+      this.apiTeams = [];
+    }
+  }
+
+  displayAvailableTeams() {
+    if (!this.teamButtonsContainer || this.apiTeams.length === 0) {
+      return;
+    }
+
+    let html = '<div class="api-teams-section"><p>Beschikbare teams:</p><div class="team-buttons-grid">';
+
+    this.apiTeams.forEach((apiTeam) => {
+      const color = (apiTeam.color || '').trim() || '#3B82F6';
+      const isAdded = this.teams.some((t) => String(t.id) === String(apiTeam.id));
+      html += `
+        <button type="button" class="team-select-button ${isAdded ? 'added' : ''}" 
+                onclick="simpleSetup.addTeamFromAPI('${apiTeam.id}')"
+                style="border-color: ${color};" ${isAdded ? 'disabled' : ''}>
+          <span>${this.getIconEmoji(apiTeam.icon)}</span> ${apiTeam.name}
+        </button>
+      `;
+    });
+
+    html += '</div></div>';
+    this.teamButtonsContainer.innerHTML = html;
+  }
+
+  updateExistingTeamsSelect() {
+    if (!this.existingTeamSelect) return;
+
+    // Clear and rebuild options
+    this.existingTeamSelect.innerHTML = '<option value="">-- Selecteer een bestaand team --</option>';
+
+    // Filter out teams already in session
+    const currentTeamIds = this.teams.map((t) => String(t.id));
+    const available = this.apiTeams.filter((t) => !currentTeamIds.includes(String(t.id)));
+
+    available.forEach((team) => {
+      const option = document.createElement('option');
+      option.value = team.id;
+      option.textContent = `${this.getIconEmoji(team.icon)} ${team.name}`;
+      this.existingTeamSelect.appendChild(option);
+    });
+
+    // Disable button if no teams available
+    if (this.addExistingTeamBtn) {
+      this.addExistingTeamBtn.disabled = available.length === 0;
+    }
+  }
+
+  addTeamFromAPI(apiTeam) {
+    if (typeof apiTeam === 'string') {
+      apiTeam = this.apiTeams.find((t) => String(t.id) === String(apiTeam));
+      if (!apiTeam) {
+        alert('Team niet gevonden.');
+        return;
+      }
+    }
+
+    // Check if team already added
+    if (this.teams.some((t) => String(t.id) === String(apiTeam.id))) {
+      alert(`${apiTeam.name} is al toegevoegd aan deze sessie`);
+      return;
+    }
+
+    // Add team with API id
+    const team = {
+      id: apiTeam.id,
+      name: apiTeam.name,
+      color: (apiTeam.color || '').trim() || '#3B82F6',
+      icon: this.getIconEmoji(apiTeam.icon),
+      description: apiTeam.description || '',
+      players: apiTeam.players ? [...apiTeam.players] : [],
+    };
+
+    this.teams.push(team);
+    this.updateTeamsList();
+    this.updateTeamSelect();
+    this.displayAvailableTeams();
+    this.updateExistingTeamsSelect();
+  }
+
+  addExistingTeam() {
+    const teamId = this.existingTeamSelect.value;
+    if (!teamId) {
+      alert('Selecteer eerst een team om toe te voegen.');
+      return;
+    }
+
+    const apiTeam = this.apiTeams.find((t) => String(t.id) === String(teamId));
+    if (!apiTeam) {
+      alert('Geselecteerd team niet gevonden.');
+      return;
+    }
+
+    this.addTeamFromAPI(apiTeam);
+    this.existingTeamSelect.value = ''; // Reset selection
+  }
+
+  updateTeamSelect() {
+    this.teamForPlayerSelect.innerHTML = this.teams.map((team, index) => `<option value="${index}">${team.icon} ${team.name}</option>`).join('');
+  }
+
+  addPlayer() {
+    const name = this.playerNameInput.value.trim();
+    const teamIndex = this.teamForPlayerSelect.value;
+    if (name && teamIndex !== '') {
+      this.players.push({ name, teamIndex: parseInt(teamIndex) });
+      this.updatePlayersList();
+      this.playerNameInput.value = '';
+    }
+  }
+
+  updatePlayersList() {
+    // Update the players list in step 3
+    this.playersList.innerHTML = this.players
+      .map(
+        (player, index) => `
+      <div class="player-item">
+        ${player.name} (${this.teams[player.teamIndex].icon} ${this.teams[player.teamIndex].name})
+        <button onclick="simpleSetup.removePlayer(${index})">Verwijder</button>
+      </div>
+    `
+      )
+      .join('');
+
+    // Update players in team cards
+    this.teams.forEach((_, teamIndex) => {
+      const playersListElement = document.getElementById(`players-list-${teamIndex + 1}`);
+      if (playersListElement) {
+        playersListElement.innerHTML = this.getTeamPlayersHtml(teamIndex);
+      }
+    });
+  }
+
+  removePlayer(index) {
+    this.players.splice(index, 1);
+    this.updatePlayersList();
+  }
+
+  toggleUnassignedPlayers(teamIndex) {
+    const el = document.getElementById(`unassigned-players-${teamIndex + 1}`);
+    if (!el) return;
+    if (el.style.display === 'none' || el.style.display === '') {
+      this.loadUnassignedPlayersForTeam(teamIndex);
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  async loadUnassignedPlayersForTeam(teamIndex) {
+    const container = document.getElementById(`unassigned-list-${teamIndex + 1}`);
+    if (!container) return;
+
+    try {
+      // Load all players if not already loaded
+      if (this.allPlayers.length === 0) {
+        await this.loadAllPlayers();
+      }
+
+      // Determine which players are not assigned to any team in this session
+      const unassigned = this.allPlayers.filter((p) => !this.assignedMap.has(p.id));
+
+      if (unassigned.length === 0) {
+        container.innerHTML = '<em>Geen beschikbare spelers</em>';
+        return;
+      }
+
+      container.innerHTML = '';
+      unassigned.forEach((p) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;';
+        playerDiv.innerHTML = `
+          <span>${p.name}</span>
+          <button class="save-team-btn compact" onclick="simpleSetup.assignPlayerToTeam(${teamIndex}, '${p.id}')">Toevoegen</button>
+        `;
+        container.appendChild(playerDiv);
+      });
+    } catch (error) {
+      console.error('Error loading unassigned players:', error);
+      container.innerHTML = '<em>Fout bij laden spelers</em>';
+    }
+  }
+
+  async loadAllPlayers() {
+    try {
+      const response = await this.api.getPlayers();
+      this.allPlayers = response.players || [];
+      // Initialize assigned map
+      this.assignedMap.clear();
+      this.players.forEach((p) => {
+        if (p.id) this.assignedMap.set(p.id, true);
+      });
+    } catch (error) {
+      console.error('Error loading players:', error);
+      this.allPlayers = [];
+    }
+  }
+
+  async assignPlayerToTeam(teamIndex, playerId) {
+    try {
+      const player = this.allPlayers.find((p) => p.id === playerId);
+      if (!player) return;
+
+      // Add to local players list
+      this.players.push({
+        id: player.id,
+        name: player.name,
+        teamIndex: teamIndex,
+      });
+
+      // Mark as assigned
+      this.assignedMap.set(playerId, true);
+
+      // Update displays
+      this.updatePlayersList();
+      this.updateTeamsList();
+
+      // Hide the dropdown
+      const el = document.getElementById(`unassigned-players-${teamIndex + 1}`);
+      if (el) el.style.display = 'none';
+
+      this.showSuccessMessage(`${player.name} toegevoegd aan team`);
+    } catch (error) {
+      console.error('Error assigning player:', error);
+      this.showErrorMessage('Fout bij toewijzen speler');
+    }
+  }
+
+  showSuccessMessage(message) {
+    const existing = document.querySelector('.success-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">OK</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  showErrorMessage(message) {
+    const existing = document.querySelector('.error-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'error-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">!</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  updatePlayerSection() {
+    if (this.scoringModeSelect.value === 'player' || this.scoringModeSelect.value === 'team_with_players') {
+      this.playersSection.style.display = 'block';
+    } else {
+      this.playersSection.style.display = 'none';
+    }
+  }
+
+  populateReview() {
+    this.reviewSessionName.textContent = this.sessionData.name;
+    this.reviewSportType.textContent = this.sportTypeSelect.options[this.sportTypeSelect.selectedIndex].text;
+    this.reviewScoringMode.textContent = this.scoringModeSelect.options[this.scoringModeSelect.selectedIndex].text;
+    this.reviewTeams.innerHTML = this.teams.map((team) => `<li>${team.name}</li>`).join('');
+
+    // Only show players section if scoring mode requires players
+    const playersHeading = this.reviewPlayers.previousElementSibling;
+    if (this.scoringModeSelect.value === 'team') {
+      // Hide players section for team-only mode
+      if (playersHeading) playersHeading.style.display = 'none';
+      this.reviewPlayers.style.display = 'none';
+    } else {
+      // Show players section for player modes
+      if (playersHeading) playersHeading.style.display = 'block';
+      this.reviewPlayers.style.display = 'block';
+      this.reviewPlayers.innerHTML = this.players.map((player) => `<li>${player.name} (${this.teams[player.teamIndex].name})</li>`).join('');
+    }
+  }
+
+  async createSession() {
+    try {
+      // Gather all session data
+      const maxTeams = parseInt(this.maxTeamsInput?.value) || this.teams.length;
+      const totalRounds = parseInt(this.totalRoundsInput?.value) || 1;
+      const timeLimit = this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null; // Convert minutes to seconds
+      const showPlayers = this.sessionData.scoringMode !== 'team'; // Derived from scoring mode
+
+      // Create session
+      const sessionData = {
+        name: this.sessionData.name,
+        sport_type: this.sessionData.sportType,
+        game_type: 'custom',
+        scoring_mode: this.sessionData.scoringMode,
+        max_teams: maxTeams,
+        total_rounds: totalRounds,
+        time_limit: timeLimit,
+        show_players: showPlayers,
+      };
+
+      const session = await this.api.createSession(sessionData);
+      const sessionId = session.id;
+
+      // Add teams - use API team ids if available
+      const sessionTeams = [];
+      for (const team of this.teams) {
+        const teamData = {
+          name: team.name,
+          ...(team.id && { id: team.id }), // Use API team id if available
+        };
+        const createdTeam = await this.api.createSessionTeam(sessionId, teamData);
+        sessionTeams.push(createdTeam);
+      }
+
+      // Add players if player scoring mode or team_with_players mode
+      if (this.sessionData.scoringMode === 'player' || this.sessionData.scoringMode === 'team_with_players') {
+        for (const player of this.players) {
+          const teamId = sessionTeams[player.teamIndex]?.id;
+          if (teamId) {
+            await this.api.createPlayer({
+              name: player.name,
+              default_team_id: teamId,
+            });
+          }
+        }
+      }
+
+      // Redirect to simple scoreinput
+      window.location.href = `simple-scoreinput.html?session=${sessionId}`;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      alert('Fout bij aanmaken sessie: ' + error.message);
+    }
+  }
+}
+
+// Initialize
+const simpleSetup = new SimpleSetup();

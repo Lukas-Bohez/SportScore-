@@ -152,12 +152,12 @@ class LeaderboardView {
     if (!this.leaderboard) return;
 
     // Calculate team scores
-    const teamScores = this.calculateTeamScores();
+    const SportScores = this.calculateSportScores();
 
     // Filter out eliminated teams if game type is elimination
-    let filteredTeams = teamScores;
+    let filteredTeams = SportScores;
     if (this.sessionData && this.sessionData.game_type === 'elimination') {
-      filteredTeams = teamScores.filter((team) => !team.is_eliminated);
+      filteredTeams = SportScores.filter((team) => !team.is_eliminated);
     }
 
     // Sort by score descending
@@ -173,12 +173,12 @@ class LeaderboardView {
     this.leaderboard.innerHTML = leaderboardHtml;
   }
 
-  calculateTeamScores() {
-    const teamScores = {};
+  calculateSportScores() {
+    const SportScores = {};
 
     // Initialize teams with 0 score
     this.teamsData.forEach((team) => {
-      teamScores[team.id] = {
+      SportScores[team.id] = {
         id: team.id,
         name: team.name,
         color: team.color,
@@ -190,12 +190,12 @@ class LeaderboardView {
 
     // Add up scores
     this.scoresData.forEach((score) => {
-      if (teamScores[score.team_id]) {
-        teamScores[score.team_id].score += score.points;
+      if (SportScores[score.team_id]) {
+        SportScores[score.team_id].score += score.points;
       }
     });
 
-    return Object.values(teamScores);
+    return Object.values(SportScores);
   }
 
   createLeaderboardItem(team, position) {
@@ -228,7 +228,7 @@ class LeaderboardView {
   }
 
   createTeamCard(team) {
-    const teamScore = this.calculateTeamScore(team.id);
+    const SportScore = this.calculateSportScore(team.id);
     const players = team.players || [];
     const playersHtml =
       this.showPlayers && players.length > 0
@@ -247,7 +247,7 @@ class LeaderboardView {
         <div class="team-stats">
           <div class="stat">
             <span class="stat-label">Score:</span>
-            <span class="stat-value">${teamScore}</span>
+            <span class="stat-value">${SportScore}</span>
           </div>
           <div class="stat">
             <span class="stat-label">Status:</span>
@@ -261,7 +261,7 @@ class LeaderboardView {
     `;
   }
 
-  calculateTeamScore(teamId) {
+  calculateSportScore(teamId) {
     return this.scoresData.filter((score) => score.team_id === teamId).reduce((total, score) => total + score.points, 0);
   }
 

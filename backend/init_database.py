@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Initialize SQLite database for TeamScore application.
+Initialize SQLite database for SportScore application.
 Reads the schema from database_schema_sqlite.sql and creates all tables.
 """
 import sqlite3

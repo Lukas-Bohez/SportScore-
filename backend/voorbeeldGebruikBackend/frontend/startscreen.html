@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeamScore - Nieuwe Sessie</title>
+    <title>SportScore - Nieuwe Sessie</title>
     <link rel="stylesheet" href="css/startscreen.css">
     <link rel="stylesheet" href="css/buttons.css">
     <link rel="stylesheet" href="css/themes.css">
@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>🧩 TeamScore</h1>
+            <h1>🧩 SportScore</h1>
             <p>Digitaal scorebord voor teambuildings</p>
         </header>
 
@@ -122,7 +122,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="team-color">Kleur:</label>
-                                    <input type="color" id="team-color" value="#3B82F6">
+                                    <input type="color" id="team-color" value="#3B82F6" style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+                                    <div id="color-preview" class="color-preview">#3B82F6</div>
                                 </div>
                             </div>
                             
@@ -182,7 +183,7 @@
         </main>
 
         <footer class="footer">
-            <p>&copy; 2025 TeamScore - Digitaal Scorebord voor Teambuildings</p>
+            <p>&copy; 2025 SportScore - Digitaal Scorebord voor Teambuildings</p>
         </footer>
     </div>
 

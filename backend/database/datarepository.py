@@ -56,8 +56,12 @@ class TeamRepository:
 
     @staticmethod
     def create_team(name: str, sport_id: Optional[int] = None) -> int:
-        sql = "INSERT INTO teams (name) VALUES (?)"
-        params = [name]
+        if sport_id:
+            sql = "INSERT INTO teams (name, sport_id) VALUES (?, ?)"
+            params = [name, sport_id]
+        else:
+            sql = "INSERT INTO teams (name) VALUES (?)"
+            params = [name]
         return Database.execute_sql(sql, params)
 
     @staticmethod

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SportScore - Eenvoudige Score Invoer</title>
+    <link rel="stylesheet" href="css/scoreinput.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <style>
+        .power-user-link { position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5; }
+        .power-user-link:hover { opacity: 1; }
+        .recent-scores-section, .quick-actions { display: none; }
+        .card {
+            background: var(--card-background, #ffffff);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧩 SportScore - Score Invoer</h1>
+            <div class="session-info">
+                <span id="session-name">Sessie laden...</span>
+                <span id="round-info">Ronde 1/1</span>
+                <span id="timer">--:--</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="leaderboard-section card">
+                <h2>Scorebord</h2>
+                <div class="leaderboard" id="leaderboard">
+                    <!-- Leaderboard will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="score-input-section card">
+                <h2>Score Toevoegen</h2>
+
+                <div class="score-form">
+                    <div class="form-group">
+                        <label for="team-select">Selecteer Team:</label>
+                        <select id="team-select">
+                            <option value="">Kies een team...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="player-group" style="display: none;">
+                        <label for="player-select">Selecteer Speler (optioneel):</label>
+                        <select id="player-select">
+                            <option value="">Heel team / geen specifieke speler</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="points-input">Punten:</label>
+                        <div class="points-controls">
+                            <button id="subtract-btn" type="button" class="points-btn subtract">-</button>
+                            <input type="number" id="points-input" value="1" min="-100" max="100">
+                            <button id="add-btn" type="button" class="points-btn add">+</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reason-input">Reden (optioneel):</label>
+                        <input type="text" id="reason-input" placeholder="bijv. Quiz vraag correct, Bonus punten..." maxlength="200">
+                    </div>
+
+                    <button id="submit-score-btn" type="button" class="submit-btn">Score Toevoegen</button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="session-controls">
+                <button id="pause-session-btn" type="button" class="control-btn pause">Pauze</button>
+                <button id="next-round-btn" type="button" class="control-btn next">Volgende Ronde</button>
+                <button id="end-session-btn" type="button" class="control-btn end">Sessie Beëindigen</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Score Animation Overlay -->
+    <div class="score-animation" id="score-animation">
+        <div class="animation-content">
+            <div class="team-icon" id="anim-team-icon">👥</div>
+            <div class="score-change" id="anim-score-change">+5</div>
+            <div class="team-name" id="anim-team-name">Team Naam</div>
+        </div>
+    </div>
+
+    <a href="startscreen.html" class="power-user-link" title="Power User Mode">⚙️</a>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dark_mode_toggle.js"></script>
+    <script src="js/simple-scoreinput.js"></script>
+</body>
+</html></content>
+<parameter name="filePath">c:\Users\lukas\OneDrive - Hogeschool West-Vlaanderen\Documents\security\SportScore-\backend\voorbeeldGebruikBackend\frontend\simple-scoreinput.html
