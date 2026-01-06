@@ -537,8 +537,13 @@ class BigScreenDisplay {
         // Create status badge if it doesn't exist
         this.sessionStatusBadge = document.createElement('div');
         this.sessionStatusBadge.id = 'session-status-badge';
-        this.sessionStatusBadge.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000;';
-        document.body.appendChild(this.sessionStatusBadge);
+        this.sessionStatusBadge.style.cssText = 'display: inline-block; margin-left: 10px; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em; box-shadow: 0 2px 8px rgba(0,0,0,0.15);';
+        const header = document.querySelector('.header');
+        if (header) {
+          header.appendChild(this.sessionStatusBadge);
+        } else {
+          document.body.appendChild(this.sessionStatusBadge);
+        }
       }
     }
 
@@ -580,6 +585,12 @@ class BigScreenDisplay {
 
     // Sort leaderboard by score descending
     leaderboard.sort((a, b) => b.score - a.score);
+
+    // Add class based on number of teams for layout
+    this.teamsContainer.className = 'leaderboard-container';
+    if (leaderboard.length === 2) {
+      this.teamsContainer.classList.add('two-teams');
+    }
 
     // Create leaderboard
     leaderboard.forEach((team, index) => {
@@ -634,10 +645,8 @@ class BigScreenDisplay {
 
     teamDiv.innerHTML = `
       <div class="team-position">${position}</div>
-      <div class="team-info">
-        <div class="team-name">${team.team_name}</div>
-        <div class="team-icon">${this.getEmojiFromName(team.team_icon)}</div>
-      </div>
+      <div class="team-name">${team.team_name}</div>
+      <div class="team-icon">${this.getEmojiFromName(team.team_icon)}</div>
       <div class="team-score">${team.total_score || 0}</div>
       ${playersHtml}
     `;
