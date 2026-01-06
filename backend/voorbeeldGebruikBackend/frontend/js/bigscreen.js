@@ -294,7 +294,7 @@ class BigScreenDisplay {
     };
 
     const icon = sportIcons[sportType] || '🎯';
-    document.title = `${icon} TeamScore - Live Scorebord`;
+    document.title = `${icon} SportScore - Live Scorebord`;
   }
 
   async loadPlayersForLeaderboard(sessionId, leaderboard) {
@@ -515,7 +515,7 @@ class BigScreenDisplay {
     if (this.sessionTitle) {
       // Add subtle icon for scoring mode
       const scoringModeIcon = session.scoring_mode === 'player' ? '👤' : '👥';
-      this.sessionTitle.textContent = session.name || 'TeamScore Session';
+      this.sessionTitle.textContent = session.name || 'SportScore Session';
 
       // Add icon as separate element for better styling control
       const existingIcon = this.sessionTitle.querySelector('.scoring-mode-icon');
@@ -696,7 +696,7 @@ class BigScreenDisplay {
 
   showNoSessionMessage() {
     if (this.sessionTitle) {
-      this.sessionTitle.textContent = 'TeamScore';
+      this.sessionTitle.textContent = 'SportScore';
     }
     if (this.sessionStatus) {
       this.sessionStatus.textContent = 'Geen actieve sessie';

@@ -512,11 +512,11 @@ class ScoreInput {
   }
 
   calculateLeaderboard(allScores) {
-    const teamScores = {};
+    const SportScores = {};
 
     // Initialize teams with 0 score and include players
     this.teams.forEach((team) => {
-      teamScores[team.id] = {
+      SportScores[team.id] = {
         id: team.id,
         name: team.name,
         icon: team.icon,
@@ -528,24 +528,24 @@ class ScoreInput {
       // Initialize player scores to 0
       if (team.players) {
         team.players.forEach((player) => {
-          teamScores[team.id].playerScores[player.id] = 0;
+          SportScores[team.id].playerScores[player.id] = 0;
         });
       }
     });
 
     // Add up all scores
     allScores.forEach((score) => {
-      if (teamScores[score.team_id]) {
-        teamScores[score.team_id].score += score.points;
+      if (SportScores[score.team_id]) {
+        SportScores[score.team_id].score += score.points;
 
         // If this score is for a specific player, track it
-        if (score.player_id && teamScores[score.team_id].playerScores[score.player_id] !== undefined) {
-          teamScores[score.team_id].playerScores[score.player_id] += score.points;
+        if (score.player_id && SportScores[score.team_id].playerScores[score.player_id] !== undefined) {
+          SportScores[score.team_id].playerScores[score.player_id] += score.points;
         }
       }
     });
 
-    return Object.values(teamScores);
+    return Object.values(SportScores);
   }
 
   displayLeaderboard(leaderboard) {

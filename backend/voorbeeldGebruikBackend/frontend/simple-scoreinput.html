@@ -3,9 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SportScore - Score Invoer</title>
+    <title>SportScore - Eenvoudige Score Invoer</title>
     <link rel="stylesheet" href="css/scoreinput.css">
     <link rel="stylesheet" href="css/themes.css">
+    <style>
+        .power-user-link { position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5; }
+        .power-user-link:hover { opacity: 1; }
+        .recent-scores-section, .quick-actions { display: none; }
+        .card {
+            background: var(--card-background, #ffffff);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -19,15 +31,15 @@
         </header>
 
         <main class="main-content">
-            <div class="leaderboard-section">
+            <div class="leaderboard-section card">
                 <h2>Scorebord</h2>
                 <div class="leaderboard" id="leaderboard">
                     <!-- Leaderboard will be populated by JavaScript -->
                 </div>
             </div>
 
-            <div class="score-input-section">
-                <h2>Score Aanpassen</h2>
+            <div class="score-input-section card">
+                <h2>Score Toevoegen</h2>
 
                 <div class="score-form">
                     <div class="form-group">
@@ -37,7 +49,7 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="player-group" style="display: none;">
                         <label for="player-select">Selecteer Speler (optioneel):</label>
                         <select id="player-select">
                             <option value="">Heel team / geen specifieke speler</option>
@@ -48,7 +60,7 @@
                         <label for="points-input">Punten:</label>
                         <div class="points-controls">
                             <button id="subtract-btn" type="button" class="points-btn subtract">-</button>
-                            <input type="number" id="points-input" value="1" min="1" max="100">
+                            <input type="number" id="points-input" value="1" min="-100" max="100">
                             <button id="add-btn" type="button" class="points-btn add">+</button>
                         </div>
                     </div>
@@ -59,33 +71,6 @@
                     </div>
 
                     <button id="submit-score-btn" type="button" class="submit-btn">Score Toevoegen</button>
-                </div>
-
-                <div class="quick-actions">
-                    <h3>Snelle Acties</h3>
-                    <div class="quick-buttons" id="sport-quick-buttons">
-                        <!-- Sport-specific buttons will be added here by JavaScript -->
-                    </div>
-
-                    <div class="custom-quick-actions" id="custom-quick-actions">
-                        <!-- Custom quick actions will be loaded here -->
-                    </div>
-
-                    <div class="create-quick-action">
-                        <h4>Maak Snelle Actie</h4>
-                        <div class="create-form">
-                            <input type="text" id="custom-reason" placeholder="Reden (bijv. 3 Pointer)" maxlength="50">
-                            <input type="number" id="custom-points" placeholder="Punten" min="-100" max="100">
-                            <button id="add-custom-action" type="button" class="add-custom-btn">Toevoegen</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="recent-scores-section">
-                <h2>Recente Scores</h2>
-                <div class="recent-scores" id="recent-scores">
-                    <!-- Recent scores will be populated by JavaScript -->
                 </div>
             </div>
         </main>
@@ -108,9 +93,12 @@
         </div>
     </div>
 
+    <a href="startscreen.html" class="power-user-link" title="Power User Mode">⚙️</a>
+
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
-    <script src="js/scoreinput.js"></script>
+    <script src="js/simple-scoreinput.js"></script>
 </body>
-</html>
+</html></content>
+<parameter name="filePath">c:\Users\lukas\OneDrive - Hogeschool West-Vlaanderen\Documents\security\SportScore-\backend\voorbeeldGebruikBackend\frontend\simple-scoreinput.html

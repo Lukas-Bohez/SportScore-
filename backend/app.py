@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Scoreboard Backend",
     version="1.0.0",
-    description="REST + Socket.IO backend for TeamScore. All REST endpoints are prefixed with /api/v1."
+    description="REST + Socket.IO backend for SportScore. All REST endpoints are prefixed with /api/v1."
 )
 
 # ----------------------------------------------------

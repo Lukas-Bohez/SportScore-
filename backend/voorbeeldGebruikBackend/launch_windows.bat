@@ -1,8 +1,8 @@
 @echo off
-REM TeamScore Launch Script for Windows (adjusted to current folder layout)
+REM SportScore Launch Script for Windows (adjusted to current folder layout)
 REM This script sets up the SQLite database, launches backend and frontend
 
-echo 🚀 Starting TeamScore Application Setup...
+echo 🚀 Starting SportScore Application Setup...
 
 REM Determine script directory and repository root (tries a couple of parent locations)
 set "SCRIPT_DIR=%~dp0"
@@ -58,7 +58,7 @@ echo ✅ SQLite database ready
 REM Start backend in a new window
 echo 🚀 Starting backend server...
 REM We're already in %ROOT% due to pushd above; use relative paths to avoid quoting issues
-start "TeamScore Backend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && run_server.bat"
+start "SportScore Backend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && run_server.bat"
 
 REM Wait a moment for backend to start
 ping -n 4 127.0.0.1 >nul
@@ -66,23 +66,23 @@ ping -n 4 127.0.0.1 >nul
 REM Start frontend server in a new window
 echo 🌐 Starting frontend server...
 REM Use relative path so cmd quoting stays simple
-start "TeamScore Frontend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && serve_frontend_server.bat"
+start "SportScore Frontend" cmd /k "cd /d "backend\voorbeeldGebruikBackend" && serve_frontend_server.bat"
 
 REM Wait a moment for frontend to start
 ping -n 3 127.0.0.1 >nul
 
 REM Open browser to the application
-echo 🌍 Opening TeamScore in browser...
+echo 🌍 Opening SportScore in browser...
 start http://localhost:3000
 
-echo ✅ TeamScore is now running!
+echo ✅ SportScore is now running!
 echo 📱 Frontend: http://localhost:3000
 echo 🚀 Backend: http://localhost:8000
 echo 📚 API Docs: http://localhost:8000/docs
 echo.
 echo 💡 Two server windows have been opened:
-echo    - TeamScore Backend (port 8000)
-echo    - TeamScore Frontend (port 3000)
+echo    - SportScore Backend (port 8000)
+echo    - SportScore Frontend (port 3000)
 echo.
 echo ⚠️  Do NOT close the server windows! Close this window instead.
 echo    To stop the servers, press Ctrl+C in each server window.

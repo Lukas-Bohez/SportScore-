@@ -20,7 +20,7 @@ class SportResponse(SportBase):
 # Team Models
 class TeamBase(BaseModel):
     name: str
-    sport_id: int
+    sport_id: Optional[int] = None
 
 class TeamCreate(TeamBase):
     pass

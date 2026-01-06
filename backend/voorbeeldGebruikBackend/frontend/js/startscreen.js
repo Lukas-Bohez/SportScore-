@@ -96,6 +96,22 @@ class StartScreen {
         this.createTeam();
       });
     }
+
+    // Color preview event listener
+    const teamColorInput = document.getElementById('team-color');
+    if (teamColorInput) {
+      teamColorInput.addEventListener('input', this.handleColorChange.bind(this));
+    }
+
+    // Color preview click to open color picker
+    const colorPreview = document.getElementById('color-preview');
+    if (colorPreview) {
+      colorPreview.addEventListener('click', () => {
+        if (teamColorInput) {
+          teamColorInput.click();
+        }
+      });
+    }
   }
 
   async createNewSession() {
@@ -318,11 +334,22 @@ class StartScreen {
   showTeamForm() {
     this.teamFormContainer.classList.remove('hidden');
     this.teamForm.reset();
+    // Initialize color preview
+    this.handleColorChange({ target: { value: '#3B82F6' } });
   }
 
   hideTeamForm() {
     this.teamFormContainer.classList.add('hidden');
     this.teamForm.reset();
+  }
+
+  handleColorChange(e) {
+    const color = e.target.value;
+    const preview = document.getElementById('color-preview');
+    if (preview) {
+      preview.style.backgroundColor = color;
+      preview.textContent = color.toUpperCase();
+    }
   }
 
   async loadTeams() {
@@ -495,7 +522,7 @@ class StartScreen {
       <div class="team-card" data-team-id="${team.id}">
         <div class="team-card-header">
           <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
-          <div class="team-color-badge" style="background-color: ${team.color}"></div>
+          <div class="team-color-badge" style="background-color: ${team.color} !important;"></div>
           <span class="team-name">${team.name}</span>
         </div>
         ${team.description ? `<p class="team-description">${team.description}</p>` : ''}
