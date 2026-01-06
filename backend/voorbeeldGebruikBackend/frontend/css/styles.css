@@ -675,10 +675,26 @@ body {
     flex-basis: 100%;
     margin-top: 15px;
     padding-top: 15px;
-    border-top: 1px solid #d0d0d0;
+    border-top: 1px solid var(--border-color);
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.team-position {
+    color: var(--text-color);
+}
+
+.team-name {
+    color: var(--text-color);
+}
+
+.team-score {
+    color: var(--text-color);
+}
+
+.player-badge-bigscreen {
+    color: var(--text-color);
 }
 
 .team-players-bigscreen.player-mode {
