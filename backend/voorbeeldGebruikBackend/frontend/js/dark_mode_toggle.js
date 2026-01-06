@@ -11,7 +11,7 @@ const config = {
   darkVars: {
     // General dark mode variables for overrides
     '--bg': '#1a1a1a',
-    '--text': '#e0e0e0',
+    '--text': '#ffffff',
     '--border': '#404040',
     '--button-bg': '#333',
     '--button-text': '#fff',
@@ -27,8 +27,8 @@ const config = {
     '--theme-accent': '#ffffff',
     // Common variables
     '--background-color': '#1a1a1a',
-    '--text-color': '#e0e0e0',
-    '--text-secondary': '#b0b0b0',
+    '--text-color': '#ffffff',
+    '--text-secondary': '#cccccc',
     '--border-color': '#404040',
     '--card-bg': '#2c2c2c',
     '--primary-color': '#4dabf7',
@@ -46,7 +46,7 @@ const config = {
     '--button-secondary-text': '#ffffff',
     '--input-bg': '#2a2a2a',
     '--input-border': '#555555',
-    '--input-text': '#e0e0e0',
+    '--input-text': '#ffffff',
     '--link-color': '#4dabf7',
     '--link-hover': '#2196f3',
     '--border-radius': '8px',
