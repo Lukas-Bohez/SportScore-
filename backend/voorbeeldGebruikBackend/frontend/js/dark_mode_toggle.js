@@ -78,7 +78,7 @@ function injectStyles() {
       color: var(--text-color);
     }
     .dark-mode .header {
-      background: var(--theme-background);
+      background: #404040 !important;
     }
     .dark-mode input, .dark-mode select, .dark-mode textarea {
       background: var(--input-bg);
