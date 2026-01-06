@@ -7,16 +7,28 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #ffffff; /* White background */
-    color: #333333; /* Dark grey text */
+    background: var(--background-color); /* White background */
+    color: var(--text-color); /* Dark grey text */
     line-height: 1.6;
     min-height: 100vh;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 15px;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 25px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 30px;
+    }
 }
 
 /* Header */
@@ -24,17 +36,28 @@ body {
     text-align: center;
     margin-bottom: 30px;
     padding: 30px;
-    background: #e0e0e0; /* Light grey background */
+    background: var(--theme-background); /* Light grey background */
     border-radius: 15px;
-    border: 2px solid #cccccc; /* Light grey border */
     position: relative;
 }
 
 .header h1 {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 15px;
-    color: #333333; /* Dark grey text */
+    color: var(--theme-text); /* Dark grey text */
+}
+
+@media (min-width: 768px) {
+    .header h1 {
+        font-size: 2.2rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .header h1 {
+        font-size: 2.5rem;
+    }
 }
 
 .session-info {
@@ -48,7 +71,7 @@ body {
 .session-info span {
     font-size: 1.1rem;
     font-weight: 600;
-    color: #666666; /* Medium grey text */
+    color: var(--text-secondary); /* Medium grey text */
 }
 
 .nav-links {
@@ -61,7 +84,7 @@ body {
 
 .nav-link {
     padding: 8px 15px;
-    background: #b8860b; /* Dark goldenrod */
+    background: var(--gold-color); /* Dark goldenrod */
     color: #ffffff;
     text-decoration: none;
     border-radius: 8px;
@@ -71,29 +94,29 @@ body {
 }
 
 .nav-link:hover {
-    background: #a0780a; /* Darker goldenrod on hover */
+    background: var(--gold-hover); /* Darker goldenrod on hover */
     transform: translateY(-1px);
 }
 
 /* Main Content */
 .main-content {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 30px;
 }
 
 /* Session Details */
 .session-details {
-    background: #e0e0e0; /* Light grey background */
+    background: var(--light-color); /* Light grey background */
     padding: 25px;
     border-radius: 15px;
-    border: 2px solid #cccccc; /* Light grey border */
+    border: 2px solid var(--border-color); /* Light grey border */
 }
 
 .session-details h2 {
     text-align: center;
     margin-bottom: 20px;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
     font-size: 1.5rem;
 }
 
@@ -108,32 +131,32 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 10px 15px;
-    background: #cccccc; /* Light grey background */
+    background: var(--border-color); /* Light grey background */
     border-radius: 8px;
-    border: 1px solid #aaaaaa; /* Medium grey border */
+    border: 1px solid var(--border-color); /* Medium grey border */
 }
 
 .stat-label {
     font-weight: 600;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
 }
 
 .stat-value {
-    color: #666666; /* Medium grey text */
+    color: var(--text-secondary); /* Medium grey text */
 }
 
 /* Leaderboard Section */
 .leaderboard-section {
-    background: #e0e0e0; /* Light grey background */
+    background: var(--light-color); /* Light grey background */
     padding: 25px;
     border-radius: 15px;
-    border: 2px solid #cccccc; /* Light grey border */
+    border: 2px solid var(--border-color); /* Light grey border */
 }
 
 .leaderboard-section h2 {
     text-align: center;
     margin-bottom: 25px;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
     font-size: 1.8rem;
 }
 
@@ -147,9 +170,9 @@ body {
     display: flex;
     align-items: center;
     padding: 20px;
-    background: #ffffff; /* White background */
+    background: var(--card-bg); /* White background */
     border-radius: 12px;
-    border-left: 5px solid #333;
+    border-left: 5px solid var(--text-color);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }
@@ -161,13 +184,13 @@ body {
 
 .leaderboard-item.eliminated {
     opacity: 0.6;
-    background: #f5f5f5; /* Very light grey */
+    background: var(--light-color); /* Very light grey */
 }
 
 .position {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #333333; /* Dark grey instead of gold */
+    color: var(--text-color); /* Dark grey instead of gold */
     min-width: 40px;
     text-align: center;
 }
@@ -187,7 +210,7 @@ body {
 .team-name {
     font-size: 1.3rem;
     font-weight: 600;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
 }
 
 .team-icon {
@@ -197,23 +220,23 @@ body {
 .team-score {
     font-size: 1.2rem;
     font-weight: bold;
-    color: #333333; /* Dark grey instead of gold */
+    color: var(--text-color); /* Dark grey instead of gold */
     text-align: right;
     min-width: 120px;
 }
 
 /* Teams Section */
 .teams-section {
-    background: #e0e0e0; /* Light grey background */
+    background: var(--light-color); /* Light grey background */
     padding: 25px;
     border-radius: 15px;
-    border: 2px solid #cccccc; /* Light grey border */
+    border: 2px solid var(--border-color); /* Light grey border */
 }
 
 .teams-section h2 {
     text-align: center;
     margin-bottom: 25px;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
     font-size: 1.8rem;
 }
 
@@ -225,9 +248,9 @@ body {
 
 .team-card {
     padding: 20px;
-    background: #ffffff; /* White background */
+    background: var(--card-bg); /* White background */
     border-radius: 12px;
-    border: 3px solid #333;
+    border: 3px solid var(--border-color);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }

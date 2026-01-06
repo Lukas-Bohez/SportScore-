@@ -31,9 +31,21 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 15px;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 25px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 30px;
+    }
 }
 
 /* Header */
@@ -155,9 +167,9 @@ h2::after {
 }
 
 .player-badge {
-    background: #e7f3ff;
-    color: #0066cc;
-    border: 1px solid #b3d9ff;
+    background: var(--light-color);
+    color: var(--secondary-color);
+    border: 1px solid var(--border-color);
     padding: 6px 12px;
     border-radius: 16px;
     font-size: 0.85rem;
@@ -167,9 +179,9 @@ h2::after {
 }
 
 .player-badge:hover {
-    background: #0066cc;
+    background: var(--secondary-color);
     color: white;
-    border-color: #0066cc;
+    border-color: var(--secondary-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
 }
@@ -247,7 +259,7 @@ h2::after {
     border-radius: var(--border-radius);
     font-size: 1rem;
     transition: var(--transition);
-    background: #fafafa;
+    background: var(--input-bg);
 }
 
 .form-group select:focus,
@@ -255,7 +267,7 @@ h2::after {
     outline: none;
     border-color: var(--secondary-color);
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
-    background: white;
+    background: var(--card-bg);
 }
 
 .btn-submit {
@@ -716,11 +728,15 @@ h2::after {
 }
 
 .animation-content {
-    background: white;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
     padding: 40px;
-    border-radius: var(--border-radius);
+    border-radius: 20px;
     text-align: center;
     animation: scorePop 0.5s ease-out;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
 }
 
 .team-icon {
@@ -732,11 +748,14 @@ h2::after {
     font-size: 2.5rem;
     font-weight: bold;
     margin-bottom: 10px;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .team-name {
     font-size: 1.5rem;
-    color: var(--primary-color);
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes scorePop {

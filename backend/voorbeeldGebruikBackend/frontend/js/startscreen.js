@@ -371,20 +371,16 @@ class StartScreen {
       // Sort players alphabetically by name
       players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (players.length === 0) {
-        this.pmPlayersList.innerHTML = '<p style="color:#666">Nog geen spelers.</p>';
+        this.pmPlayersList.innerHTML = '<p class="info-message">Nog geen spelers.</p>';
         return;
       }
       this.pmPlayersList.innerHTML = '';
       players.forEach((p) => {
         const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.justifyContent = 'space-between';
-        row.style.alignItems = 'center';
-        row.style.padding = '6px 0';
-        row.innerHTML = `<div><strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}</div>`;
+        row.className = 'player-item';
+        row.innerHTML = `<div class="player-item-name">${this.escapeHtml(p.name)} ${p.position ? '<span class="player-item-position">(' + this.escapeHtml(p.position) + ')</span>' : ''}</div>`;
         const actions = document.createElement('div');
-        actions.style.display = 'flex';
-        actions.style.gap = '6px';
+        actions.className = 'player-item-actions';
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-team-btn';
         deleteBtn.textContent = 'Verwijderen';
@@ -404,7 +400,7 @@ class StartScreen {
       });
     } catch (err) {
       api.handleError(err, 'loading players for manager');
-      this.pmPlayersList.innerHTML = '<p style="color:#666">Kan spelers niet laden.</p>';
+      this.pmPlayersList.innerHTML = '<p class="info-message">Kan spelers niet laden.</p>';
     }
   }
 
@@ -478,7 +474,7 @@ class StartScreen {
 
   displayTeams(teams) {
     if (teams.length === 0) {
-      this.teamsList.innerHTML = '<p style="color: #666; text-align: center;">Nog geen teams aangemaakt.</p>';
+      this.teamsList.innerHTML = '<p class="info-message" style="text-align: center;">Nog geen teams aangemaakt.</p>';
       return;
     }
 
@@ -511,8 +507,8 @@ class StartScreen {
         </div>
         <div class="players-section" id="players-for-${team.id}">
           <div class="players-list" id="players-list-${team.id}">Laden spelers…</div>
-          <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
-            <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
+          <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none;">
+            <div class="unassigned-dropdown-header">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
             <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
           </div>
         </div>
@@ -539,7 +535,7 @@ class StartScreen {
       // Sort assigned players alphabetically by name
       assigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!assigned || assigned.length === 0) {
-        listEl.innerHTML = '<p style="color:#666">Nog geen spelers toegewezen.</p>';
+        listEl.innerHTML = '<p class="info-message">Nog geen spelers toegewezen.</p>';
         return;
       }
       listEl.innerHTML = '';
@@ -569,7 +565,7 @@ class StartScreen {
       });
     } catch (err) {
       api.handleError(err, 'loading assigned players');
-      listEl.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
+      listEl.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
     }
   }
 
@@ -594,17 +590,15 @@ class StartScreen {
       // Sort unassigned players alphabetically by name
       unassigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!unassigned || unassigned.length === 0) {
-        container.innerHTML = '<p style="color:#666">Geen beschikbare spelers om toe te wijzen.</p>';
+        container.innerHTML = '<p class="info-message">Geen beschikbare spelers om toe te wijzen.</p>';
         return;
       }
       container.innerHTML = '';
       unassigned.forEach((p) => {
         const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.justifyContent = 'space-between';
-        row.style.alignItems = 'center';
-        row.style.marginBottom = '6px';
+        row.className = 'unassigned-player-item';
         const left = document.createElement('div');
+        left.className = 'unassigned-player-name';
         left.textContent = this.escapeHtml(p.name);
         const btn = document.createElement('button');
         btn.className = 'save-team-btn compact';
@@ -618,7 +612,7 @@ class StartScreen {
       });
     } catch (err) {
       api.handleError(err, 'loading unassigned players');
-      container.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
+      container.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
     }
   }
 

@@ -23,15 +23,15 @@
                     <h2>Teams Beheren</h2>
 
                     <!-- Bestaande teams selecteren -->
-                    <div class="existing-teams-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <h3 style="margin-top: 0;">Bestaand Team Toevoegen</h3>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <select id="existing-team-select" title="Selecteer een bestaand team" aria-label="Bestaand team selecteren" style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1em;">
+                    <div class="existing-teams-section">
+                        <h3>Bestaand Team Toevoegen</h3>
+                        <div class="flex-row">
+                            <select id="existing-team-select" title="Selecteer een bestaand team" aria-label="Bestaand team selecteren">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
-                            <button id="add-existing-team-btn" class="save-team-btn" style="white-space: nowrap;">Team Toevoegen</button>
+                            <button id="add-existing-team-btn" class="save-team-btn">Team Toevoegen</button>
                         </div>
-                        <p style="font-size: 0.85em; color: #666; margin-top: 8px; margin-bottom: 0;">
+                        <p>
                             💡 Teams kunnen hergebruikt worden in meerdere sessies
                         </p>
                     </div>
@@ -191,6 +191,7 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/dark_mode_toggle.js"></script>
     <script src="js/teamsetup.js"></script>
 </body>
 </html>

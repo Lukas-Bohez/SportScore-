@@ -7,16 +7,28 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #ffffff; /* 60% white background */
-    color: #333333; /* Dark grey text */
+    background: var(--background-color);
+    color: var(--text-color);
     line-height: 1.6;
     min-height: 100vh;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 15px;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 25px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 30px;
+    }
 }
 
 /* Header */
@@ -24,16 +36,27 @@ body {
     text-align: center;
     margin-bottom: 40px;
     padding: 30px;
-    background: #e0e0e0; /* 30% grey background */
+    background: var(--theme-background);
     border-radius: 15px;
-    border: 2px solid #cccccc; /* Light grey border */
 }
 
 .header h1 {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 15px;
-    color: #333333; /* Dark grey text */
+    color: var(--theme-text);
+}
+
+@media (min-width: 768px) {
+    .header h1 {
+        font-size: 2.2rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .header h1 {
+        font-size: 2.5rem;
+    }
 }
 
 .session-info {
@@ -41,14 +64,39 @@ body {
     justify-content: center;
     gap: 30px;
     font-size: 1.1rem;
-    color: #666666; /* Medium grey text */
+    color: #666666;
 }
 
 /* Main Content */
 .main-content {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+@media (min-width: 768px) {
+    .main-content {
+        gap: 25px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .main-content {
+        flex-direction: row;
+        gap: 30px;
+        align-items: flex-start;
+    }
+    
+    .team-setup-section {
+        flex: 2;
+        min-width: 0;
+    }
+    
+    .leaderboard-preview {
+        flex: 1;
+        min-width: 300px;
+        max-width: 400px;
+    }
 }
 
 .left-column {
@@ -191,8 +239,8 @@ body {
 }
 
 .team-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e9ecef;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 18px;
     text-align: left;
@@ -216,7 +264,7 @@ body {
 .team-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-color: #007bff;
+    border-color: var(--primary-color);
 }
 
 .team-icon {
@@ -793,4 +841,51 @@ body {
 
 .session-summary h3 {
     margin-bottom: 10px;
+}
+
+.existing-teams-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #ffffff;
+    border-radius: 8px;
+    border: 2px solid #e3f2fd;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.existing-teams-section h3 {
+    margin-top: 0;
+    color: #333333;
+}
+
+.existing-teams-section .flex-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.existing-teams-section select {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #e3f2fd;
+    border-radius: 6px;
+    font-size: 1em;
+    background: #ffffff;
+    color: #333333;
+}
+
+.existing-teams-section button {
+    background: #2196f3;
+    color: #ffffff;
+    white-space: nowrap;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.existing-teams-section p {
+    font-size: 0.85em;
+    color: #666666;
+    margin-top: 8px;
+    margin-bottom: 0;
 }
