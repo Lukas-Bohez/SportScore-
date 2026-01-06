@@ -682,6 +682,10 @@ body {
     flex-wrap: wrap;
 }
 
+.dark-mode .team-players-bigscreen {
+    border-top-color: white;
+}
+
 .team-position {
     color: var(--text-color);
 }

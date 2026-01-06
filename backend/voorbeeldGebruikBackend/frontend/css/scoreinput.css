@@ -217,7 +217,7 @@ h2::after {
 .team-name {
     font-size: 1.3rem;
     font-weight: 600;
-    color: var(--primary-color);
+    color: var(--text-color);
 }
 
 .team-score {
@@ -752,7 +752,7 @@ h2::after {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.team-name {
+.animation-content .team-name {
     font-size: 1.5rem;
     color: #ffffff;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
