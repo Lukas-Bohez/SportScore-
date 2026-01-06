@@ -353,20 +353,21 @@ body {
     gap: 15px;
     align-items: center;
     padding: 12px 15px;
-    background: #ffffff; /* White background */
+    background: var(--card-bg); /* White background */
     border-radius: 8px;
-    border: 1px solid #cccccc; /* Light grey border */
+    border: 1px solid var(--border-color); /* Light grey border */
     font-size: 0.9rem;
+    color: var(--text-color);
 }
 
 .score-time {
-    color: #666666; /* Medium grey text */
+    color: var(--text-secondary); /* Medium grey text */
     font-size: 0.8rem;
 }
 
 .score-team {
     font-weight: 600;
-    color: #333333; /* Dark grey text */
+    color: var(--text-color); /* Dark grey text */
 }
 
 .score-points {
@@ -378,17 +379,17 @@ body {
 }
 
 .score-points.positive {
-    background: #d4edda; /* Light green */
-    color: #155724; /* Dark green */
+    background: var(--success-color); /* Light green */
+    color: #ffffff; /* White text for contrast */
 }
 
 .score-points.negative {
-    background: #f8d7da; /* Light red */
-    color: #721c24; /* Dark red */
+    background: var(--danger-color); /* Light red */
+    color: #ffffff; /* White text for contrast */
 }
 
 .score-reason {
-    color: #666666; /* Medium grey text */
+    color: var(--text-secondary); /* Medium grey text */
     font-style: italic;
 }
 
@@ -396,7 +397,7 @@ body {
 .no-data {
     text-align: center;
     padding: 40px;
-    color: #666666; /* Medium grey text */
+    color: var(--text-secondary); /* Medium grey text */
     font-style: italic;
     background: #f9f9f9; /* Very light grey */
     border-radius: 8px;

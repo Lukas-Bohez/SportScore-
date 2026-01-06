@@ -621,15 +621,16 @@ body {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    background: #ffffff;
-    border: 2px solid #e3f2fd;
-    border-left: 8px solid #2196f3;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-left: 8px solid var(--primary-color);
     border-radius: 15px;
     padding: 20px 25px;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px var(--shadow-color);
     min-height: 80px;
     position: relative;
+    color: var(--text-color);
 }
     animation: fadeInUp 0.6s ease-out forwards;
     opacity: 0;
@@ -645,13 +646,13 @@ body {
 
 .leaderboard-team:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.2);
-    background: #f8f9ff;
+    box-shadow: 0 4px 16px var(--shadow-color);
+    background: var(--light-color);
 }
 
 .leaderboard-team.eliminated {
     opacity: 0.6;
-    background: #f0f0f0;
+    background: var(--light-color);
 }
 
 .leaderboard-team.eliminated::after {
