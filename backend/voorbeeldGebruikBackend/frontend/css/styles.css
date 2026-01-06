@@ -447,6 +447,7 @@ body {
         flex-direction: column;
         align-items: center;
         text-align: center;
+        color: var(--text-color);
     }
 
     .team-position {
@@ -517,6 +518,7 @@ body {
         flex-direction: column;
         align-items: center;
         text-align: center;
+        color: var(--text-color);
     }
 
     .team-position {
@@ -588,6 +590,7 @@ body {
     flex-direction: row;
     text-align: left;
     align-items: center;
+    color: var(--text-color);
 }
 
 .leaderboard-container.two-teams .team-position {
