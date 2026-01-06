@@ -484,3 +484,15 @@ body {
         padding: 2px 0;
     }
 }
+
+/* Last Update Styling */
+.last-update {
+    background: var(--card-bg);
+    color: var(--text-color);
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    text-align: center;
+    margin: 10px 0;
+}
