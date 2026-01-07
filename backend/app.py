@@ -14,12 +14,12 @@ import logging
 CET = pytz.timezone('Europe/Brussels')
 
 
-# Import repositories
+# Import the new repository
 from database.datarepository import (
     SportRepository, TeamRepository, PlayerRepository,
     ScoreTypeRepository, GameRepository, ScoreRepository,
     SessionRepository, SessionTeamRepository, SessionScoreRepository,
-    SessionPlayerRepository
+    SessionPlayerRepository, SessionTemplateRepository
 )
 
 # Import models
@@ -281,6 +281,20 @@ async def assign_player(session_id: int, assignment: SessionPlayerCreate):
 
     assign_id = SessionPlayerRepository.assign_player_to_session(session_id, assignment.team_id, assignment.player_id)
     created = SessionPlayerRepository.get_player_assignment(session_id, assignment.player_id)
+
+    # Emit real-time update for team (since players changed)
+    updated_team = SessionTeamRepository.get_team_in_session(assignment.team_id, session_id)
+    total_score = SessionScoreRepository.get_team_total_score(session_id, assignment.team_id)
+    await sio.emit('team_update', _jsonable({
+        'session_id': session_id,
+        'team_id': assignment.team_id,
+        'team': {
+            **updated_team,
+            'total_score': total_score  # Add calculated total score
+        },
+        'timestamp': datetime.now(CET).isoformat()
+    }))
+
     return SessionPlayerResponse(**created)
 
 
@@ -999,6 +1013,61 @@ async def remove_team_from_session(session_id: int, team_id: int):
 # ----------------------------------------------------
 # Main
 # ----------------------------------------------------
+
+# Session Templates Endpoints
+@app.get(f"{ENDPOINT}/session-templates", tags=["Session Templates"], summary="List all session templates")
+async def get_session_templates():
+    templates = SessionTemplateRepository.get_all_templates()
+    return {"templates": templates}
+
+@app.post(f"{ENDPOINT}/session-templates", tags=["Session Templates"], summary="Create a new session template")
+async def create_session_template(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    name = payload.get('name')
+    template_data = payload.get('template_data')
+    
+    if not name or not template_data:
+        raise HTTPException(status_code=422, detail="Name and template_data are required")
+    
+    template_id = SessionTemplateRepository.create_template(name, template_data)
+    if not template_id:
+        raise HTTPException(status_code=400, detail="Failed to create template")
+    
+    return {"template_id": template_id}
+
+@app.get(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Get a session template by ID")
+async def get_session_template(template_id: int):
+    template = SessionTemplateRepository.get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return template
+
+@app.put(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Update a session template")
+async def update_session_template(template_id: int, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    name = payload.get('name')
+    template_data = payload.get('template_data')
+    
+    success = SessionTemplateRepository.update_template(template_id, name, template_data)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update template")
+    
+    return {"message": "Template updated"}
+
+@app.delete(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Delete a session template")
+async def delete_session_template(template_id: int):
+    success = SessionTemplateRepository.delete_template(template_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete template")
+    return {"message": "Template deleted"}
 
 # Health check endpoint (useful for uptime and debugging CORS/network issues)
 @app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")

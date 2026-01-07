@@ -12,7 +12,7 @@ class ScoreInput {
 
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
       return;
     }
 
@@ -165,7 +165,7 @@ class ScoreInput {
     } catch (error) {
       api.handleError(error, 'loading session');
       alert('Fout bij het laden van de sessie.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     }
   }
 
@@ -926,7 +926,7 @@ class ScoreInput {
     try {
       await api.put(`/api/v1/sessions/${this.sessionId}`, { status: 'completed' });
       alert('Sessie beëindigd!');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     } catch (error) {
       api.handleError(error, 'ending session');
     }

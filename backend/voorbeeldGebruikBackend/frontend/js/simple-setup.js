@@ -9,8 +9,56 @@ class SimpleSetup {
     this.apiTeams = []; // Teams from API
     this.assignedMap = new Map(); // Track player assignments
     this.editingTeamIndex = null;
-    this.api = new ScoreboardAPI();
+    this.playersLoaded = false;
+    this.api = window.api || new ScoreboardAPI();
+    this.loadTemplateData();
     this.init();
+    window.simpleSetup = this;
+  }
+
+  loadTemplateData() {
+    const templateData = sessionStorage.getItem('templateData');
+    if (templateData) {
+      try {
+        this.sessionData = JSON.parse(templateData);
+        sessionStorage.removeItem('templateData'); // Clear after loading
+      } catch (error) {
+        console.error('Error parsing template data:', error);
+      }
+    }
+  }
+
+  populateFormFromTemplate() {
+    if (this.sessionData.name) {
+      this.sessionNameInput.value = this.sessionData.name;
+    }
+    if (this.sessionData.sport_type) {
+      this.sportTypeSelect.value = this.sessionData.sport_type;
+    }
+    if (this.sessionData.scoring_mode) {
+      this.scoringModeSelect.value = this.sessionData.scoring_mode;
+    }
+    if (this.sessionData.game_type) {
+      this.gameTypeSelect.value = this.sessionData.game_type;
+    }
+    if (this.sessionData.max_teams) {
+      this.maxTeamsInput.value = this.sessionData.max_teams;
+    }
+    if (this.sessionData.total_rounds) {
+      this.totalRoundsInput.value = this.sessionData.total_rounds;
+    }
+    if (this.sessionData.time_limit) {
+      this.timeLimitInput.value = this.sessionData.time_limit;
+    }
+    // Load teams and players if available
+    if (this.sessionData.teams) {
+      this.teams = this.sessionData.teams;
+      this.updateTeamsList();
+    }
+    if (this.sessionData.players) {
+      this.players = this.sessionData.players;
+      this.updatePlayersList();
+    }
   }
 
   init() {
@@ -18,15 +66,17 @@ class SimpleSetup {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
         this.bindElements();
+        this.populateFormFromTemplate();
         this.setupEventListeners();
         this.loadTeamsFromAPI();
-        this.loadAllPlayers(); // Load players for team_with_players mode
+        this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
       });
     } else {
       this.bindElements();
+      this.populateFormFromTemplate();
       this.setupEventListeners();
       this.loadTeamsFromAPI();
-      this.loadAllPlayers(); // Load players for team_with_players mode
+      this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
     }
   }
 
@@ -41,6 +91,7 @@ class SimpleSetup {
     this.sessionNameInput = document.getElementById('session-name');
     this.sportTypeSelect = document.getElementById('sport-type');
     this.scoringModeSelect = document.getElementById('scoring-mode');
+    this.gameTypeSelect = document.getElementById('game-type');
     this.maxTeamsInput = document.getElementById('max-teams');
     this.totalRoundsInput = document.getElementById('total-rounds');
     this.timeLimitInput = document.getElementById('time-limit');
@@ -64,14 +115,18 @@ class SimpleSetup {
     // Player management elements
     this.teamForPlayerSelect = document.getElementById('team-for-player');
     this.playerNameInput = document.getElementById('player-name');
+    this.playerSearchInput = document.getElementById('player-search');
     this.addPlayerBtn = document.getElementById('add-player');
     this.playersList = document.getElementById('players-list');
     this.playersSection = document.getElementById('players-section');
+    this.teamsSectionStep3 = document.getElementById('teams-section-step3');
+    this.teamsListStep3 = document.getElementById('teams-list-step3');
 
     // Review elements
     this.reviewSessionName = document.getElementById('review-session-name');
     this.reviewSportType = document.getElementById('review-sport-type');
     this.reviewScoringMode = document.getElementById('review-scoring-mode');
+    this.reviewGameType = document.getElementById('review-game-type');
     this.reviewTeams = document.getElementById('review-teams');
     this.reviewPlayers = document.getElementById('review-players');
 
@@ -83,6 +138,7 @@ class SimpleSetup {
       this.prevBtns[i] = document.getElementById(`prev-${i}`);
     }
     this.startScoringBtn = document.getElementById('start-scoring');
+    this.saveTemplateBtn = document.getElementById('save-template');
   }
 
   setupEventListeners() {
@@ -100,6 +156,9 @@ class SimpleSetup {
     }
     if (this.startScoringBtn) {
       this.startScoringBtn.addEventListener('click', this.handleStartClick.bind(this));
+    }
+    if (this.saveTemplateBtn) {
+      this.saveTemplateBtn.addEventListener('click', this.handleSaveTemplateClick.bind(this));
     }
 
     // Team management
@@ -136,9 +195,19 @@ class SimpleSetup {
       this.addPlayerBtn.addEventListener('click', this.handleAddPlayer.bind(this));
     }
 
+    // Player search
+    if (this.playerSearchInput) {
+      this.playerSearchInput.addEventListener('input', this.handlePlayerSearch.bind(this));
+    }
+
     // Scoring mode change
     if (this.scoringModeSelect) {
       this.scoringModeSelect.addEventListener('change', this.handleScoringModeChange.bind(this));
+    }
+
+    // Game type change
+    if (this.gameTypeSelect) {
+      this.gameTypeSelect.addEventListener('change', this.handleGameTypeChange.bind(this));
     }
   }
 
@@ -155,6 +224,11 @@ class SimpleSetup {
   handleStartClick(e) {
     e.preventDefault();
     this.createSession();
+  }
+
+  handleSaveTemplateClick(e) {
+    e.preventDefault();
+    this.saveAsTemplate();
   }
 
   handleAddTeamClick(e) {
@@ -182,6 +256,11 @@ class SimpleSetup {
     this.addPlayer();
   }
 
+  handlePlayerSearch(e) {
+    const searchTerm = e.target.value;
+    this.updatePlayersList(searchTerm);
+  }
+
   handleAddExistingTeam(e) {
     e.preventDefault();
     this.addExistingTeam();
@@ -201,15 +280,21 @@ class SimpleSetup {
     this.sessionData.scoring_mode = e.target.value;
   }
 
+  handleGameTypeChange(e) {
+    const gameType = e.target.value;
+    const timeLimitGroup = this.timeLimitInput.closest('.form-group');
+    if (gameType === 'team_vs_time') {
+      timeLimitGroup.style.display = 'block';
+    } else {
+      timeLimitGroup.style.display = 'none';
+      this.timeLimitInput.value = '';
+    }
+  }
+
   nextStep() {
     if (this.validateCurrentStep()) {
       this.saveCurrentStepData();
       this.currentStep++;
-
-      // Skip step 3 (players) if scoring mode is "team"
-      if (this.currentStep === 3 && this.scoringModeSelect.value === 'team') {
-        this.currentStep = 4;
-      }
 
       this.showStep();
     }
@@ -217,11 +302,6 @@ class SimpleSetup {
 
   prevStep() {
     this.currentStep--;
-
-    // Skip step 3 (players) if scoring mode is "team"
-    if (this.currentStep === 3 && this.scoringModeSelect.value === 'team') {
-      this.currentStep = 2;
-    }
 
     this.showStep();
   }
@@ -233,9 +313,27 @@ class SimpleSetup {
       this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
     }
     if (this.currentStep === 3) {
-      // Only update player section if scoring mode requires players
-      if (this.scoringModeSelect.value !== 'team') {
+      if (this.scoringModeSelect.value === 'team_with_players') {
+        this.teamsSectionStep3.style.display = 'block';
+        this.playersSection.style.display = 'block';
+        this.updateTeamsListStep3();
         this.updatePlayerSection();
+        // Load players if not loaded yet
+        if (!this.playersLoaded) {
+          this.loadAllPlayers();
+        } else {
+          this.updatePlayersList();
+        }
+      } else {
+        this.teamsSectionStep3.style.display = 'none';
+        this.playersSection.style.display = 'block';
+        this.updatePlayerSection();
+        // Load players if not loaded yet
+        if (!this.playersLoaded) {
+          this.loadAllPlayers();
+        } else {
+          this.updatePlayersList();
+        }
       }
     }
     if (this.currentStep === 4) {
@@ -287,12 +385,18 @@ class SimpleSetup {
           // Skip validation for team-only mode
           break;
         }
-        if (this.scoringModeSelect.value === 'player' && this.players.length === 0) {
-          errorMessage = 'Voeg minstens één speler toe voor individuele scores.';
-          isValid = false;
-        } else if (this.scoringModeSelect.value === 'team_with_players' && this.players.length === 0) {
-          errorMessage = 'Voeg minstens één speler toe voor team scores met spelers.';
-          isValid = false;
+        if (this.scoringModeSelect.value === 'player') {
+          // For player mode, players are individual, no team assignment required
+          break;
+        } else if (this.scoringModeSelect.value === 'team_with_players') {
+          // Check that all session teams have at least one player assigned via API
+          const teamsWithoutPlayers = this.teams.filter(team => {
+            return !this.allPlayers.some(player => player.team_id == team.id);
+          });
+          if (teamsWithoutPlayers.length > 0) {
+            errorMessage = 'Voeg minstens één speler toe aan elk team.';
+            isValid = false;
+          }
         }
         break;
       default:
@@ -316,6 +420,7 @@ class SimpleSetup {
         this.sessionData.name = this.sessionNameInput.value.trim();
         this.sessionData.sportType = this.sportTypeSelect.value;
         this.sessionData.scoringMode = this.scoringModeSelect.value;
+        this.sessionData.gameType = this.gameTypeSelect.value;
         break;
     }
   }
@@ -415,6 +520,8 @@ class SimpleSetup {
       return;
     }
 
+    const showPlayers = this.currentStep === 3 && this.sessionData.scoringMode !== 'team';
+
     this.teamsList.innerHTML = this.teams
       .map((team, index) => {
         const teamColor = (team.color || '').trim() || '#3B82F6';
@@ -439,13 +546,16 @@ class SimpleSetup {
             Bewerken
           </button>
           ${
-            this.sessionData.scoringMode === 'team_with_players'
+            showPlayers && this.sessionData.scoringMode === 'team_with_players'
               ? `
           <button class="save-team-btn compact" title="Speler toewijzen aan dit team" onclick="simpleSetup.toggleUnassignedPlayers(${index})">+ Speler</button>
           `
               : ''
           }
         </div>
+        ${
+          showPlayers
+            ? `
         <div class="players-section" id="players-for-${index + 1}">
           <div class="players-list" id="players-list-${index + 1}">
             ${this.getTeamPlayersHtml(index)}
@@ -461,10 +571,317 @@ class SimpleSetup {
               : ''
           }
         </div>
+        `
+            : ''
+        }
       </div>
     `;
       })
       .join('');
+  }
+
+  updateTeamsListStep3() {
+    const teams = this.teams;
+    if (teams.length === 0) {
+      this.teamsListStep3.innerHTML = '<p class="info-message" style="text-align: center;">Nog geen teams aangemaakt.</p>';
+      return;
+    }
+
+    const iconMap = {
+      team: '👥',
+      star: '⭐',
+      trophy: '🏆',
+      fire: '🔥',
+      rocket: '🚀',
+      crown: '👑',
+      lightning: '⚡',
+      heart: '❤️',
+    };
+
+    const teamsHtml = teams
+      .map(
+        (team) => `
+    <div class="team-card" data-team-id="${team.id}">
+      <div class="team-card-header">
+        <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
+        <div class="team-color-badge" style="background-color: ${team.color} !important;"></div>
+        <span class="team-name">${team.name}</span>
+      </div>
+      ${team.description ? `<p class="team-description">${team.description}</p>` : ''}
+      <div class="team-actions">
+        <button class="delete-team-btn" onclick="simpleSetup.deleteTeam(${team.id}, '${team.name}')">
+          🗑️ Verwijderen
+        </button>
+        <button class="save-team-btn compact" onclick="simpleSetup.toggleUnassignedPlayers(${team.id})">Speler toewijzen</button>
+      </div>
+      <div class="players-section" id="players-for-${team.id}">
+        <div class="players-list" id="players-list-${team.id}">Laden spelers…</div>
+        <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none;">
+          <div class="unassigned-dropdown-header">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
+          <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
+        </div>
+      </div>
+    </div>
+  `
+      )
+      .join('');
+
+    this.teamsListStep3.innerHTML = teamsHtml;
+    // Load assigned players for each team and prepare unassigned lists
+    teams.forEach((t) => {
+      this.loadAssignedPlayersForTeam(t.id);
+    });
+  }
+
+  async loadAssignedPlayersForTeam(teamId) {
+    const listEl = document.getElementById(`players-list-${teamId}`);
+    if (!listEl) return;
+    try {
+      listEl.innerHTML = '<p style="color:#666">Laden…</p>';
+      const resp = await this.api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players : [];
+      const assigned = players.filter((p) => p.team_id && String(p.team_id) === String(teamId));
+      // Sort assigned players alphabetically by name
+      assigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!assigned || assigned.length === 0) {
+        listEl.innerHTML = '<p class="info-message">Nog geen spelers toegewezen.</p>';
+        return;
+      }
+      listEl.innerHTML = '';
+      assigned.forEach((p) => {
+        const row = document.createElement('div');
+        row.className = 'player-row';
+        row.innerHTML = `<div class="player-left"><strong>${this.escapeHtml(p.name)}</strong></div>`;
+        const actions = document.createElement('div');
+        actions.className = 'player-actions';
+        const unassignBtn = document.createElement('button');
+        unassignBtn.className = 'delete-team-btn';
+        unassignBtn.textContent = 'Verwijderen';
+        unassignBtn.onclick = async () => {
+          if (!confirm('Weet je zeker dat je deze speler van het team wilt halen?')) return;
+          try {
+            await this.api.put(`/api/v1/players/${p.id}`, { team_id: null });
+            await this.loadAssignedPlayersForTeam(teamId);
+            await this.loadAllPlayers(); // Refresh the players list
+          } catch (err) {
+            this.api.handleError(err, 'unassigning player');
+            alert('Fout bij het verwijderen van speler uit team.');
+          }
+        };
+        actions.appendChild(unassignBtn);
+        row.appendChild(actions);
+        listEl.appendChild(row);
+      });
+    } catch (err) {
+      this.api.handleError(err, 'loading assigned players');
+      listEl.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
+    }
+  }
+
+  toggleUnassignedPlayers(teamId) {
+    const el = document.getElementById(`unassigned-players-${teamId}`);
+    if (!el) return;
+    if (el.style.display === 'none' || el.style.display === '') {
+      el.style.display = 'block';
+      this.loadUnassignedForTeam(teamId);
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  async loadUnassignedForTeam(teamId) {
+    const container = document.getElementById(`unassigned-list-${teamId}`);
+    if (!container) return;
+    try {
+      const resp = await this.api.get('/api/v1/players');
+      const players = resp && resp.players ? resp.players : [];
+      const unassigned = players.filter((p) => !p.team_id || String(p.team_id) !== String(teamId));
+      // Sort unassigned players alphabetically by name
+      unassigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!unassigned || unassigned.length === 0) {
+        container.innerHTML = '<p class="info-message">Geen beschikbare spelers om toe te wijzen.</p>';
+        return;
+      }
+      container.innerHTML = '';
+      unassigned.forEach((p) => {
+        const row = document.createElement('div');
+        row.className = 'unassigned-player-item';
+        const left = document.createElement('div');
+        left.className = 'unassigned-player-name';
+        left.textContent = this.escapeHtml(p.name);
+        const btn = document.createElement('button');
+        btn.className = 'save-team-btn compact';
+        btn.textContent = 'Toewijzen';
+        btn.onclick = async () => {
+          await this.assignPlayerToTeam(teamId, p.id);
+        };
+        row.appendChild(left);
+        row.appendChild(btn);
+        container.appendChild(row);
+      });
+    } catch (err) {
+      this.api.handleError(err, 'loading unassigned players');
+      container.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
+    }
+  }
+
+  async assignPlayerToTeam(teamId, playerId) {
+    try {
+      await this.api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) });
+      // refresh lists
+      await this.loadAssignedPlayersForTeam(teamId);
+      await this.loadAllPlayers(); // Refresh the players list
+      const ul = document.getElementById(`unassigned-players-${teamId}`);
+      if (ul) ul.style.display = 'none';
+    } catch (err) {
+      this.api.handleError(err, 'assigning player to team');
+      alert('Fout bij het toewijzen van speler aan team.');
+    }
+  }
+
+  async deleteTeam(teamId, teamName) {
+    if (!confirm(`Weet je zeker dat je team "${teamName}" wilt verwijderen? Dit verwijdert het team uit alle sessies.`)) {
+      return;
+    }
+
+    try {
+      await this.api.deleteStandaloneTeam(teamId);
+      this.teams = this.teams.filter(t => t.id !== teamId);
+      this.updateTeamsListStep3();
+      alert(`Team "${teamName}" succesvol verwijderd!`);
+    } catch (error) {
+      this.api.handleError(error, 'deleting team');
+      alert('Fout bij het verwijderen van het team. Probeer opnieuw.');
+    }
+  }
+
+  async loadAllPlayers() {
+    try {
+      const resp = await this.api.get('/api/v1/players');
+      if (Array.isArray(resp)) {
+        this.allPlayers = resp;
+      } else {
+        this.allPlayers = resp.players || [];
+      }
+      this.playersLoaded = true;
+      this.assignedMap.clear();
+      this.players.forEach((p) => {
+        if (p.id) this.assignedMap.set(p.id, true);
+      });
+      if (this.currentStep === 3) {
+        this.updatePlayersList();
+      }
+    } catch (error) {
+      console.error('Error loading players:', error);
+      this.api.handleError(error, 'loading players');
+      alert('Fout bij het laden van spelers: ' + error.message);
+    }
+  }
+
+  updatePlayersList(searchTerm = '') {
+    if (!this.allPlayers || this.allPlayers.length === 0) {
+      this.playersList.innerHTML = '<p class="info-message">Geen spelers gevonden.</p>';
+      return;
+    }
+
+    // Categorize players
+    const sessionPlayers = [];
+    const unassignedPlayers = [];
+    const otherTeamsPlayers = [];
+
+    this.allPlayers.forEach(player => {
+      if (player.team_id) {
+        otherTeamsPlayers.push(player);
+      } else {
+        unassignedPlayers.push(player);
+      }
+    });
+
+    // Filter by search term
+    const filterPlayers = (players) => {
+      if (!searchTerm) return players;
+      return players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    };
+
+    const filteredUnassigned = filterPlayers(unassignedPlayers);
+    const filteredOtherTeams = filterPlayers(otherTeamsPlayers);
+
+    let html = '';
+
+    // Unassigned players section
+    if (filteredUnassigned.length > 0) {
+      html += '<h4>Niet toegewezen spelers</h4>';
+      html += '<div class="player-section">';
+      filteredUnassigned.forEach(player => {
+        html += `
+          <div class="player-item">
+            <span>${this.escapeHtml(player.name)}</span>
+            <div class="player-assign-buttons">
+              <select class="team-select" onchange="simpleSetup.assignPlayerToTeamFromList(${player.id}, this.value)">
+                <option value="">-- Selecteer team --</option>
+                ${this.teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+
+    // Players in other teams section
+    if (filteredOtherTeams.length > 0) {
+      html += '<h4>Spelers in teams</h4>';
+      const groupedByTeam = {};
+      filteredOtherTeams.forEach(player => {
+        const teamId = player.team_id;
+        if (!groupedByTeam[teamId]) groupedByTeam[teamId] = [];
+        groupedByTeam[teamId].push(player);
+      });
+
+      const sessionTeamIds = new Set(this.teams.map(t => String(t.id)));
+      const sessionTeams = [];
+      const nonSessionTeams = [];
+      Object.keys(groupedByTeam).forEach(teamId => {
+        if (sessionTeamIds.has(teamId)) {
+          sessionTeams.push(teamId);
+        } else {
+          nonSessionTeams.push(teamId);
+        }
+      });
+
+      // Process session teams first
+      [...sessionTeams, ...nonSessionTeams].forEach(teamId => {
+        const team = this.apiTeams.find(t => String(t.id) === String(teamId)) || this.teams.find(t => String(t.id) === String(teamId));
+        const teamName = team ? team.name : `Team ${teamId}`;
+        html += `<h5><span style="color: ${team.color};">●</span> ${this.escapeHtml(teamName)}</h5>`;
+        html += '<div class="player-section">';
+        groupedByTeam[teamId].forEach(player => {
+          html += `
+            <div class="player-item">
+              <span>${this.escapeHtml(player.name)}</span>
+              <button class="delete-team-btn compact" style="max-width: 120px;" onclick="simpleSetup.assignPlayerToTeamFromList(${player.id}, null)">Verwijder uit team</button>
+            </div>
+          `;
+        });
+        html += '</div>';
+      });
+    }
+
+    if (html === '') {
+      html = '<p class="info-message">Geen spelers gevonden voor de zoekterm.</p>';
+    }
+
+    this.playersList.innerHTML = html;
+  }
+
+  async assignPlayerToTeamFromList(playerId, teamId) {
+    try {
+      await this.api.put(`/api/v1/players/${playerId}`, { team_id: teamId });
+      await this.loadAllPlayers(); // Refresh all players
+    } catch (error) {
+      console.error('Error assigning player:', error);
+      alert('Fout bij het toewijzen van speler.');
+    }
   }
 
   getTeamPlayersHtml(teamIndex) {
@@ -478,7 +895,7 @@ class SimpleSetup {
       <div class="player-row">
         <div class="player-left"><strong>${this.escapeHtml(player.name)}</strong></div>
         <div class="player-actions">
-          <button class="delete-team-btn" onclick="simpleSetup.removePlayerFromTeam(${this.players.indexOf(player)})">Verwijderen</button>
+          <button class="delete-team-btn" onclick="simpleSetup.removePlayerFromTeam(${this.players.indexOf(player)}, 'step3')">Verwijderen</button>
         </div>
       </div>
     `
@@ -486,7 +903,7 @@ class SimpleSetup {
       .join('');
   }
 
-  removePlayerFromTeam(playerIndex) {
+  removePlayerFromTeam(playerIndex, prefix = '') {
     const player = this.players[playerIndex];
     if (!player) return;
 
@@ -501,7 +918,11 @@ class SimpleSetup {
 
       // Update displays
       this.updatePlayersList();
-      this.updateTeamsList();
+      if (prefix === 'step3') {
+        this.updateTeamsListStep3();
+      } else {
+        this.updateTeamsList();
+      }
     }
   }
 
@@ -539,10 +960,9 @@ class SimpleSetup {
         name: team.name,
         color: team.color || '#3B82F6',
         icon: team.icon || 'team',
-          description: team.description || '',
-          players: team.players || [],
-        };
-      });
+        description: team.description || '',
+        players: team.players || [],
+      }));
 
       // Do not auto-load teams - let user choose which ones to add
       // if (this.teams.length === 0 && this.apiTeams.length > 0) {
@@ -634,7 +1054,22 @@ class SimpleSetup {
     };
 
     this.teams.push(team);
+
+    // Add existing players to the players list
+    const teamIndex = this.teams.length - 1;
+    if (team.players && team.players.length > 0) {
+      team.players.forEach((player) => {
+        this.players.push({
+          id: player.id,
+          name: player.name,
+          teamIndex: teamIndex,
+        });
+        this.assignedMap.set(player.id, true);
+      });
+    }
+
     this.updateTeamsList();
+    this.updatePlayersList(); // Update to show the new players
     this.updateTeamSelect();
     this.displayAvailableTeams();
     this.updateExistingTeamsSelect();
@@ -661,36 +1096,47 @@ class SimpleSetup {
     this.teamForPlayerSelect.innerHTML = this.teams.map((team, index) => `<option value="${index}">${team.icon} ${team.name}</option>`).join('');
   }
 
-  addPlayer() {
+  async addPlayer() {
     const name = this.playerNameInput.value.trim();
     const teamIndex = this.teamForPlayerSelect.value;
-    if (name && teamIndex !== '') {
-      this.players.push({ name, teamIndex: parseInt(teamIndex) });
+    if (!name) return;
+
+    try {
+      // Create player via API
+      const playerData = { name };
+      if (this.sessionData.scoringMode !== 'player' && teamIndex !== '') {
+        // For team modes, assign to team if selected
+        const team = this.teams[parseInt(teamIndex)];
+        if (team && team.id) {
+          playerData.team_id = team.id;
+        }
+      }
+
+      const response = await this.api.createPlayer(playerData);
+      const newPlayer = response.player || response;
+
+      // Add to allPlayers
+      this.allPlayers.push(newPlayer);
+
+      // Add to session players
+      const playerForSession = {
+        id: newPlayer.id,
+        name: newPlayer.name,
+        teamIndex: this.sessionData.scoringMode === 'player' ? null : (teamIndex !== '' ? parseInt(teamIndex) : null)
+      };
+      this.players.push(playerForSession);
+
+      // Mark as assigned if has team
+      if (newPlayer.team_id) {
+        this.assignedMap.set(newPlayer.id, true);
+      }
+
       this.updatePlayersList();
       this.playerNameInput.value = '';
+    } catch (error) {
+      console.error('Error creating player:', error);
+      alert('Fout bij het toevoegen van speler. Probeer opnieuw.');
     }
-  }
-
-  updatePlayersList() {
-    // Update the players list in step 3
-    this.playersList.innerHTML = this.players
-      .map(
-        (player, index) => `
-      <div class="player-item">
-        ${player.name} (${this.teams[player.teamIndex].icon} ${this.teams[player.teamIndex].name})
-        <button onclick="simpleSetup.removePlayer(${index})">Verwijder</button>
-      </div>
-    `
-      )
-      .join('');
-
-    // Update players in team cards
-    this.teams.forEach((_, teamIndex) => {
-      const playersListElement = document.getElementById(`players-list-${teamIndex + 1}`);
-      if (playersListElement) {
-        playersListElement.innerHTML = this.getTeamPlayersHtml(teamIndex);
-      }
-    });
   }
 
   removePlayer(index) {
@@ -698,19 +1144,46 @@ class SimpleSetup {
     this.updatePlayersList();
   }
 
-  toggleUnassignedPlayers(teamIndex) {
-    const el = document.getElementById(`unassigned-players-${teamIndex + 1}`);
+  addPlayerToSession(playerId) {
+    const player = this.allPlayers.find(p => p.id === playerId);
+    if (!player) return;
+
+    // Check if already in session
+    if (this.players.find(p => p.id === playerId)) return;
+
+    // Add to session players
+    this.players.push({
+      id: player.id,
+      name: player.name,
+      teamIndex: null
+    });
+
+    this.updatePlayersList();
+  }
+
+  removePlayerFromSession(playerId) {
+    const index = this.players.findIndex(p => p.id === playerId);
+    if (index !== -1) {
+      this.players.splice(index, 1);
+      this.updatePlayersList();
+    }
+  }
+
+  toggleUnassignedPlayers(teamIndex, prefix = '') {
+    const suffix = prefix ? `-${prefix}-${teamIndex + 1}` : `-${teamIndex + 1}`;
+    const el = document.getElementById(`unassigned-players${suffix}`);
     if (!el) return;
     if (el.style.display === 'none' || el.style.display === '') {
-      this.loadUnassignedPlayersForTeam(teamIndex);
+      this.loadUnassignedPlayersForTeam(teamIndex, prefix);
       el.style.display = 'block';
     } else {
       el.style.display = 'none';
     }
   }
 
-  async loadUnassignedPlayersForTeam(teamIndex) {
-    const container = document.getElementById(`unassigned-list-${teamIndex + 1}`);
+  async loadUnassignedPlayersForTeam(teamIndex, prefix = '') {
+    const suffix = prefix ? `-${prefix}-${teamIndex + 1}` : `-${teamIndex + 1}`;
+    const container = document.getElementById(`unassigned-list${suffix}`);
     if (!container) return;
 
     try {
@@ -733,7 +1206,7 @@ class SimpleSetup {
         playerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;';
         playerDiv.innerHTML = `
           <span>${p.name}</span>
-          <button class="save-team-btn compact" onclick="simpleSetup.assignPlayerToTeam(${teamIndex}, '${p.id}')">Toevoegen</button>
+          <button class="save-team-btn compact" onclick="simpleSetup.assignPlayerToTeam(${teamIndex}, '${p.id}', '${prefix}')">Toevoegen</button>
         `;
         container.appendChild(playerDiv);
       });
@@ -743,22 +1216,7 @@ class SimpleSetup {
     }
   }
 
-  async loadAllPlayers() {
-    try {
-      const response = await this.api.getPlayers();
-      this.allPlayers = response.players || [];
-      // Initialize assigned map
-      this.assignedMap.clear();
-      this.players.forEach((p) => {
-        if (p.id) this.assignedMap.set(p.id, true);
-      });
-    } catch (error) {
-      console.error('Error loading players:', error);
-      this.allPlayers = [];
-    }
-  }
-
-  async assignPlayerToTeam(teamIndex, playerId) {
+  async assignPlayerToTeam(teamIndex, playerId, prefix = '') {
     try {
       const player = this.allPlayers.find((p) => p.id === playerId);
       if (!player) return;
@@ -775,10 +1233,13 @@ class SimpleSetup {
 
       // Update displays
       this.updatePlayersList();
-      this.updateTeamsList();
+      if (prefix === 'step3') {
+        this.updateTeamsListStep3();
+      }
 
       // Hide the dropdown
-      const el = document.getElementById(`unassigned-players-${teamIndex + 1}`);
+      const suffix = prefix ? `-${prefix}-${teamIndex + 1}` : `-${teamIndex + 1}`;
+      const el = document.getElementById(`unassigned-players${suffix}`);
       if (el) el.style.display = 'none';
 
       this.showSuccessMessage(`${player.name} toegevoegd aan team`);
@@ -819,10 +1280,23 @@ class SimpleSetup {
   }
 
   updatePlayerSection() {
-    if (this.scoringModeSelect.value === 'player' || this.scoringModeSelect.value === 'team_with_players') {
-      this.playersSection.style.display = 'block';
+    this.playersSection.style.display = 'block';
+    const teamModeMessage = document.getElementById('team-mode-message');
+    const playerFormSection = document.getElementById('player-form-section');
+    if (this.scoringModeSelect.value === 'team') {
+      if (teamModeMessage) teamModeMessage.style.display = 'block';
+      if (playerFormSection) playerFormSection.style.display = 'none';
+    } else if (this.scoringModeSelect.value === 'player' || this.scoringModeSelect.value === 'team_with_players') {
+      if (teamModeMessage) teamModeMessage.style.display = 'none';
+      if (playerFormSection) playerFormSection.style.display = 'block';
+      // Hide team select for player mode
+      const teamSelectGroup = document.getElementById('team-select-group');
+      if (teamSelectGroup) {
+        teamSelectGroup.style.display = this.scoringModeSelect.value === 'player' ? 'none' : 'block';
+      }
     } else {
-      this.playersSection.style.display = 'none';
+      if (teamModeMessage) teamModeMessage.style.display = 'none';
+      if (playerFormSection) playerFormSection.style.display = 'none';
     }
   }
 
@@ -830,7 +1304,8 @@ class SimpleSetup {
     this.reviewSessionName.textContent = this.sessionData.name;
     this.reviewSportType.textContent = this.sportTypeSelect.options[this.sportTypeSelect.selectedIndex].text;
     this.reviewScoringMode.textContent = this.scoringModeSelect.options[this.scoringModeSelect.selectedIndex].text;
-    this.reviewTeams.innerHTML = this.teams.map((team) => `<li>${team.name}</li>`).join('');
+    this.reviewGameType.textContent = this.gameTypeSelect.options[this.gameTypeSelect.selectedIndex].text;
+    this.reviewTeams.innerHTML = this.teams.map((team) => `<li><span style="color: ${team.color};">●</span> ${team.name}</li>`).join('');
 
     // Only show players section if scoring mode requires players
     const playersHeading = this.reviewPlayers.previousElementSibling;
@@ -842,7 +1317,14 @@ class SimpleSetup {
       // Show players section for player modes
       if (playersHeading) playersHeading.style.display = 'block';
       this.reviewPlayers.style.display = 'block';
-      this.reviewPlayers.innerHTML = this.players.map((player) => `<li>${player.name} (${this.teams[player.teamIndex].name})</li>`).join('');
+      // Collect players assigned to session teams
+      const sessionTeamIds = new Set(this.teams.map(t => t.id));
+      const assignedPlayers = this.allPlayers.filter(p => p.team_id && sessionTeamIds.has(p.team_id));
+      this.reviewPlayers.innerHTML = assignedPlayers.map((player) => {
+        const team = this.teams.find(t => t.id == player.team_id);
+        const teamName = team ? team.name : 'Unknown';
+        return `<li>${player.name} (${teamName})</li>`;
+      }).join('');
     }
   }
 
@@ -858,7 +1340,7 @@ class SimpleSetup {
       const sessionData = {
         name: this.sessionData.name,
         sport_type: this.sessionData.sportType,
-        game_type: 'custom',
+        game_type: this.sessionData.gameType,
         scoring_mode: this.sessionData.scoringMode,
         max_teams: maxTeams,
         total_rounds: totalRounds,
@@ -883,13 +1365,20 @@ class SimpleSetup {
       // Add players if player scoring mode or team_with_players mode
       if (this.sessionData.scoringMode === 'player' || this.sessionData.scoringMode === 'team_with_players') {
         for (const player of this.players) {
-          const teamId = sessionTeams[player.teamIndex]?.id;
-          if (teamId) {
-            await this.api.createPlayer({
+          // Only create player if not already created via API
+          if (!player.id) {
+            const playerData = {
               name: player.name,
-              default_team_id: teamId,
-            });
+            };
+            if (player.teamIndex !== null) {
+              const teamId = sessionTeams[player.teamIndex]?.id;
+              if (teamId) {
+                playerData.default_team_id = teamId;
+              }
+            }
+            await this.api.createPlayer(playerData);
           }
+          // For existing players, they should already have team associations
         }
       }
 
@@ -899,6 +1388,50 @@ class SimpleSetup {
       console.error('Error creating session:', error);
       alert('Fout bij aanmaken sessie: ' + error.message);
     }
+  }
+
+  async saveAsTemplate() {
+    const templateName = prompt('Geef een naam voor de template:');
+    if (!templateName) return;
+
+    const templateData = {
+      name: this.sessionData.sessionName,
+      sport_type: this.sessionData.sportType,
+      scoring_mode: this.sessionData.scoringMode,
+      game_type: this.sessionData.gameType,
+      max_teams: this.sessionData.maxTeams,
+      total_rounds: this.sessionData.totalRounds,
+      time_limit: this.sessionData.timeLimit,
+      show_players: this.sessionData.showPlayers,
+      teams: this.teams,
+      players: this.players
+    };
+
+    try {
+      const response = await fetch(`${this.api.baseURL}/session-templates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: templateName,
+          template_data: templateData
+        })
+      });
+
+      if (response.ok) {
+        alert('Template opgeslagen!');
+      } else {
+        throw new Error('Failed to save template');
+      }
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Fout bij opslaan template: ' + error.message);
+    }
+  }
+
+  escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 }
 

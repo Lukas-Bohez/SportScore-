@@ -693,7 +693,7 @@ class SessionTeamRepository:
     @staticmethod
     def get_teams_by_session(session_id: int) -> List[Dict[str, Any]]:
         """Haal alle teams op die deelnemen aan een specifieke sessie."""
-        sql = """SELECT t.id, ? as session_id, t.name, t.color, t.icon, 
+        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, 
                         gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
                  FROM game_teams gt
@@ -707,7 +707,7 @@ class SessionTeamRepository:
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
         """Haal een specifiek team op (zonder sessie context)."""
-        sql = """SELECT t.id, t.name, t.color, t.icon, t.description,
+        sql = """SELECT t.id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, t.description,
                         t.created_at, t.updated_at
                  FROM teams t
                  WHERE t.id = ?"""
@@ -716,7 +716,7 @@ class SessionTeamRepository:
     @staticmethod
     def get_team_in_session(team_id: int, session_id: int) -> Optional[Dict[str, Any]]:
         """Haal een team op binnen de context van een specifieke sessie."""
-        sql = """SELECT t.id, ? as session_id, t.name, t.color, t.icon, 
+        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, 
                         gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
                  FROM teams t
@@ -811,7 +811,7 @@ class SessionTeamRepository:
     @staticmethod
     def get_all_teams() -> List[Dict[str, Any]]:
         """Haal alle teams op (los van sessies)."""
-        sql = """SELECT t.id, t.name, t.color, t.icon, t.description,
+        sql = """SELECT t.id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, t.description,
                         t.created_at, t.updated_at,
                         COUNT(DISTINCT gt.game_id) as sessions_count
                  FROM teams t
@@ -945,3 +945,55 @@ class SessionScoreRepository:
         """
         result = Database.get_one_row(sql, [session_id, team_id])
         return result['total_score'] if result else 0
+
+class SessionTemplateRepository:
+    """
+    Repository for managing session templates.
+    """
+
+    @staticmethod
+    def create_template(name: str, template_data: dict) -> int:
+        """Create a new session template."""
+        sql = "INSERT INTO session_templates (name, template_data) VALUES (?, ?)"
+        return Database.execute_sql(sql, [name, json.dumps(template_data)])
+
+    @staticmethod
+    def get_all_templates() -> List[Dict[str, Any]]:
+        """Get all session templates."""
+        sql = "SELECT * FROM session_templates ORDER BY created_at DESC"
+        templates = Database.get_rows(sql)
+        for template in templates:
+            template['template_data'] = json.loads(template['template_data'])
+        return templates
+
+    @staticmethod
+    def get_template_by_id(template_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific template by ID."""
+        sql = "SELECT * FROM session_templates WHERE id = ?"
+        template = Database.get_one_row(sql, [template_id])
+        if template:
+            template['template_data'] = json.loads(template['template_data'])
+        return template
+
+    @staticmethod
+    def update_template(template_id: int, name: Optional[str] = None, template_data: Optional[dict] = None) -> bool:
+        """Update a template."""
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if template_data is not None:
+            updates.append("template_data = ?")
+            params.append(json.dumps(template_data))
+        if not updates:
+            return False
+        sql = f"UPDATE session_templates SET {', '.join(updates)} WHERE id = ?"
+        params.append(template_id)
+        return Database.execute_sql(sql, params) is not None
+
+    @staticmethod
+    def delete_template(template_id: int) -> bool:
+        """Delete a template."""
+        sql = "DELETE FROM session_templates WHERE id = ?"
+        return Database.execute_sql(sql, [template_id]) is not None

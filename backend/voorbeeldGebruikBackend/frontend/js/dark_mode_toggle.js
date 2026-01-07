@@ -156,50 +156,64 @@ function getSystemPreference() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-// Initialize
-function init() {
-  injectStyles();
-  const button = createToggleButton();
-
-  // Check localStorage first, then system preference
-  let isDark = localStorage.getItem(config.storageKey);
-  if (isDark === null) {
-    isDark = getSystemPreference();
-    localStorage.setItem(config.storageKey, isDark);
-  } else {
-    isDark = isDark === 'true';
-  }
-
-  applyTheme(isDark);
-
-  // Listen for system preference changes
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      if (localStorage.getItem(config.storageKey) === null) {
-        applyTheme(e.matches);
-      }
-    });
-  }
-
-  // MutationObserver for dynamic content
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'childList') {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // Reapply styles to new elements if needed
-            // For simplicity, rely on CSS inheritance
-          }
-        });
-      }
-    });
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
 // Run on load
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+function init() {
+  injectStyles();
+
+  // Only show toggle button on pages except index
+  const currentPage = window.location.pathname.split('/').pop();
+  console.log('Current page:', currentPage);
+  if (currentPage !== 'index.html' && currentPage !== '') {
+    const button = createToggleButton();
+
+    // Check localStorage first, then system preference
+    let isDark = localStorage.getItem(config.storageKey);
+    if (isDark === null) {
+      isDark = getSystemPreference();
+      localStorage.setItem(config.storageKey, isDark);
+    } else {
+      isDark = isDark === 'true';
+    }
+
+    applyTheme(isDark);
+
+    // Listen for system preference changes
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (localStorage.getItem(config.storageKey) === null) {
+          applyTheme(e.matches);
+        }
+      });
+    }
+
+    // MutationObserver for dynamic content
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Reapply styles to new elements if needed
+              // For simplicity, rely on CSS inheritance
+            }
+          });
+        }
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  } else {
+    // For other pages, still apply the theme if set
+    let isDark = localStorage.getItem(config.storageKey);
+    if (isDark === null) {
+      isDark = getSystemPreference();
+    } else {
+      isDark = isDark === 'true';
+    }
+    applyTheme(isDark);
+  }
 }

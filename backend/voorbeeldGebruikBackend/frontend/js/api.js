@@ -685,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Only initialize Socket.IO for pages that need it
   const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
   console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
-  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'startscreen.html'];
+  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'homescreen.html'];
 
   if (pagesNeedingSocket.includes(currentPage)) {
     console.log('API: Page needs Socket.IO, initializing...');

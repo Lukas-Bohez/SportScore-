@@ -24,7 +24,7 @@ class TeamSetup {
     this.sessionId = urlParams.get('session');
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     }
   }
 
@@ -69,7 +69,7 @@ class TeamSetup {
     this.addExistingTeamBtn.addEventListener('click', () => this.addExistingTeam());
     this.startSessionBtn.addEventListener('click', () => this.startSession());
     this.backBtn.addEventListener('click', () => {
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     });
     this.deleteSessionBtn.addEventListener('click', () => this.deleteSession());
 
@@ -114,7 +114,7 @@ class TeamSetup {
     } catch (error) {
       api.handleError(error, 'loading session');
       alert('Fout bij het laden van de sessie.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     }
   }
 
@@ -445,7 +445,7 @@ class TeamSetup {
   updatePlayerManagerDisplay() {
     if (!this.playersListGlobal) return;
     if (!this.allPlayers || this.allPlayers.length === 0) {
-      this.playersListGlobal.innerHTML = '<p style="color:#666">Nog geen spelers aanwezig. Maak er één aan hierboven.</p>';
+      this.playersListGlobal.innerHTML = '<p class="no-players">Nog geen spelers aanwezig. Maak er één aan hierboven.</p>';
       return;
     }
     this.playersListGlobal.innerHTML = '';
@@ -456,14 +456,13 @@ class TeamSetup {
 
     this.allPlayers.forEach((p) => {
       const playerCard = document.createElement('div');
+      playerCard.className = 'player-card';
       playerCard.style.padding = '12px';
-      playerCard.style.background = '#fff';
       playerCard.style.borderRadius = '8px';
-      playerCard.style.border = '1px solid #e9ecef';
 
       const nameRow = document.createElement('div');
       nameRow.style.marginBottom = '8px';
-      nameRow.innerHTML = `<strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span style="color:#666">(' + this.escapeHtml(p.position) + ')</span>' : ''}`;
+      nameRow.innerHTML = `<strong>${this.escapeHtml(p.name)}</strong> ${p.position ? '<span class="position-text">(' + this.escapeHtml(p.position) + ')</span>' : ''}`;
       playerCard.appendChild(nameRow);
 
       const assignedTeamId = this.assignedMap[p.id];
@@ -478,8 +477,8 @@ class TeamSetup {
       if (assignedTeamId) {
         const teamObj = this.teams.find((t) => t.id === assignedTeamId);
         const assignedLabel = document.createElement('span');
+        assignedLabel.className = 'assigned-label';
         assignedLabel.style.flex = '1';
-        assignedLabel.style.color = '#333';
         assignedLabel.style.fontWeight = '500';
         assignedLabel.innerHTML = teamObj ? `✓ Toegewezen aan: <strong>${teamObj.name}</strong>` : `✓ Toegewezen (team ${assignedTeamId})`;
         assignRow.appendChild(assignedLabel);
@@ -494,10 +493,10 @@ class TeamSetup {
       } else {
         // Show quick assign menu: select with teams
         const sel = document.createElement('select');
+        sel.className = 'team-assign-select';
         sel.style.flex = '1';
         sel.style.padding = '8px';
         sel.style.borderRadius = '6px';
-        sel.style.border = '2px solid #e9ecef';
         const defaultOpt = document.createElement('option');
         defaultOpt.value = '';
         defaultOpt.textContent = '-- Toewijzen aan team --';
@@ -1032,7 +1031,7 @@ class TeamSetup {
     try {
       await api.delete(`/api/v1/sessions/${this.sessionId}`);
       alert('Sessie succesvol verwijderd.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
     } catch (error) {
       api.handleError(error, 'deleting session');
       alert('Fout bij het verwijderen van de sessie.');

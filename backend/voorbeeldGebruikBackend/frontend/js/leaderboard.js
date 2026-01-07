@@ -34,7 +34,7 @@ class LeaderboardView {
     this.sessionId = urlParams.get('session');
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'startscreen.html';
+      window.location.href = 'homescreen.html';
       return;
     }
   }
