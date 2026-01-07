@@ -783,8 +783,14 @@ body {
     gap: 10px;
 }
 
-.player-item-name {
+.player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     flex: 1;
+}
+
+.player-name {
     font-weight: 500;
     color: var(--text-color);
     font-size: 1rem;
@@ -792,15 +798,26 @@ body {
     overflow-wrap: break-word;
 }
 
-.player-item-position {
+.player-team {
     color: var(--text-secondary);
-    font-weight: normal;
+    font-size: 0.9rem;
 }
 
-.player-item-actions {
+.player-actions {
     display: flex;
     gap: 6px;
     flex-shrink: 0;
+    align-items: center;
+}
+
+.team-select {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    min-width: 120px;
 }
 
 /* Unassigned player items */
@@ -889,4 +906,22 @@ body {
 .color-preview:hover {
     border-color: rgba(255,255,255,0.8);
     transform: scale(1.05);
+}
+
+/* Player sections in step 3 */
+.players-section {
+    margin-bottom: 24px;
+}
+
+.players-section h4 {
+    color: var(--text-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
 }

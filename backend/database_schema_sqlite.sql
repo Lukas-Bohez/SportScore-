@@ -232,6 +232,27 @@ ORDER BY total_points DESC;
 -- VOORBEELD QUERIES
 -- ===========================================
 
+-- ===========================================
+-- SESSION TEMPLATES
+-- Saved session configurations for reuse
+-- ===========================================
+CREATE TABLE IF NOT EXISTS session_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(200) NOT NULL,
+    template_data TEXT NOT NULL,  -- JSON string with session settings
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_templates_name ON session_templates(name);
+
+-- Trigger voor updated_at in session_templates
+CREATE TRIGGER IF NOT EXISTS update_session_templates_timestamp 
+AFTER UPDATE ON session_templates
+BEGIN
+    UPDATE session_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 -- Krijg leaderboard voor een specifiek spel:
 -- SELECT * FROM v_game_leaderboard WHERE game_id = 1 ORDER BY total_score DESC;
 

@@ -372,7 +372,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="sport-type">Activiteit Type:</label>
+                        <label for="sport-type">Activiteit Type <small>(stijl)</small>:</label>
                         <select id="sport-type">
                             <option value="custom">🎯 Aangepast</option>
                             <option value="quiz">🧠 Quiz</option>
@@ -397,6 +397,17 @@
                             <option value="player">👤 Speler Scores</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-type">Game Type <small>(modus)</small>:</label>
+                    <select id="game-type">
+                        <option value="custom">🎯 Aangepast</option>
+                        <option value="quiz">🧠 Quiz Modus</option>
+                        <option value="sport_challenge">🏃 Sport Challenge</option>
+                        <option value="elimination">❌ Eliminatie Modus</option>
+                        <option value="team_vs_time">⏱️ Team vs Tijd</option>
+                    </select>
                 </div>
 
                 <div class="form-row">
@@ -492,14 +503,29 @@
 
             <div id="step-3" class="step card">
                 <h2>Stap 3: Spelers Toevoegen</h2>
+                <div id="teams-section-step3" style="display: none;">
+                    <div class="teams-list" id="teams-list-step3"></div>
+                </div>
                 <div id="players-section">
-                    <div class="form-group">
-                        <label for="player-name">Speler Naam:</label>
-                        <select id="team-for-player"></select>
-                        <input type="text" id="player-name" placeholder="bijv. Jan">
-                        <button id="add-player" class="add-team-btn">Speler Toevoegen</button>
+                    <div id="team-mode-message" style="display: none; text-align: center; color: #666; font-style: italic; margin: 20px 0;">
+                        Geen spelers nodig voor team-modus. Ga door naar de volgende stap.
                     </div>
-                    <div class="players-list" id="players-list"></div>
+                    <div id="player-form-section">
+                        <div class="form-group" id="team-select-group">
+                            <label for="team-for-player">Team:</label>
+                            <select id="team-for-player"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="player-name">Speler Naam:</label>
+                            <input type="text" id="player-name" placeholder="bijv. Jan">
+                            <button id="add-player" class="add-team-btn">Speler Toevoegen</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="player-search">Zoek spelers:</label>
+                            <input type="text" id="player-search" placeholder="Typ om te zoeken...">
+                        </div>
+                        <div class="players-list" id="players-list"></div>
+                    </div>
                 </div>
                 <div id="step-3-error" class="error-message"></div>
                 <div class="step-navigation">
@@ -512,8 +538,9 @@
                 <h2>Stap 4: Overzicht</h2>
                 <div id="session-review">
                     <p><strong>Sessie Naam:</strong> <span id="review-session-name">-</span></p>
-                    <p><strong>Sport Type:</strong> <span id="review-sport-type">-</span></p>
+                    <p><strong>Activiteit Type (stijl):</strong> <span id="review-sport-type">-</span></p>
                     <p><strong>Scoring Mode:</strong> <span id="review-scoring-mode">-</span></p>
+                    <p><strong>Game Type (modus):</strong> <span id="review-game-type">-</span></p>
                     <h3>Teams:</h3>
                     <ul id="review-teams"></ul>
                     <h3>Spelers:</h3>
@@ -521,6 +548,7 @@
                 </div>
                 <div class="step-navigation">
                     <button id="prev-4" class="control-btn">Vorige</button>
+                    <button id="save-template" class="control-btn">Opslaan als Template</button>
                     <button id="start-scoring" class="create-btn">Start Sessie</button>
                 </div>
             </div>
