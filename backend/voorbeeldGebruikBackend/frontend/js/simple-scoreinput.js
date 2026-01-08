@@ -1,17 +1,18 @@
 // Score Input JavaScript - Session Score Management
-class SimpleScoreInput {
+class ScoreInput {
   constructor() {
     this.sessionId = new URLSearchParams(window.location.search).get('session');
     this.session = null;
     this.teams = [];
+    this.recentScores = [];
     this.timer = null;
     this.timeRemaining = 0;
     this.customQuickActions = [];
     this.isSubmitting = false;
 
     if (!this.sessionId) {
-      alert('Geen sessie ID gevonden. Ga terug naar de setup.');
-      window.location.href = 'simple-setup.html';
+      alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
+      window.location.href = 'homescreen.html';
       return;
     }
 
@@ -25,6 +26,7 @@ class SimpleScoreInput {
     await this.loadSession();
     await this.loadTeams();
     await this.loadLeaderboard();
+    this.loadRecentScores();
   }
 
   bindElements() {
@@ -40,6 +42,7 @@ class SimpleScoreInput {
     this.pointsInput = document.getElementById('points-input');
     this.reasonInput = document.getElementById('reason-input');
     this.submitScoreBtn = document.getElementById('submit-score-btn');
+    this.recentScores = document.getElementById('recent-scores');
 
     // Control buttons
     this.subtractBtn = document.getElementById('subtract-btn');
@@ -401,7 +404,7 @@ class SimpleScoreInput {
     this.teams.forEach((team) => {
       const option = document.createElement('option');
       option.value = team.id;
-      option.textContent = `${team.name} (${team.score} punten)`;
+      option.textContent = team.name;
       this.teamSelect.appendChild(option);
     });
   }
@@ -517,7 +520,6 @@ class SimpleScoreInput {
         id: team.id,
         name: team.name,
         icon: team.icon,
-        color: team.color,
         score: 0,
         players: team.players || [],
         playerScores: {}, // Track individual player scores
@@ -646,7 +648,50 @@ class SimpleScoreInput {
     });
   }
 
+  async loadRecentScores() {
+    try {
+      const response = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
+      const scores = response.scores || [];
+      // Show most recent 10 scores (newest first)
+      this.recentScoresData = scores.slice(0, 10);
+      this.displayRecentScores();
+    } catch (error) {
+      api.handleError(error, 'loading recent scores');
+    }
+  }
 
+  displayRecentScores() {
+    if (!this.recentScores) return;
+
+    if (!this.recentScoresData || this.recentScoresData.length === 0) {
+      this.recentScores.innerHTML = '<div class="no-scores">Nog geen scores toegevoegd</div>';
+      return;
+    }
+
+    const scoresHtml = this.recentScoresData
+      .map((score) => {
+        const team = this.teams.find((t) => t.id === score.team_id);
+        const timeAgo = this.getTimeAgo(new Date(score.timestamp));
+
+        // Check if there's a player name
+        const teamDisplay = team ? team.name : 'Onbekend team';
+        const playerDisplay = score.player_name ? ` - ${score.player_name}` : '';
+
+        return `
+        <div class="score-item">
+          <div class="score-team">${teamDisplay}${playerDisplay}</div>
+          <div class="score-change ${score.points >= 0 ? 'positive' : 'negative'}">
+            ${score.points >= 0 ? '+' : ''}${score.points}
+          </div>
+          <div class="score-reason">${score.reason || 'Handmatig'}</div>
+          <div class="score-time">${timeAgo}</div>
+        </div>
+      `;
+      })
+      .join('');
+
+    this.recentScores.innerHTML = scoresHtml;
+  }
 
   adjustPoints(delta) {
     let currentValue = parseInt(this.pointsInput.value) || 0;
@@ -806,9 +851,9 @@ class SimpleScoreInput {
     this.loadLeaderboard();
 
     // Load recent scores with a small delay to ensure the score is saved
-    // setTimeout(() => {
-    //   this.loadRecentScores();
-    // }, 500);
+    setTimeout(() => {
+      this.loadRecentScores();
+    }, 500);
   }
 
   addQuickScore(reason, points) {
@@ -1012,7 +1057,7 @@ class SimpleScoreInput {
       }
 
       // Load recent scores to show the new score entry
-      // this.loadRecentScores();
+      this.loadRecentScores();
 
       // Only reload teams if no team is currently selected
       if (!this.teamSelect.value) {
@@ -1141,9 +1186,9 @@ class SimpleScoreInput {
 }
 
 // Global instance for onclick handlers
-let simpleScoreInput;
+let scoreInput;
 
 // Initialize the score input when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  simpleScoreInput = new SimpleScoreInput();
+  scoreInput = new ScoreInput();
 });

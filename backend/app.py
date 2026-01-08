@@ -48,7 +48,7 @@ import json
 # ----------------------------------------------------
 # Logging Setup
 # ----------------------------------------------------
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # ----------------------------------------------------
@@ -505,12 +505,21 @@ async def get_sessions():
     description="Create a new teambuilding session and broadcast a session_created event."
 )
 async def create_session(session: SessionCreate):
+    # End any currently active session
+    active_session = SessionRepository.get_active_session()
+    if active_session and active_session.get('status') == 'active':
+        SessionRepository.update_session(active_session['id'], status='completed')
+        logger.info(f"Ended active session {active_session['id']} as new session is being created")
+    
     session_id = SessionRepository.create_session(
         session.name, session.game_type, session.max_teams,
         session.total_rounds, session.time_limit, session.scoring_mode,
         session.sport_type, session.show_players
     )
     created_session = SessionRepository.get_session_by_id(session_id)
+
+    # Set the new session as active
+    SessionRepository.update_session(session_id, status='active')
 
     # Emit real-time update for new session creation
     await sio.emit('session_created', _jsonable({
@@ -633,8 +642,8 @@ async def create_session_team(session_id: int, request: Request):
     # Extract and validate fields
     body_session_id = payload.get('session_id')
     name = (payload.get('name') or '').strip()
-    color = payload.get('color') or '#333333'
-    icon = payload.get('icon') or 'team'
+    color = (payload.get('color') or '').strip() or '#FF6B6B'
+    icon = (payload.get('icon') or '').strip() or 'team'
 
     if not name:
         raise HTTPException(status_code=422, detail="Field 'name' is required")
@@ -646,6 +655,7 @@ async def create_session_team(session_id: int, request: Request):
     # Create team
     team_id = SessionTeamRepository.create_team(session_id, name, color, icon)
     created_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    logger.info(f"Created team {team_id} ({name}) in session {session_id} with color: {created_team.get('color') if created_team else 'None'}")
 
     # Emit real-time update for new team creation
     print(f"Emitting team_update event for team creation: session_id={session_id}, team_id={team_id}")
@@ -977,6 +987,7 @@ async def add_existing_team_to_session(session_id: int, request: Request):
         raise HTTPException(status_code=400, detail="Failed to add team to session (may already be added)")
     
     team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+    logger.info(f"Team {team_id} added to session {session_id}, retrieved color: {team.get('color') if team else 'None'}")
     
     # Emit real-time update
     await sio.emit('team_update', _jsonable({

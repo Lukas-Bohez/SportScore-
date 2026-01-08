@@ -7,103 +7,67 @@
     <link rel="stylesheet" href="css/startscreen.css">
     <link rel="stylesheet" href="css/buttons.css">
     <link rel="stylesheet" href="css/themes.css">
+    <style>
+        .main-content {
+            display: flex;
+            justify-content: center;
+        }
+        .right-column {
+            max-width: 800px;
+        }
+        .control-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+        .control-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+        .power-user-link {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .power-user-link:hover {
+            opacity: 1;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🧩 SportScore</h1>
-            <p>Digitaal scorebord voor teambuildings</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="homescreen.html" class="control-btn" style="text-decoration: none;">← Terug naar Home</a>
+                <div>
+                    <h1>🧩 SportScore</h1>
+                    <p>Digitaal scorebord voor teambuildings</p>
+                </div>
+                <div></div> <!-- Spacer -->
+            </div>
         </header>
 
         <main class="main-content">
-            <div class="session-setup">
-                <h2>Nieuwe Sessie Aanmaken</h2>
-
-                <form id="session-form" class="setup-form">
-                    <div class="form-group">
-                        <label for="session-name">Sessie Naam:</label>
-                        <input type="text" id="session-name" placeholder="bijv. Team Building Dag 2025" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="sport-type">Sport/Activiteit Type:</label>
-                        <select id="sport-type">
-                            <option value="custom">🎯 Aangepast</option>
-                            <option value="quiz">🧠 Quiz</option>
-                            <option value="voetbal">⚽ Voetbal</option>
-                            <option value="basketbal">🏀 Basketbal</option>
-                            <option value="volleybal">🏐 Volleybal</option>
-                            <option value="hockey">🏑 Hockey</option>
-                            <option value="tennis">🎾 Tennis</option>
-                            <option value="atletiek">🏃 Atletiek</option>
-                            <option value="zwemmen">🏊 Zwemmen</option>
-                            <option value="fietsen">🚴 Wielrennen</option>
-                            <option value="hardlopen">🏃 Hardlopen</option>
-                            <option value="esports">🎮 E-Sports</option>
-                            <option value="boardgame">🎲 Bordspel</option>
-                        </select>
-                        <small class="form-hint">
-                            Dit bepaalt het thema van het scorebord
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="game-type">Speltype:</label>
-                        <select id="game-type">
-                            <option value="custom">🎯 Aangepast</option>
-                            <option value="quiz">🧠 Quiz Modus</option>
-                            <option value="sport_challenge">🏃 Sport Challenge</option>
-                            <option value="elimination">❌ Eliminatie Modus</option>
-                            <option value="team_vs_time">⏱️ Team vs Tijd</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="scoring-mode">Score Modus:</label>
-                        <select id="scoring-mode" name="scoring-mode">
-                            <option value="team">👥 Team Scores (alleen totale punten per team)</option>
-                            <option value="team_with_players">👥👤 Team met Spelers (team scores, spelers zichtbaar)</option>
-                            <option value="player">👤 Speler Scores (individuele punten per speler)</option>
-                        </select>
-                        <small class="form-hint">
-                            Team: alleen team totalen | Team met Spelers: spelers zichtbaar zonder individuele scores | Speler: volledige individuele scores
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="show-players">Toon spelers op scoreboard:</label>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="show-players" checked>
-                            <small class="form-hint">(als uit, worden individuele spelers niet op het leaderboard weergegeven)</small>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="max-teams">Maximum Aantal Teams:</label>
-                        <input type="number" id="max-teams" value="6" min="2" max="20">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="total-rounds">Aantal Rondes:</label>
-                        <input type="number" id="total-rounds" value="1" min="1" max="10">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="time-limit">Tijdslimiet per Ronde (minuten, optioneel):</label>
-                        <input type="number" id="time-limit" placeholder="Laat leeg voor geen limiet" min="1">
-                    </div>
-
-                    <button type="submit" class="create-btn">Sessie Aanmaken</button>
-                </form>
-            </div>
-
             <div class="right-column">
                 <div class="active-session hidden" id="active-session">
                     <h2>Actieve Sessie</h2>
                     <div id="active-session-info"></div>
                     <div class="session-actions">
                         <button id="continue-session" class="continue-btn">Doorgaan met Sessie</button>
-                        <button id="end-session" class="end-btn">Sessie Beëindigen</button>
+                        <button id="end-session" class="delete-team-btn">Sessie Beëindigen</button>
                     </div>
                 </div>
 
@@ -172,7 +136,7 @@
                     </div>
                 </div>
 
-                <div class="recent-sessions" id="recent-sessions">
+                <div class="recent-sessions hidden" id="recent-sessions">
                     <div class="section-header">
                         <h2>Recente Sessies</h2>
                         <button id="view-all-sessions-btn" class="view-all-btn">Alle Sessies Bekijken</button>
@@ -186,6 +150,8 @@
             <p>&copy; 2025 SportScore - Digitaal Scorebord voor Teambuildings</p>
         </footer>
     </div>
+
+    <button id="power-user-btn" class="power-user-link" title="Power User Mode">⚙️</button>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>

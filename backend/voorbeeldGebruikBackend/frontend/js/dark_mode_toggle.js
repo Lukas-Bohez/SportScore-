@@ -47,7 +47,7 @@ const config = {
     '--input-bg': '#2a2a2a',
     '--input-border': '#555555',
     '--input-text': '#ffffff',
-    '--link-color': '#4dabf7',
+    '--link-color': '#e0e0e0',
     '--link-hover': '#2196f3',
     '--border-radius': '8px',
     '--transition': 'all 0.3s ease',

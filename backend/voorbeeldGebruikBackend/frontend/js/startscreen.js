@@ -37,6 +37,10 @@ class StartScreen {
     this.pmAddPlayerBtn = document.getElementById('pm-add-player');
     this.pmPlayersList = document.getElementById('pm-players-list');
 
+    // Power user elements
+    this.powerUserBtn = document.getElementById('power-user-btn');
+    this.recentSessionsDiv = document.getElementById('recent-sessions');
+
     // Log missing elements for debugging
     if (!this.sessionForm) console.warn('session-form element not found');
     if (!this.activeSessionDiv) console.warn('active-session element not found');
@@ -76,6 +80,9 @@ class StartScreen {
     // Player manager events
     if (this.showPlayerManagerBtn) this.showPlayerManagerBtn.addEventListener('click', () => this.togglePlayerManager());
     if (this.pmAddPlayerBtn) this.pmAddPlayerBtn.addEventListener('click', () => this.createPlayerFromManager());
+
+    // Power user events
+    if (this.powerUserBtn) this.powerUserBtn.addEventListener('click', () => this.toggleRecentSessions());
 
     // Team management event listeners
     if (this.addTeamBtn) {
@@ -223,12 +230,7 @@ class StartScreen {
     try {
       const activeSession = await api.get('/api/v1/sessions/active');
       if (activeSession) {
-        // Redirect to team setup or score input based on session status
-        if (activeSession.status === 'setup') {
-          window.location.href = `teamsetup.html?session=${activeSession.id}`;
-        } else {
-          window.location.href = `scoreinput.html?session=${activeSession.id}`;
-        }
+        window.location.href = `simple-scoreinput.html?session=${activeSession.id}`;
       }
     } catch (error) {
       api.handleError(error, 'continuing session');
@@ -694,6 +696,12 @@ class StartScreen {
     } catch (error) {
       api.handleError(error, 'deleting team');
       alert('Fout bij het verwijderen van het team. Probeer opnieuw.');
+    }
+  }
+
+  toggleRecentSessions() {
+    if (this.recentSessionsDiv) {
+      this.recentSessionsDiv.classList.toggle('hidden');
     }
   }
 }
