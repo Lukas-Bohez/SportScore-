@@ -158,6 +158,7 @@ body {
 
 .stat-value {
     color: var(--text-secondary); /* Medium grey text */
+    white-space: nowrap;
 }
 
 /* Leaderboard Section */

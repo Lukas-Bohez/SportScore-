@@ -22,6 +22,7 @@ class SimpleSetup {
       try {
         this.sessionData = JSON.parse(templateData);
         sessionStorage.removeItem('templateData'); // Clear after loading
+        this.isFromTemplate = true;
       } catch (error) {
         console.error('Error parsing template data:', error);
       }
@@ -67,6 +68,11 @@ class SimpleSetup {
       document.addEventListener('DOMContentLoaded', () => {
         this.bindElements();
         this.populateFormFromTemplate();
+        if (this.isFromTemplate) {
+          this.autoAdvanceToStep4();
+        } else {
+          this.showStep();
+        }
         this.setupEventListeners();
         this.loadTeamsFromAPI();
         this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
@@ -74,6 +80,11 @@ class SimpleSetup {
     } else {
       this.bindElements();
       this.populateFormFromTemplate();
+      if (this.isFromTemplate) {
+        this.autoAdvanceToStep4();
+      } else {
+        this.showStep();
+      }
       this.setupEventListeners();
       this.loadTeamsFromAPI().then(() => this.loadAllPlayers());
       this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
@@ -1418,6 +1429,20 @@ class SimpleSetup {
 
   escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  autoAdvanceToStep4() {
+    this.currentStep = 1;
+    this.showStep();
+    const advance = () => {
+      if (this.currentStep < 4) {
+        setTimeout(() => {
+          this.nextStep();
+          advance();
+        }, 100);
+      }
+    };
+    advance();
   }
 }
 
