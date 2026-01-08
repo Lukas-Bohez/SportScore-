@@ -185,8 +185,6 @@ class BigScreenDisplay {
     this.sessionStatus = document.getElementById('game-status');
     this.teamsContainer = document.getElementById('teams-container');
     this.lastUpdateTime = document.getElementById('last-update');
-    this.scoringModeBadge = document.getElementById('scoring-mode-badge');
-    this.scoringModeText = document.getElementById('scoring-mode-text');
   }
 
   setupEventListeners() {
@@ -529,37 +527,6 @@ class BigScreenDisplay {
         this.sessionTitle.appendChild(iconSpan);
       }
     }
-
-    // Update or create status badge
-    if (!this.sessionStatusBadge) {
-      this.sessionStatusBadge = document.getElementById('session-status-badge');
-      if (!this.sessionStatusBadge) {
-        // Create status badge if it doesn't exist
-        this.sessionStatusBadge = document.createElement('div');
-        this.sessionStatusBadge.id = 'session-status-badge';
-        this.sessionStatusBadge.style.cssText = 'display: inline-block; margin-left: 10px; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em; box-shadow: 0 2px 8px rgba(0,0,0,0.15);';
-        const header = document.querySelector('.header');
-        if (header) {
-          header.appendChild(this.sessionStatusBadge);
-        } else {
-          document.body.appendChild(this.sessionStatusBadge);
-        }
-      }
-    }
-
-    // Update status badge based on session status
-    const statusText = this.getStatusText(session.status);
-    const statusColors = {
-      setup: { bg: '#6c757d', text: 'white', icon: '⚙️' },
-      active: { bg: '#28a745', text: 'white', icon: '▶️' },
-      paused: { bg: '#ffc107', text: '#000', icon: '⏸️' },
-      completed: { bg: '#007bff', text: 'white', icon: '🏁' },
-    };
-
-    const statusStyle = statusColors[session.status] || statusColors.setup;
-    this.sessionStatusBadge.style.background = statusStyle.bg;
-    this.sessionStatusBadge.style.color = statusStyle.text;
-    this.sessionStatusBadge.textContent = `${statusStyle.icon} ${statusText}`;
 
     if (this.sessionStatus) {
       this.sessionStatus.textContent = this.getStatusText(session.status);

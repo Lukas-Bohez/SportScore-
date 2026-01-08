@@ -75,7 +75,7 @@ class SimpleSetup {
       this.bindElements();
       this.populateFormFromTemplate();
       this.setupEventListeners();
-      this.loadTeamsFromAPI();
+      this.loadTeamsFromAPI().then(() => this.loadAllPlayers());
       this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
     }
   }
@@ -313,27 +313,13 @@ class SimpleSetup {
       this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
     }
     if (this.currentStep === 3) {
-      if (this.scoringModeSelect.value === 'team_with_players') {
-        this.teamsSectionStep3.style.display = 'block';
-        this.playersSection.style.display = 'block';
-        this.updateTeamsListStep3();
-        this.updatePlayerSection();
-        // Load players if not loaded yet
-        if (!this.playersLoaded) {
-          this.loadAllPlayers();
-        } else {
-          this.updatePlayersList();
-        }
+      this.playersSection.style.display = 'block';
+      this.updatePlayerSection();
+      // Load players if not loaded yet
+      if (!this.playersLoaded) {
+        this.loadAllPlayers();
       } else {
-        this.teamsSectionStep3.style.display = 'none';
-        this.playersSection.style.display = 'block';
-        this.updatePlayerSection();
-        // Load players if not loaded yet
-        if (!this.playersLoaded) {
-          this.loadAllPlayers();
-        } else {
-          this.updatePlayersList();
-        }
+        this.updatePlayersList();
       }
     }
     if (this.currentStep === 4) {
@@ -390,8 +376,8 @@ class SimpleSetup {
           break;
         } else if (this.scoringModeSelect.value === 'team_with_players') {
           // Check that all session teams have at least one player assigned via API
-          const teamsWithoutPlayers = this.teams.filter(team => {
-            return !this.allPlayers.some(player => player.team_id == team.id);
+          const teamsWithoutPlayers = this.teams.filter((team) => {
+            return !this.allPlayers.some((player) => player.team_id == team.id);
           });
           if (teamsWithoutPlayers.length > 0) {
             errorMessage = 'Voeg minstens één speler toe aan elk team.';
@@ -578,6 +564,13 @@ class SimpleSetup {
     `;
       })
       .join('');
+    this.updateTeamSelect();
+  }
+
+  updateTeamSelect() {
+    if (this.teamForPlayerSelect) {
+      this.teamForPlayerSelect.innerHTML = '<option value="">Selecteer team</option>' + this.teams.map((team) => `<option value="${team.id}">${team.icon} ${team.name}</option>`).join('');
+    }
   }
 
   updateTeamsListStep3() {
@@ -746,7 +739,7 @@ class SimpleSetup {
 
     try {
       await this.api.deleteStandaloneTeam(teamId);
-      this.teams = this.teams.filter(t => t.id !== teamId);
+      this.teams = this.teams.filter((t) => t.id !== teamId);
       this.updateTeamsListStep3();
       alert(`Team "${teamName}" succesvol verwijderd!`);
     } catch (error) {
@@ -789,7 +782,7 @@ class SimpleSetup {
     const unassignedPlayers = [];
     const otherTeamsPlayers = [];
 
-    this.allPlayers.forEach(player => {
+    this.allPlayers.forEach((player) => {
       if (player.team_id) {
         otherTeamsPlayers.push(player);
       } else {
@@ -800,7 +793,7 @@ class SimpleSetup {
     // Filter by search term
     const filterPlayers = (players) => {
       if (!searchTerm) return players;
-      return players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      return players.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     };
 
     const filteredUnassigned = filterPlayers(unassignedPlayers);
@@ -812,14 +805,14 @@ class SimpleSetup {
     if (filteredUnassigned.length > 0) {
       html += '<h4>Niet toegewezen spelers</h4>';
       html += '<div class="player-section">';
-      filteredUnassigned.forEach(player => {
+      filteredUnassigned.forEach((player) => {
         html += `
           <div class="player-item">
             <span>${this.escapeHtml(player.name)}</span>
             <div class="player-assign-buttons">
               <select class="team-select" onchange="simpleSetup.assignPlayerToTeamFromList(${player.id}, this.value)">
                 <option value="">-- Selecteer team --</option>
-                ${this.teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('')}
+                ${this.teams.map((team) => `<option value="${team.id}">${team.name}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -832,16 +825,16 @@ class SimpleSetup {
     if (filteredOtherTeams.length > 0) {
       html += '<h4>Spelers in teams</h4>';
       const groupedByTeam = {};
-      filteredOtherTeams.forEach(player => {
+      filteredOtherTeams.forEach((player) => {
         const teamId = player.team_id;
         if (!groupedByTeam[teamId]) groupedByTeam[teamId] = [];
         groupedByTeam[teamId].push(player);
       });
 
-      const sessionTeamIds = new Set(this.teams.map(t => String(t.id)));
+      const sessionTeamIds = new Set(this.teams.map((t) => String(t.id)));
       const sessionTeams = [];
       const nonSessionTeams = [];
-      Object.keys(groupedByTeam).forEach(teamId => {
+      Object.keys(groupedByTeam).forEach((teamId) => {
         if (sessionTeamIds.has(teamId)) {
           sessionTeams.push(teamId);
         } else {
@@ -850,12 +843,12 @@ class SimpleSetup {
       });
 
       // Process session teams first
-      [...sessionTeams, ...nonSessionTeams].forEach(teamId => {
-        const team = this.apiTeams.find(t => String(t.id) === String(teamId)) || this.teams.find(t => String(t.id) === String(teamId));
+      [...sessionTeams, ...nonSessionTeams].forEach((teamId) => {
+        const team = this.apiTeams.find((t) => String(t.id) === String(teamId)) || this.teams.find((t) => String(t.id) === String(teamId));
         const teamName = team ? team.name : `Team ${teamId}`;
-        html += `<h5><span style="color: ${team.color};">●</span> ${this.escapeHtml(teamName)}</h5>`;
+        html += `<h5><span style="color: ${team ? team.color : '#3B82F6'};">●</span> ${this.escapeHtml(teamName)}</h5>`;
         html += '<div class="player-section">';
-        groupedByTeam[teamId].forEach(player => {
+        groupedByTeam[teamId].forEach((player) => {
           html += `
             <div class="player-item">
               <span>${this.escapeHtml(player.name)}</span>
@@ -1106,10 +1099,12 @@ class SimpleSetup {
       const playerData = { name };
       if (this.sessionData.scoringMode !== 'player' && teamIndex !== '') {
         // For team modes, assign to team if selected
-        const team = this.teams[parseInt(teamIndex)];
-        if (team && team.id) {
-          playerData.team_id = team.id;
+        const team = this.teams.find((t) => String(t.id) === String(teamIndex));
+        if (!team) {
+          alert('Geselecteerd team niet gevonden.');
+          return;
         }
+        playerData.team_id = team.id;
       }
 
       const response = await this.api.createPlayer(playerData);
@@ -1122,7 +1117,7 @@ class SimpleSetup {
       const playerForSession = {
         id: newPlayer.id,
         name: newPlayer.name,
-        teamIndex: this.sessionData.scoringMode === 'player' ? null : (teamIndex !== '' ? parseInt(teamIndex) : null)
+        teamIndex: this.sessionData.scoringMode === 'player' ? null : teamIndex !== '' ? parseInt(teamIndex) : null,
       };
       this.players.push(playerForSession);
 
@@ -1145,24 +1140,24 @@ class SimpleSetup {
   }
 
   addPlayerToSession(playerId) {
-    const player = this.allPlayers.find(p => p.id === playerId);
+    const player = this.allPlayers.find((p) => p.id === playerId);
     if (!player) return;
 
     // Check if already in session
-    if (this.players.find(p => p.id === playerId)) return;
+    if (this.players.find((p) => p.id === playerId)) return;
 
     // Add to session players
     this.players.push({
       id: player.id,
       name: player.name,
-      teamIndex: null
+      teamIndex: null,
     });
 
     this.updatePlayersList();
   }
 
   removePlayerFromSession(playerId) {
-    const index = this.players.findIndex(p => p.id === playerId);
+    const index = this.players.findIndex((p) => p.id === playerId);
     if (index !== -1) {
       this.players.splice(index, 1);
       this.updatePlayersList();
@@ -1318,13 +1313,15 @@ class SimpleSetup {
       if (playersHeading) playersHeading.style.display = 'block';
       this.reviewPlayers.style.display = 'block';
       // Collect players assigned to session teams
-      const sessionTeamIds = new Set(this.teams.map(t => t.id));
-      const assignedPlayers = this.allPlayers.filter(p => p.team_id && sessionTeamIds.has(p.team_id));
-      this.reviewPlayers.innerHTML = assignedPlayers.map((player) => {
-        const team = this.teams.find(t => t.id == player.team_id);
-        const teamName = team ? team.name : 'Unknown';
-        return `<li>${player.name} (${teamName})</li>`;
-      }).join('');
+      const sessionTeamIds = new Set(this.teams.map((t) => t.id));
+      const assignedPlayers = this.allPlayers.filter((p) => p.team_id && sessionTeamIds.has(p.team_id));
+      this.reviewPlayers.innerHTML = assignedPlayers
+        .map((player) => {
+          const team = this.teams.find((t) => t.id == player.team_id);
+          const teamName = team ? team.name : 'Unknown';
+          return `<li>${player.name} (${teamName})</li>`;
+        })
+        .join('');
     }
   }
 
@@ -1395,39 +1392,28 @@ class SimpleSetup {
     if (!templateName) return;
 
     const templateData = {
-      name: this.sessionData.sessionName,
+      name: this.sessionData.name,
       sport_type: this.sessionData.sportType,
       scoring_mode: this.sessionData.scoringMode,
       game_type: this.sessionData.gameType,
-      max_teams: this.sessionData.maxTeams,
-      total_rounds: this.sessionData.totalRounds,
-      time_limit: this.sessionData.timeLimit,
-      show_players: this.sessionData.showPlayers,
+      max_teams: parseInt(this.maxTeamsInput?.value) || this.teams.length,
+      total_rounds: parseInt(this.totalRoundsInput?.value) || 1,
+      time_limit: this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null,
       teams: this.teams,
-      players: this.players
+      players: this.players,
     };
 
-    try {
-      const response = await fetch(`${this.api.baseURL}/session-templates`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: templateName,
-          template_data: templateData
-        })
-      });
+    // Save to localStorage
+    const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
+    const newTemplate = {
+      id: Date.now(),
+      name: templateName,
+      template_data: templateData,
+    };
+    templates.push(newTemplate);
+    localStorage.setItem('sportScoreTemplates', JSON.stringify(templates));
 
-      if (response.ok) {
-        alert('Template opgeslagen!');
-      } else {
-        throw new Error('Failed to save template');
-      }
-    } catch (error) {
-      console.error('Error saving template:', error);
-      alert('Fout bij opslaan template: ' + error.message);
-    }
+    alert('Template opgeslagen!');
   }
 
   escapeHtml(s) {

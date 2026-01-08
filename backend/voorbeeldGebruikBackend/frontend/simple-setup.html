@@ -357,8 +357,14 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>🧩 SportScore - Eenvoudige Setup</h1>
-            <p>Stap-voor-stap sessie aanmaken</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="homescreen.html" class="control-btn" style="text-decoration: none;">← Terug naar Home</a>
+                <div>
+                    <h1>🧩 SportScore - Eenvoudige Setup</h1>
+                    <p>Stap-voor-stap sessie aanmaken</p>
+                </div>
+                <div></div> <!-- Spacer -->
+            </div>
         </header>
 
         <main class="main-content">
@@ -503,9 +509,6 @@
 
             <div id="step-3" class="step card">
                 <h2>Stap 3: Spelers Toevoegen</h2>
-                <div id="teams-section-step3" style="display: none;">
-                    <div class="teams-list" id="teams-list-step3"></div>
-                </div>
                 <div id="players-section">
                     <div id="team-mode-message" style="display: none; text-align: center; color: #666; font-style: italic; margin: 20px 0;">
                         Geen spelers nodig voor team-modus. Ga door naar de volgende stap.
@@ -558,8 +561,6 @@
             <p>&copy; 2025 SportScore - Digitaal Scorebord voor Teambuildings</p>
         </footer>
     </div>
-
-    <a href="startscreen.html" class="power-user-link" title="Power User Mode">⚙️</a>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>

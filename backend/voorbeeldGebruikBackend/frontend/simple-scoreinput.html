@@ -6,9 +6,29 @@
     <title>SportScore - Score Invoer</title>
     <link rel="stylesheet" href="css/scoreinput.css">
     <link rel="stylesheet" href="css/themes.css">
+    <style>
+        .control-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+        .control-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
+        <a href="homescreen.html" class="control-btn" style="text-decoration: none; margin-bottom: 10px; display: inline-block;">← Terug naar Home</a>
         <header class="header">
             <h1>🧩 SportScore - Score Invoer</h1>
             <div class="session-info">
@@ -82,6 +102,12 @@
                 </div>
             </div>
 
+            <div class="recent-scores-section">
+                <h2>Recente Scores</h2>
+                <div class="recent-scores" id="recent-scores">
+                    <!-- Recent scores will be populated by JavaScript -->
+                </div>
+            </div>
         </main>
 
         <footer class="footer">
@@ -105,6 +131,6 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
-    <script src="js/scoreinput.js"></script>
+    <script src="js/simple-scoreinput.js"></script>
 </body>
 </html>

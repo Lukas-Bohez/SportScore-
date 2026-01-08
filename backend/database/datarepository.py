@@ -3,9 +3,12 @@ from datetime import datetime
 import pytz
 from typing import List, Optional, Dict, Any
 import json
+import logging
 
 # Define CET/CEST timezone for Belgium
 CET = pytz.timezone('Europe/Brussels')
+
+logger = logging.getLogger(__name__)
 
 class SportRepository:
 
@@ -639,15 +642,22 @@ class SessionTeamRepository:
     """
 
     @staticmethod
-    def create_team(session_id: int, name: str, color: str = "#333333", icon: str = "team") -> int:
+    def create_team(session_id: int, name: str, color: str = "#FF6B6B", icon: str = "team") -> int:
         """Maak een nieuw team aan en voeg het toe aan de sessie."""
+        # Ensure color and icon are not empty
+        if not color or color.strip() == '':
+            color = "#FF6B6B"
+        if not icon or icon.strip() == '':
+            icon = "team"
+        
+        logger.info(f"Creating team '{name}' with color '{color}' and icon '{icon}' for session {session_id}")
+        
         # Eerst: check of team al bestaat met deze naam
         existing_team = Database.get_one_row("SELECT id FROM teams WHERE name = ?", [name])
         
         if existing_team:
             team_id = existing_team['id']
-            # Update kleur en icoon van bestaand team
-            Database.execute_sql("UPDATE teams SET color = ?, icon = ? WHERE id = ?", [color, icon, team_id])
+            # Do not update existing team properties, just link to session
         else:
             # Maak nieuw team aan
             sql = """INSERT INTO teams (name, color, icon) VALUES (?, ?, ?)"""
@@ -669,6 +679,12 @@ class SessionTeamRepository:
     @staticmethod
     def add_existing_team_to_session(session_id: int, team_id: int) -> bool:
         """Voeg een bestaand team toe aan een sessie."""
+        # Log current team color
+        current_team = Database.get_one_row("SELECT name, color, icon FROM teams WHERE id = ?", [team_id])
+        logger.info(f"Adding existing team {team_id} ({current_team['name']}) to session {session_id}. Current color: {current_team['color']}, icon: {current_team['icon']}")
+        
+        # Do not change color when adding to session
+        
         # First add the team to the session
         sql = """INSERT OR IGNORE INTO game_teams (game_id, team_id) VALUES (?, ?)"""
         result = Database.execute_sql(sql, [session_id, team_id])
@@ -693,7 +709,7 @@ class SessionTeamRepository:
     @staticmethod
     def get_teams_by_session(session_id: int) -> List[Dict[str, Any]]:
         """Haal alle teams op die deelnemen aan een specifieke sessie."""
-        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, 
+        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(NULLIF(t.color, ''), '#333333') as color, COALESCE(NULLIF(t.icon, ''), 'team') as icon, 
                         gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
                  FROM game_teams gt
@@ -702,12 +718,14 @@ class SessionTeamRepository:
                  WHERE gt.game_id = ?
                  GROUP BY t.id, t.name, t.color, t.icon, gt.is_eliminated, t.created_at, t.updated_at
                  ORDER BY score DESC, t.name ASC"""
-        return Database.get_rows(sql, [session_id, session_id])
+        teams = Database.get_rows(sql, [session_id, session_id])
+        logger.info(f"Retrieved {len(teams)} teams for session {session_id}: {[f'{t['name']}: {t['color']}' for t in teams]}")
+        return teams
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
         """Haal een specifiek team op (zonder sessie context)."""
-        sql = """SELECT t.id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, t.description,
+        sql = """SELECT t.id, COALESCE(t.name, '') as name, COALESCE(NULLIF(t.color, ''), '#333333') as color, COALESCE(NULLIF(t.icon, ''), 'team') as icon, t.description,
                         t.created_at, t.updated_at
                  FROM teams t
                  WHERE t.id = ?"""
@@ -716,7 +734,9 @@ class SessionTeamRepository:
     @staticmethod
     def get_team_in_session(team_id: int, session_id: int) -> Optional[Dict[str, Any]]:
         """Haal een team op binnen de context van een specifieke sessie."""
-        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(t.color, '#3B82F6') as color, COALESCE(t.icon, 'team') as icon, 
+        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, 
+                        CASE WHEN t.color IN ('', '#000000') OR t.color IS NULL THEN '#333333' ELSE t.color END as color, 
+                        CASE WHEN t.icon IN ('', '#000000') OR t.icon IS NULL THEN 'team' ELSE t.icon END as icon, 
                         gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
                  FROM teams t
@@ -737,10 +757,10 @@ class SessionTeamRepository:
         if name is not None:
             updates.append("name = ?")
             params.append(name)
-        if color is not None:
+        if color is not None and color.strip() != '':
             updates.append("color = ?")
             params.append(color)
-        if icon is not None:
+        if icon is not None and icon.strip() != '':
             updates.append("icon = ?")
             params.append(icon)
         if description is not None:
