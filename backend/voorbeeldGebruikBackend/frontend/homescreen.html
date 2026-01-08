@@ -8,26 +8,69 @@
     <link rel="stylesheet" href="css/buttons.css">
     <link rel="stylesheet" href="css/themes.css">
     <style>
-        .main-content {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 70vh;
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 40px;
+        }
+        .hero h2 {
+            font-size: 2.5em;
+            margin: 0 0 20px;
+            color: var(--text-color);
+        }
+        .hero p {
+            font-size: 1.2em;
+            margin: 0 0 30px;
+            color: var(--text-secondary, #666);
+        }
+        .hero .btn {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .hero .btn:hover {
+            background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+            transform: translateY(-2px);
         }
         .homepage-cards {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+            flex-direction: column;
             gap: 20px;
             max-width: 1200px;
+            margin: 0 auto;
+            align-items: center;
+        }
+        .bottom-row {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .bottom-row .card:first-child {
+            flex: 1;
+        }
+        .bottom-row .card:last-child {
+            flex: 2;
+        }
+        .homepage-cards .card {
+            flex: none;
         }
         .card {
             background: var(--card-background, #ffffff);
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            padding: 30px;
+            padding: 30px 30px 20px 30px;
             text-align: center;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
+            flex: 1 1 300px;
+            max-width: 400px;
         }
         .card:hover {
             transform: translateY(-5px);
@@ -73,6 +116,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: relative;
+        }
+        .session-item > div, .template-item > div {
+            flex: 1;
+            min-width: 0;
         }
         .session-item h4, .template-item h4 {
             margin: 0;
@@ -83,48 +131,71 @@
             font-size: 0.9em;
         }
         .session-item .btn, .template-item .btn {
-            padding: 6px 12px;
-            font-size: 14px;
+            padding: 4px 8px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .template-actions {
+            display: flex;
+            gap: 5px;
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
         }
         .power-user-link { position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5; }
         .power-user-link:hover { opacity: 1; }
+        @media (max-width: 768px) {
+            .bottom-row {
+                flex-direction: column;
+            }
+            .bottom-row .card:first-child {
+                order: 2;
+                flex: none;
+            }
+            .bottom-row .card:last-child {
+                order: 1;
+                flex: none;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🧩 SportScore</h1>
+            <h1>SportScore</h1>
             <p>Digitaal scorebord voor teambuildings</p>
         </header>
 
-        <main class="main-content">
+        <main>
+            <div class="hero">
+                <h2>Welkom bij SportScore</h2>
+                <p>Start je teambuilding avontuur eenvoudig.</p>
+                <a href="simple-setup.html" class="btn">Nieuwe Sessie Starten</a>
+            </div>
+
             <div class="homepage-cards">
-
-
-                <div class="card">
-                    <h2>➕ Nieuwe Sessie</h2>
-                    <p>Maak een nieuwe sessie aan met de eenvoudige setup wizard.</p>
-                    <a href="simple-setup.html" class="btn">Start Nieuwe Sessie</a>
-                </div>
-
                 <div class="card">
                     <h2>👥 Teams & Sessies Beheren</h2>
                     <p>Beheer bestaande teams en hervat actieve sessies.</p>
                     <a href="startscreen.html" class="btn">Beheren</a>
                 </div>
-                                <div class="card">
-                    <h2>📚 Oud Sessies</h2>
-                    <p>Bekijk vorige gespeelde sessies en hun winnaars.</p>
-                    <div class="sessions-list" id="sessions-list">
-                        <!-- Sessions will be loaded here -->
-                    </div>
-                </div>
 
-                <div class="card">
-                    <h2>📋 Templates</h2>
-                    <p>Gebruik opgeslagen sessie templates om snel te starten.</p>
-                    <div class="templates-list" id="templates-list">
-                        <!-- Templates will be loaded here -->
+                <div class="bottom-row">
+                    <div class="card">
+                        <h2>📚 Vorige Sessies</h2>
+                        <p>Bekijk vorige gespeelde sessies en hun winnaars.</p>
+                        <div class="sessions-list" id="sessions-list">
+                            <!-- Sessions will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>📋 Templates</h2>
+                        <p>Bekijk opgeslagen sessie templates om snel te starten.</p>
+                        <div class="templates-list" id="templates-list">
+                            <!-- Templates will be loaded here -->
+                        </div>
                     </div>
                 </div>
             </div>
