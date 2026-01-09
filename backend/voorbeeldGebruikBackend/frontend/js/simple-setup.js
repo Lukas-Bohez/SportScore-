@@ -458,7 +458,6 @@ class SimpleSetup {
 
     if (name) {
       try {
-        // Create team in API first
         const apiTeamData = {
           name: name,
           color: color,
@@ -466,10 +465,18 @@ class SimpleSetup {
           description: description || `${name} team.`,
         };
 
-        const createdTeam = await this.api.createStandaloneTeam(apiTeamData);
+        let apiResult;
+        if (this.editingTeamIndex !== null) {
+          // Update existing team
+          const existingTeam = this.teams[this.editingTeamIndex];
+          apiResult = await this.api.updateStandaloneTeam(existingTeam.id, apiTeamData);
+        } else {
+          // Create new team
+          apiResult = await this.api.createStandaloneTeam(apiTeamData);
+        }
 
         const teamData = {
-          id: createdTeam.id,
+          id: apiResult.team.id,
           name: name,
           color: color,
           icon: this.getIconEmoji(icon),
@@ -491,8 +498,8 @@ class SimpleSetup {
         this.displayAvailableTeams(); // Refresh available teams
         this.updateExistingTeamsSelect();
       } catch (error) {
-        console.error('Error creating team:', error);
-        alert('Fout bij aanmaken team: ' + error.message);
+        console.error('Error creating/updating team:', error);
+        alert('Fout bij aanmaken/bewerken team: ' + error.message);
       }
     }
   }
