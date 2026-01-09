@@ -40,7 +40,6 @@ class TeamSetup {
     this.backBtn = document.getElementById('back-btn');
     this.deleteSessionBtn = document.getElementById('delete-session-btn');
     this.teamsCount = document.getElementById('teams-count');
-    this.maxTeams = document.getElementById('max-teams');
     this.gameType = document.getElementById('game-type');
 
     // Existing teams selection
@@ -125,9 +124,6 @@ class TeamSetup {
     if (this.sessionStatus) {
       const scoringModeText = this.session.scoring_mode === 'player' ? ' | Speler Scores' : this.session.scoring_mode === 'team_with_players' ? ' | Team Scores met Spelers' : ' | Team Scores';
       this.sessionStatus.textContent = `Status: ${this.getStatusText(this.session.status)}${scoringModeText}`;
-    }
-    if (this.maxTeams) {
-      this.maxTeams.textContent = this.session.max_teams;
     }
     if (this.gameType) {
       this.gameType.textContent = this.getGameTypeText(this.session.game_type);
@@ -745,11 +741,6 @@ class TeamSetup {
       return;
     }
 
-    if (this.teams.length >= this.session.max_teams) {
-      alert(`Maximum aantal teams (${this.session.max_teams}) bereikt.`);
-      return;
-    }
-
     const teamData = {
       session_id: parseInt(this.sessionId),
       name: teamName,
@@ -908,11 +899,6 @@ class TeamSetup {
     const teamId = this.existingTeamSelect.value;
     if (!teamId) {
       alert('Selecteer eerst een team.');
-      return;
-    }
-
-    if (this.teams.length >= this.session.max_teams) {
-      alert(`Maximum aantal teams (${this.session.max_teams}) bereikt.`);
       return;
     }
 

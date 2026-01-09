@@ -343,22 +343,29 @@ body {
 }
 
 .add-team-btn {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: #ffffff;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 500;
+    padding: 20px;
+    background: var(--card-bg);
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+    box-shadow: 0 2px 8px var(--shadow-color);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    width: 100%;
+    max-width: 800px; /* Match teams-list width */
 }
 
 .add-team-btn:hover {
-    background: linear-gradient(135deg, #218838 0%, #1aa179 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 3px 6px rgba(40, 167, 69, 0.3);
+    background: var(--theme-background);
+    border-color: var(--theme-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .team-form-container {
@@ -415,23 +422,12 @@ body {
 }
 
 .teams-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 15px;
     margin-top: 20px;
-}
-
-@media (min-width: 640px) {
-    .teams-list {
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-    
-    .teams-list .team-card {
-        flex: 1 1 calc(50% - 8px);
-        min-width: 250px;
-        max-width: 400px;
-    }
+    width: 100%;
+    max-width: 800px; /* Consistent width */
 }
 
 .team-card {
@@ -444,11 +440,38 @@ body {
     gap: 10px;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px var(--shadow-color);
+    min-height: 200px; /* Ensure consistent height */
 }
 
-.team-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px var(--shadow-color);
+.add-team-card {
+    grid-column: span 2; /* Spans full width */
+    cursor: pointer;
+    border: 2px dashed var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-team-card:hover {
+    border-color: var(--theme-accent);
+    background: var(--theme-background);
+}
+
+.add-team-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.add-team-icon {
+    font-size: 3rem;
+}
+
+.add-team-text {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-color);
 }
 
 .team-card-header {

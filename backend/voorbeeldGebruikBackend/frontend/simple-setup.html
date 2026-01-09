@@ -418,10 +418,6 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="max-teams">Max Teams:</label>
-                        <input type="number" id="max-teams" value="6" min="2" max="20">
-                    </div>
-                    <div class="form-group">
                         <label for="total-rounds">Aantal Rondes:</label>
                         <input type="number" id="total-rounds" value="1" min="1" max="10">
                     </div>
@@ -442,7 +438,7 @@
                 <div class="team-management" id="team-management">
                     <div class="section-header">
                         <h2>Team Beheer</h2>
-                        <button id="add-team-btn" class="add-team-btn">+ Nieuw Team</button>
+                        <button id="add-team-btn" class="add-team-btn" style="flex-shrink: 0;">+ Nieuw Team</button>
                     </div>
 
                     <!-- Existing teams selection -->
@@ -452,7 +448,7 @@
                             <select id="existing-team-select" style="flex: 1;">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
-                            <button id="add-existing-team-btn" class="add-team-btn" style="padding: 8px 16px;">Toevoegen</button>
+                            <button id="add-existing-team-btn" class="add-team-btn" style="padding: 8px 16px; flex-shrink: 0;">Toevoegen</button>
                         </div>
                     </div>
 
@@ -521,7 +517,7 @@
                         <div class="form-group">
                             <label for="player-name">Speler Naam:</label>
                             <input type="text" id="player-name" placeholder="bijv. Jan">
-                            <button id="add-player" class="add-team-btn">Speler Toevoegen</button>
+                            <button id="add-player" class="add-team-btn" style="flex-shrink: 0;">Speler Toevoegen</button>
                         </div>
                         <div class="form-group">
                             <label for="player-search">Zoek spelers:</label>

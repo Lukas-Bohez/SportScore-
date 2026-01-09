@@ -78,14 +78,8 @@ def _jsonable(value):
         return [_jsonable(v) for v in value]
     return value
 
-# CORS middleware - restrict to frontend origins for security
-# Update these URLs based on your deployment environment
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-]
+# CORS middleware - allow all origins for development
+ALLOWED_ORIGINS = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -512,7 +506,7 @@ async def create_session(session: SessionCreate):
         logger.info(f"Ended active session {active_session['id']} as new session is being created")
     
     session_id = SessionRepository.create_session(
-        session.name, session.game_type, session.max_teams,
+        session.name, session.game_type,
         session.total_rounds, session.time_limit, session.scoring_mode,
         session.sport_type, session.show_players
     )
@@ -544,8 +538,6 @@ async def get_active_session():
         # Ensure defaults for fields that might be None from database
         if session.get('current_round') is None:
             session['current_round'] = 1
-        if session.get('max_teams') is None:
-            session['max_teams'] = 10
         if session.get('total_rounds') is None:
             session['total_rounds'] = 1
         if session.get('status') is None:
@@ -578,7 +570,7 @@ async def get_session(session_id: int):
 async def update_session(session_id: int, session_update: SessionUpdate):
     success = SessionRepository.update_session(
         session_id, session_update.name, session_update.game_type,
-        session_update.status, session_update.max_teams,
+        session_update.status,
         session_update.current_round, session_update.total_rounds,
         session_update.time_limit
     )

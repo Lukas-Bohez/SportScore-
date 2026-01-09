@@ -3,32 +3,130 @@
 class Homepage {
   constructor() {
     this.api = new ScoreboardAPI();
+    this.templatesGrid = document.getElementById('templates-grid');
     this.sessionsList = document.getElementById('sessions-list');
-    this.templatesList = document.getElementById('templates-list');
+    this.currentView = 'simple'; // 'simple' or 'detailed'
     this.init();
   }
 
   async init() {
-    await this.loadSessions();
+    this.setupNavigation();
+    this.setupViewToggle();
     await this.loadTemplates();
+    await this.loadSessions();
+  }
+
+  setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const section = item.dataset.section;
+        if (section === 'teams') {
+          // Navigate to team management page
+          window.location.href = 'startscreen.html';
+        } else {
+          this.showSection(section);
+        }
+      });
+    });
+  }
+
+  setupViewToggle() {
+    const simpleBtn = document.getElementById('simple-view');
+    const detailedBtn = document.getElementById('detailed-view');
+
+    if (simpleBtn && detailedBtn) {
+      simpleBtn.addEventListener('click', () => {
+        this.currentView = 'simple';
+        simpleBtn.classList.add('active');
+        detailedBtn.classList.remove('active');
+        this.loadSessions();
+      });
+
+      detailedBtn.addEventListener('click', () => {
+        this.currentView = 'detailed';
+        detailedBtn.classList.add('active');
+        simpleBtn.classList.remove('active');
+        this.loadSessions();
+      });
+    }
+  }
+
+  showSection(sectionName) {
+    // Hide all sections
+    document.querySelectorAll('.content-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    // Show selected section
+    const targetSection = document.getElementById(sectionName + '-section');
+    if (targetSection) {
+      targetSection.classList.add('active');
+    }
+
+    // Update nav active state
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    const activeNav = document.querySelector(`[data-section="${sectionName}"]`);
+    if (activeNav) {
+      activeNav.classList.add('active');
+    }
+  }
+
+  async loadTemplates() {
+    if (!this.templatesGrid) return;
+
+    try {
+      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
+
+      if (templates.length === 0) {
+        this.templatesGrid.innerHTML = '<p style="text-align: center; grid-column: 1 / -1;">Geen templates gevonden. Maak eerst een sessie aan en sla deze op als template.</p>';
+        return;
+      }
+
+      const templatesHtml = templates
+        .map(
+          (template) => `
+            <div class="template-card">
+              <h3>${template.name}</h3>
+              <p>${template.description || 'Geen beschrijving'}</p>
+              <div class="template-actions">
+                <button class="btn" onclick="homepage.loadTemplate(${template.id})">Gebruiken</button>
+                <button class="delete-team-btn" onclick="homepage.deleteTemplate(${template.id})">Verwijderen</button>
+              </div>
+            </div>
+          `
+        )
+        .join('');
+
+      this.templatesGrid.innerHTML = templatesHtml;
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      if (this.templatesGrid) {
+        this.templatesGrid.innerHTML = '<p>Fout bij laden templates.</p>';
+      }
+    }
   }
 
   async loadSessions() {
+    if (!this.sessionsList) return;
+
     try {
       const response = await this.api.getSessions();
       const sessions = response.sessions || [];
 
-      // Filter completed sessions and get winners
+      // Filter completed sessions
       const completedSessions = sessions.filter((s) => s.status === 'completed');
 
       if (completedSessions.length === 0) {
-        this.sessionsList.innerHTML = '<p>Geen gespeelde sessies gevonden.</p>';
+        this.sessionsList.innerHTML = '<p style="text-align: center; grid-column: 1 / -1;">Geen gespeelde sessies gevonden.</p>';
         return;
       }
 
       // Load winners for each session
       const sessionsWithWinners = await Promise.all(
-        completedSessions.slice(0, 5).map(async (session) => {
+        completedSessions.map(async (session) => {
           const winnerInfo = await this.getSessionWinner(session);
           return { ...session, winner: winnerInfo };
         })
@@ -38,27 +136,30 @@ class Homepage {
         .map((session) => {
           const date = new Date(session.created_at).toLocaleDateString('nl-NL');
           const winnerText = session.winner ? `${session.winner.name}${session.winner.points ? ` (${session.winner.points} punten)` : ''}` : 'Onbekend';
-          let playersHtml = '';
-          if (session.winner && session.winner.players) {
-            playersHtml = '<div class="players">' + session.winner.players.map((p) => `<div>${p.name}: ${p.score} punten</div>`).join('') + '</div>';
+
+          let extraDetails = '';
+          if (this.currentView === 'detailed' && session.winner && session.winner.players) {
+            extraDetails = '<div class="players">' + session.winner.players.map((p) => `<div>${p.name}: ${p.score} punten</div>`).join('') + '</div>';
           }
+
           return `
-                    <div class="session-item">
-                        <div>
-                            <h4>${session.name}</h4>
-                            <div class="winner">Winnaar: ${winnerText}</div>
-                            <div class="date">Datum: ${date}</div>
-                            ${playersHtml}
-                        </div>
-                    </div>
-                `;
+            <div class="session-item">
+              <h4>${session.name}</h4>
+              <div class="details">Winnaar: ${winnerText}</div>
+              <div class="details">Datum: ${date}</div>
+              ${extraDetails}
+              <button class="btn" onclick="window.location.href='leaderboard.html?session=${session.id}'">Bekijken</button>
+            </div>
+          `;
         })
         .join('');
 
       this.sessionsList.innerHTML = sessionsHtml;
     } catch (error) {
       console.error('Error loading sessions:', error);
-      this.sessionsList.innerHTML = '<p>Fout bij laden sessies.</p>';
+      if (this.sessionsList) {
+        this.sessionsList.innerHTML = '<p>Fout bij laden sessies.</p>';
+      }
     }
   }
 
@@ -100,9 +201,9 @@ class Homepage {
 
         const winner = sortedPlayers[0];
         return {
-          name: `${winner.team}, speler ${winner.name}`,
+          name: winner.name,
           points: winner.score,
-          players: null, // Don't show duplicate
+          players: this.currentView === 'detailed' ? sortedPlayers.slice(0, 5) : null // Top 5 for detailed view
         };
       } else if (session.scoring_mode === 'team_with_players') {
         // For team_with_players, winner is the team, show players of winning team
@@ -144,10 +245,10 @@ class Homepage {
         return {
           name: winner.name,
           points: winner.score,
-          players: sortedTeamPlayers,
+          players: this.currentView === 'detailed' ? sortedTeamPlayers : null
         };
       } else {
-        // For team mode, no players
+        // For team mode, winner is the team with highest score
         const teamsResponse = await this.api.getSessionTeams(session.id);
         const teams = teamsResponse.teams || [];
         const teamMap = {};
@@ -162,54 +263,25 @@ class Homepage {
         });
 
         const sortedTeams = Object.entries(teamScores)
-          .map(([id, score]) => ({ id, name: teamMap[id] || 'Onbekend', score }))
+          .map(([id, score]) => ({
+            id,
+            name: teamMap[id] || 'Onbekend',
+            score,
+          }))
           .sort((a, b) => b.score - a.score);
 
         if (sortedTeams.length === 0) return null;
 
         const winner = sortedTeams[0];
-
         return {
           name: winner.name,
           points: winner.score,
-          players: null,
+          players: this.currentView === 'detailed' ? sortedTeams.slice(0, 3) : null // Top 3 teams for detailed view
         };
       }
     } catch (error) {
-      console.error('Error getting winner for session', session.id, error);
+      console.error('Error getting session winner:', error);
       return null;
-    }
-  }
-
-  async loadTemplates() {
-    try {
-      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
-
-      if (templates.length === 0) {
-        this.templatesList.innerHTML = '<p>Geen templates gevonden.</p>';
-        return;
-      }
-
-      const templatesHtml = templates
-        .map(
-          (template) => `
-                <div class="template-item">
-                    <div>
-                        <h4>${template.name}</h4>
-                    </div>
-                    <div class="template-actions">
-                        <button class="btn" onclick="homepage.loadTemplate(${template.id})">Gebruiken</button>
-                        <button class="delete-team-btn" onclick="homepage.deleteTemplate(${template.id})">Verwijderen</button>
-                    </div>
-                </div>
-            `
-        )
-        .join('');
-
-      this.templatesList.innerHTML = templatesHtml;
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      this.templatesList.innerHTML = '<p>Fout bij laden templates.</p>';
     }
   }
 
