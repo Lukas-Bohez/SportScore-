@@ -136,7 +136,6 @@ class SessionBase(BaseModel):
     name: str
     sport_type: str = "custom"  # Type of sport/activity for theming
     game_type: str = "custom"
-    max_teams: int = 10
     total_rounds: int = 1
     time_limit: Optional[int] = None
     scoring_mode: str = "team"  # "team", "team_with_players", or "player"
@@ -150,7 +149,6 @@ class SessionUpdate(BaseModel):
     sport_type: Optional[str] = None
     game_type: Optional[str] = None
     status: Optional[str] = None
-    max_teams: Optional[int] = None
     current_round: Optional[int] = None
     total_rounds: Optional[int] = None
     time_limit: Optional[int] = None

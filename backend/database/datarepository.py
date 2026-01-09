@@ -502,7 +502,7 @@ class SessionRepository:
     """
 
     @staticmethod
-    def create_session(name: str, game_type: str = "custom", max_teams: int = 10,
+    def create_session(name: str, game_type: str = "custom",
                       total_rounds: int = 1, time_limit: Optional[int] = None, scoring_mode: str = "team",
                       sport_type: str = "custom", show_players: bool = True) -> int:
         # Sessies worden opgeslagen als games, sport_id = Teambuilding (ID 4)
@@ -512,69 +512,46 @@ class SessionRepository:
             sport_result = Database.get_one_row("SELECT id FROM sports WHERE name = 'Custom' LIMIT 1")
         sport_id = sport_result['id'] if sport_result else 4
         
-        # Sla max_teams op in settings JSON
-        settings = json.dumps({"max_teams": max_teams})
+        # Settings without max_teams
+        settings = json.dumps({})
         
         sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings, scoring_mode, sport_type, show_players)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""  
         return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings, scoring_mode, sport_type, 1 if show_players else 0])
     def get_all_sessions() -> List[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
-                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g
                  WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.created_at DESC"""
         sessions = Database.get_rows(sql)
-        
-        # Converteer JSON extract naar int
-        for session in sessions or []:
-            if 'max_teams' in session and isinstance(session['max_teams'], str):
-                try:
-                    session['max_teams'] = int(session['max_teams'])
-                except:
-                    session['max_teams'] = 10
         
         return sessions
 
     @staticmethod
     def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
-                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g WHERE g.id = ?"""
         session = Database.get_one_row(sql, [session_id])
-        
-        if session and 'max_teams' in session and isinstance(session['max_teams'], str):
-            try:
-                session['max_teams'] = int(session['max_teams'])
-            except:
-                session['max_teams'] = 10
         
         return session
 
     @staticmethod
     def get_active_session() -> Optional[Dict[str, Any]]:
         sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at,
-                        COALESCE(JSON_EXTRACT(g.settings, '$.max_teams'), 10) as max_teams
+                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g
                  WHERE g.status IN ('setup', 'active', 'paused')
                  AND g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.updated_at DESC LIMIT 1"""
         session = Database.get_one_row(sql)
         
-        if session and 'max_teams' in session and isinstance(session['max_teams'], str):
-            try:
-                session['max_teams'] = int(session['max_teams'])
-            except:
-                session['max_teams'] = 10
-        
         return session
 
     @staticmethod
     def update_session(session_id: int, name: Optional[str] = None, game_type: Optional[str] = None,
-                      status: Optional[str] = None, max_teams: Optional[int] = None,
+                      status: Optional[str] = None,
                       current_round: Optional[int] = None, total_rounds: Optional[int] = None,
                       time_limit: Optional[int] = None, scoring_mode: Optional[str] = None,
                       sport_type: Optional[str] = None, show_players: Optional[bool] = None) -> bool:
@@ -609,20 +586,7 @@ class SessionRepository:
             updates.append("show_players = ?")
             params.append(1 if show_players else 0)
         
-        # max_teams gaat in settings JSON
-        if max_teams is not None:
-            # Haal huidige settings op
-            current = Database.get_one_row("SELECT settings FROM games WHERE id = ?", [session_id])
-            current_settings = {}
-            if current and current.get('settings'):
-                try:
-                    current_settings = json.loads(current['settings'])
-                except:
-                    pass
-            current_settings['max_teams'] = max_teams
-            updates.append("settings = ?")
-            params.append(json.dumps(current_settings))
-        
+
         if not updates:
             return False
             

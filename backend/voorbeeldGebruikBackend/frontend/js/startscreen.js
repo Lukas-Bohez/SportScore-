@@ -9,7 +9,6 @@ class StartScreen {
     this.bindElements();
     this.setupEventListeners();
     this.loadActiveSession();
-    this.loadRecentSessions();
     this.loadTeams();
   }
 
@@ -19,8 +18,6 @@ class StartScreen {
     this.activeSessionInfo = document.getElementById('active-session-info');
     this.continueBtn = document.getElementById('continue-session');
     this.endBtn = document.getElementById('end-session');
-    this.sessionsList = document.getElementById('sessions-list');
-    this.viewAllSessionsBtn = document.getElementById('view-all-sessions-btn');
 
     // Team management elements
     this.addTeamBtn = document.getElementById('add-team-btn');
@@ -38,17 +35,12 @@ class StartScreen {
     this.pmAddPlayerBtn = document.getElementById('pm-add-player');
     this.pmPlayersList = document.getElementById('pm-players-list');
 
-    // Power user elements
-    this.powerUserBtn = document.getElementById('power-user-btn');
-    this.recentSessionsDiv = document.getElementById('recent-sessions');
-
     // Log missing elements for debugging
     if (!this.sessionForm) console.warn('session-form element not found');
     if (!this.activeSessionDiv) console.warn('active-session element not found');
     if (!this.activeSessionInfo) console.warn('active-session-info element not found');
     if (!this.continueBtn) console.warn('continue-session element not found');
     if (!this.endBtn) console.warn('end-session element not found');
-    if (!this.sessionsList) console.warn('sessions-list element not found');
     if (!this.viewAllSessionsBtn) console.warn('view-all-sessions-btn element not found');
   }
 
@@ -72,18 +64,9 @@ class StartScreen {
       });
     }
 
-    if (this.viewAllSessionsBtn) {
-      this.viewAllSessionsBtn.addEventListener('click', () => {
-        this.viewAllSessions();
-      });
-    }
-
     // Player manager events
     if (this.showPlayerManagerBtn) this.showPlayerManagerBtn.addEventListener('click', () => this.togglePlayerManager());
     if (this.pmAddPlayerBtn) this.pmAddPlayerBtn.addEventListener('click', () => this.createPlayerFromManager());
-
-    // Power user events
-    if (this.powerUserBtn) this.powerUserBtn.addEventListener('click', () => this.toggleRecentSessions());
 
     // Team management event listeners
     if (this.addTeamBtn) {
@@ -130,7 +113,6 @@ class StartScreen {
       game_type: document.getElementById('game-type').value,
       scoring_mode: document.getElementById('scoring-mode').value,
       show_players: this.showPlayersCheckbox ? Boolean(this.showPlayersCheckbox.checked) : true,
-      max_teams: parseInt(document.getElementById('max-teams').value),
       total_rounds: parseInt(document.getElementById('total-rounds').value),
       time_limit: document.getElementById('time-limit').value ? parseInt(document.getElementById('time-limit').value) * 60 : null, // Convert to seconds
     };
@@ -222,8 +204,7 @@ class StartScreen {
             <strong>${session.name}</strong><br>
             Type: ${gameTypeNames[session.game_type] || session.game_type}<br>
             Status: ${this.getStatusText(session.status)}<br>
-            Ronde: ${session.current_round}/${session.total_rounds}<br>
-            Max teams: ${session.max_teams}
+            Ronde: ${session.current_round}/${session.total_rounds}
         `;
   }
 
@@ -255,12 +236,7 @@ class StartScreen {
     }
   }
 
-  viewAllSessions() {
-    // Load and display ALL sessions instead of redirecting to admin
-    this.loadAllSessions();
-  }
-
-  async loadRecentSessions() {
+  async loadAllSessions() {
     try {
       const response = await api.get('/api/v1/sessions');
       // Handle both response formats: {sessions: [...]} or [...] directly
@@ -271,56 +247,6 @@ class StartScreen {
       api.handleError(error, 'loading recent sessions');
       this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
     }
-  }
-
-  async loadAllSessions() {
-    try {
-      const response = await api.get('/api/v1/sessions');
-      // Handle both response formats: {sessions: [...]} or [...] directly
-      const sessions = Array.isArray(response) ? response : response.sessions || [];
-      // Always render the section to show either the list or the empty state
-      this.displayRecentSessions(sessions);
-    } catch (error) {
-      api.handleError(error, 'loading all sessions');
-      this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
-    }
-  }
-
-  displayRecentSessions(sessions) {
-    if (sessions.length === 0) {
-      this.sessionsList.innerHTML = 'Geen recente sessies gevonden.';
-      return;
-    }
-
-    const sessionsHtml = sessions
-      .map((session) => {
-        const gameTypeNames = {
-          custom: 'Aangepast',
-          quiz: 'Quiz',
-          sport_challenge: 'Sport',
-          random_bonus: 'Bonus',
-          elimination: 'Elimination',
-          team_vs_time: 'Tijd',
-        };
-
-        return `
-                <div class="session-item">
-                    <div class="session-info">
-                        <h3>${session.name}</h3>
-                        <p>Type: ${gameTypeNames[session.game_type] || session.game_type} |
-                           Status: ${this.getStatusText(session.status)} |
-                           Aangemaakt: ${new Date(session.created_at).toLocaleDateString('nl-NL')}</p>
-                    </div>
-                    <div class="session-actions">
-                        <button class="btn-small btn-primary" onclick="window.location.href='teamsetup.html?session=${session.id}'">Bewerken</button>
-                        <button class="btn-small btn-secondary" onclick="window.location.href='leaderboard.html?session=${session.id}'">Bekijken</button>
-                    </div>
-                </div>
-            `;
-      })
-      .join('');
-
-    this.sessionsList.innerHTML = sessionsHtml;
   }
 
   getStatusText(status) {
@@ -743,12 +669,7 @@ class StartScreen {
     }
   }
 
-  toggleRecentSessions() {
-    if (this.recentSessionsDiv) {
-      this.recentSessionsDiv.classList.toggle('hidden');
-    }
   }
-}
 
 // Initialize the start screen when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

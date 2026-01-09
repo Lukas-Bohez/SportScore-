@@ -45,12 +45,54 @@
         .power-user-link:hover {
             opacity: 1;
         }
+        body {
+            /* Removed padding-bottom so nav appears on top of content */
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 8px var(--shadow-color);
+            z-index: 1000; /* Ensure it appears on top of content */
+        }
+        @media (min-width: 768px) {
+            .bottom-nav {
+                justify-content: center;
+                gap: 40px;
+                padding: 15px 0;
+            }
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+        .nav-item:hover, .nav-item.active {
+            border: 2px solid #000; /* Black border for active/hover state */
+        }
+        .nav-item .icon {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        .nav-item .label {
+            font-size: 0.8em;
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <a href="homescreen.html" class="control-btn" style="text-decoration: none; position: absolute; top: 20px; left: 20px;">← Terug naar Home</a>
             <div style="text-align: center;">
                 <h1>SportScore</h1>
                 <p>Digitaal scorebord voor teambuildings</p>
@@ -132,27 +174,47 @@
                         <div id="pm-players-list">Laden spelers…</div>
                     </div>
                 </div>
-
-                <div class="recent-sessions hidden" id="recent-sessions">
-                    <div class="section-header">
-                        <h2>Recente Sessies</h2>
-                        <button id="view-all-sessions-btn" class="view-all-btn">Alle Sessies Bekijken</button>
-                    </div>
-                    <div id="sessions-list">Laden...</div>
-                </div>
+            </div>
             </div>
         </main>
 
-        <footer class="footer">
-            <p>&copy; 2025 SportScore - Digitaal Scorebord voor Teambuildings</p>
-        </footer>
-    </div>
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-item" data-section="teams">
+                <div class="icon">👥</div>
+                <div class="label">Teams</div>
+            </div>
+            <div class="nav-item" data-section="start">
+                <div class="icon">🚀</div>
+                <div class="label">Start</div>
+            </div>
+            <div class="nav-item" data-section="sessions">
+                <div class="icon">🕐</div>
+                <div class="label">Sessies</div>
+            </div>
+        </nav>
 
-    <button id="power-user-btn" class="power-user-link" title="Power User Mode">⚙️</button>
+        <footer class="footer">
+    </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/startscreen.js"></script>
+    <script>
+        // Handle bottom navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const section = item.dataset.section;
+                    if (section === 'start' || section === 'sessions') {
+                        window.location.href = 'homescreen.html';
+                    }
+                    // teams section stays on current page
+                });
+            });
+        });
+    </script>
 </body>
 </html>

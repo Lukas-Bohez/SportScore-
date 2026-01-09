@@ -8,10 +8,21 @@
     <link rel="stylesheet" href="css/buttons.css">
     <link rel="stylesheet" href="css/themes.css">
     <style>
+        body {
+            /* Removed padding-bottom so nav appears on top of content */
+        }
+        .content-section {
+            display: none;
+            padding: 20px;
+            min-height: calc(100vh - 200px);
+        }
+        .content-section.active {
+            display: block;
+        }
         .hero {
             text-align: center;
             padding: 40px 20px;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
         .hero h2 {
             font-size: 2.5em;
@@ -40,122 +51,159 @@
             background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
             transform: translateY(-2px);
         }
-        .homepage-cards {
-            display: flex;
-            flex-direction: column;
+        .templates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-            align-items: center;
-        }
-        .bottom-row {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-        .bottom-row .card:first-child {
-            flex: 1;
-        }
-        .bottom-row .card:last-child {
-            flex: 2;
-        }
-        .homepage-cards .card {
-            flex: none;
-        }
-        .card {
-            background: var(--card-background, #ffffff);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            padding: 30px 30px 20px 30px;
-            text-align: center;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            flex: 1 1 300px;
-            max-width: 400px;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-        }
-        .card h2 {
-            color: var(--text-color);
-            margin-bottom: 15px;
-            font-size: 1.5em;
-        }
-        .card p {
-            color: var(--text-secondary, #666);
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-        .card .btn {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .card .btn:hover {
-            background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
-            transform: translateY(-2px);
-        }
-        .sessions-list, .templates-list {
-            text-align: left;
             margin-top: 20px;
         }
-        .session-item, .template-item {
-            background: var(--background-color);
-            border: 1px solid var(--border-color, #e1e5e9);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative;
+        .template-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px var(--shadow-color);
+            transition: transform 0.3s ease;
         }
-        .session-item > div, .template-item > div {
-            flex: 1;
-            min-width: 0;
+        .template-card:hover {
+            transform: translateY(-2px);
         }
-        .session-item h4, .template-item h4 {
-            margin: 0;
+        .template-card h3 {
             color: var(--text-color);
+            margin-bottom: 10px;
         }
-        .session-item .winner, .template-item .details {
-            color: var(--text-secondary, #666);
-            font-size: 0.9em;
-        }
-        .session-item .btn, .template-item .btn {
-            padding: 4px 8px;
-            font-size: 12px;
-            white-space: nowrap;
+        .template-card p {
+            color: var(--text-secondary);
+            margin-bottom: 15px;
         }
         .template-actions {
             display: flex;
-            gap: 5px;
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
+            justify-content: center;
+            gap: 10px;
         }
-        .power-user-link { position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5; }
-        .power-user-link:hover { opacity: 1; }
+        .manage-teams {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .manage-teams .team-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        .sessions-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .sessions-view h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            font-size: 1.8em;
+        }
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        .view-toggle button {
+            padding: 8px 16px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .view-toggle button.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        .sessions-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .session-item {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--shadow-color);
+            transition: transform 0.3s ease;
+        }
+        .session-item:hover {
+            transform: translateY(-2px);
+        }
+        .session-item h4 {
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+        .session-item .details {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .session-item .players {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        .session-item .players div {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+        .session-item .btn {
+            margin-top: 15px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 8px var(--shadow-color);
+            z-index: 1000; /* Ensure it appears on top of content */
+        }
+        @media (min-width: 768px) {
+            .bottom-nav {
+                justify-content: center;
+                gap: 40px;
+                padding: 15px 0;
+            }
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+        .nav-item:hover, .nav-item.active {
+            border: 2px solid #000; /* Black border for active/hover state */
+        }
+        .nav-item .icon {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        .nav-item .label {
+            font-size: 0.8em;
+            color: var(--text-color);
+        }
         @media (max-width: 768px) {
-            .bottom-row {
-                flex-direction: column;
+            .templates-grid {
+                grid-template-columns: 1fr;
             }
-            .bottom-row .card:first-child {
-                order: 2;
-                flex: none;
-            }
-            .bottom-row .card:last-child {
-                order: 1;
-                flex: none;
+            .sessions-list {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -168,42 +216,58 @@
         </header>
 
         <main>
-            <div class="hero">
-                <h2>Welkom bij SportScore</h2>
-                <p>Start je teambuilding avontuur eenvoudig.</p>
-                <a href="simple-setup.html" class="btn">Nieuwe Sessie Starten</a>
+            <!-- Start Session Section -->
+            <div id="start-section" class="content-section active">
+                <div class="hero">
+                    <h2>Start Nieuwe Sessie</h2>
+                    <p>Kies een template om snel te beginnen, of maak een custom sessie.</p>
+                    <a href="simple-setup.html" class="btn">Sessie Starten</a>
+                </div>
+                <div class="templates-grid" id="templates-grid">
+                    <!-- Templates will be loaded here -->
+                </div>
             </div>
 
-            <div class="homepage-cards">
-                <div class="card">
-                    <h2>👥 Teams & Sessies Beheren</h2>
-                    <p>Beheer bestaande teams en hervat actieve sessies.</p>
-                    <a href="startscreen.html" class="btn">Beheren</a>
+            <!-- Manage Teams Section -->
+            <div id="teams-section" class="content-section">
+                <div class="manage-teams">
+                    <div class="team-icon">👥</div>
+                    <h2>Teams Beheren</h2>
+                    <p>Beheer bestaande teams en spelers.</p>
+                    <a href="startscreen.html" class="btn">Naar Team Beheer</a>
                 </div>
+            </div>
 
-                <div class="bottom-row">
-                    <div class="card">
-                        <h2>📚 Vorige Sessies</h2>
-                        <p>Bekijk vorige gespeelde sessies en hun winnaars.</p>
-                        <div class="sessions-list" id="sessions-list">
-                            <!-- Sessions will be loaded here -->
-                        </div>
+            <!-- Old Sessions Section -->
+            <div id="sessions-section" class="content-section">
+                <div class="sessions-view">
+                    <h2>Oude Sessies</h2>
+                    <div class="view-toggle">
+                        <button id="simple-view" class="active">Eenvoudig</button>
+                        <button id="detailed-view">Gedetailleerd</button>
                     </div>
-
-                    <div class="card">
-                        <h2>📋 Templates</h2>
-                        <p>Bekijk opgeslagen sessie templates om snel te starten.</p>
-                        <div class="templates-list" id="templates-list">
-                            <!-- Templates will be loaded here -->
-                        </div>
+                    <div class="sessions-list" id="sessions-list">
+                        <!-- Sessions will be loaded here -->
                     </div>
                 </div>
             </div>
         </main>
 
-        <footer class="footer">
-            <p>&copy; 2025 SportScore - Digitaal Scorebord voor Teambuildings</p>
-        </footer>
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-item" data-section="teams">
+                <div class="icon">👥</div>
+                <div class="label">Teams</div>
+            </div>
+            <div class="nav-item active" data-section="start">
+                <div class="icon">🚀</div>
+                <div class="label">Start</div>
+            </div>
+            <div class="nav-item" data-section="sessions">
+                <div class="icon">🕐</div>
+                <div class="label">Sessies</div>
+            </div>
+        </nav>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>

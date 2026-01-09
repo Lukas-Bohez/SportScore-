@@ -42,9 +42,6 @@ class SimpleSetup {
     if (this.sessionData.game_type) {
       this.gameTypeSelect.value = this.sessionData.game_type;
     }
-    if (this.sessionData.max_teams) {
-      this.maxTeamsInput.value = this.sessionData.max_teams;
-    }
     if (this.sessionData.total_rounds) {
       this.totalRoundsInput.value = this.sessionData.total_rounds;
     }
@@ -103,7 +100,6 @@ class SimpleSetup {
     this.sportTypeSelect = document.getElementById('sport-type');
     this.scoringModeSelect = document.getElementById('scoring-mode');
     this.gameTypeSelect = document.getElementById('game-type');
-    this.maxTeamsInput = document.getElementById('max-teams');
     this.totalRoundsInput = document.getElementById('total-rounds');
     this.timeLimitInput = document.getElementById('time-limit');
 
@@ -361,9 +357,6 @@ class SimpleSetup {
           isValid = false;
         } else if (this.scoringModeSelect.value === '') {
           errorMessage = 'Selecteer een scoring mode.';
-          isValid = false;
-        } else if (this.maxTeamsInput && (parseInt(this.maxTeamsInput.value) < 2 || parseInt(this.maxTeamsInput.value) > 20)) {
-          errorMessage = 'Max teams moet tussen 2 en 20 liggen.';
           isValid = false;
         } else if (this.totalRoundsInput && (parseInt(this.totalRoundsInput.value) < 1 || parseInt(this.totalRoundsInput.value) > 10)) {
           errorMessage = 'Aantal rondes moet tussen 1 en 10 liggen.';
@@ -1346,7 +1339,6 @@ class SimpleSetup {
   async createSession() {
     try {
       // Gather all session data
-      const maxTeams = parseInt(this.maxTeamsInput?.value) || this.teams.length;
       const totalRounds = parseInt(this.totalRoundsInput?.value) || 1;
       const timeLimit = this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null; // Convert minutes to seconds
       const showPlayers = this.sessionData.scoringMode !== 'team'; // Derived from scoring mode
@@ -1357,7 +1349,6 @@ class SimpleSetup {
         sport_type: this.sessionData.sportType,
         game_type: this.sessionData.gameType,
         scoring_mode: this.sessionData.scoringMode,
-        max_teams: maxTeams,
         total_rounds: totalRounds,
         time_limit: timeLimit,
         show_players: showPlayers,
@@ -1414,7 +1405,6 @@ class SimpleSetup {
       sport_type: this.sessionData.sportType,
       scoring_mode: this.sessionData.scoringMode,
       game_type: this.sessionData.gameType,
-      max_teams: parseInt(this.maxTeamsInput?.value) || this.teams.length,
       total_rounds: parseInt(this.totalRoundsInput?.value) || 1,
       time_limit: this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null,
       teams: this.teams,
