@@ -632,6 +632,10 @@ class ScoreboardAPI {
     return this.request('/api/v1/standalone-teams');
   }
 
+  async getStandaloneTeam(teamId) {
+    return this.request(`/api/v1/standalone-teams/${teamId}`);
+  }
+
   async createStandaloneTeam(data) {
     return this.request('/api/v1/standalone-teams', {
       method: 'POST',

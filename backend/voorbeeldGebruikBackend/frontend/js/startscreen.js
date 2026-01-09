@@ -1,6 +1,7 @@
 // Start Screen JavaScript
 class StartScreen {
   constructor() {
+    this.editingTeamId = null;
     this.init();
   }
 
@@ -336,6 +337,7 @@ class StartScreen {
   showTeamForm() {
     this.teamFormContainer.classList.remove('hidden');
     this.teamForm.reset();
+    this.editingTeamId = null;
     // Initialize color preview
     this.handleColorChange({ target: { value: '#3B82F6' } });
   }
@@ -343,6 +345,35 @@ class StartScreen {
   hideTeamForm() {
     this.teamFormContainer.classList.add('hidden');
     this.teamForm.reset();
+    this.editingTeamId = null;
+  }
+
+  async editTeam(teamId) {
+    try {
+      const response = await api.getStandaloneTeam(teamId);
+      if (response && response.team) {
+        const team = response.team;
+        this.editingTeamId = teamId;
+
+        // Populate form with team data
+        document.getElementById('team-name').value = team.name || '';
+        document.getElementById('team-color').value = team.color || '#3B82F6';
+        document.getElementById('team-icon').value = team.icon || 'team';
+        document.getElementById('team-description').value = team.description || '';
+
+        // Update color preview
+        this.handleColorChange({ target: { value: team.color || '#3B82F6' } });
+
+        // Show form
+        this.teamFormContainer.classList.remove('hidden');
+
+        // Focus on name field
+        document.getElementById('team-name').focus();
+      }
+    } catch (error) {
+      api.handleError(error, 'loading team for editing');
+      alert('Fout bij het laden van team gegevens.');
+    }
   }
 
   handleColorChange(e) {
@@ -529,6 +560,9 @@ class StartScreen {
         </div>
         ${team.description ? `<p class="team-description">${team.description}</p>` : ''}
         <div class="team-actions">
+          <button class="edit-team-btn" onclick="startScreen.editTeam(${team.id})">
+            ✏️ Bewerken
+          </button>
           <button class="delete-team-btn" onclick="startScreen.deleteTeam(${team.id}, '${team.name}')">
             🗑️ Verwijderen
           </button>
@@ -615,7 +649,8 @@ class StartScreen {
     try {
       const resp = await api.get('/api/v1/players');
       const players = resp && resp.players ? resp.players : [];
-      const unassigned = players.filter((p) => !p.team_id || String(p.team_id) !== String(teamId));
+      // Only show players that are not assigned to any team
+      const unassigned = players.filter((p) => !p.team_id);
       // Sort unassigned players alphabetically by name
       unassigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!unassigned || unassigned.length === 0) {
@@ -668,18 +703,27 @@ class StartScreen {
     };
 
     try {
-      const response = await api.createStandaloneTeam(teamData);
+      let response;
+      if (this.editingTeamId) {
+        // Update existing team
+        response = await api.updateStandaloneTeam(this.editingTeamId, teamData);
+        this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
+      } else {
+        // Create new team
+        response = await api.createStandaloneTeam(teamData);
+        this.showSuccessMessage(`Team "${teamData.name}" succesvol aangemaakt!`);
+      }
+
       if (response) {
         this.hideTeamForm();
         this.loadTeams();
-        alert(`Team "${teamData.name}" succesvol aangemaakt!`);
       }
     } catch (error) {
-      api.handleError(error, 'creating team');
+      api.handleError(error, 'creating/updating team');
       if (error.message && error.message.includes('already exists')) {
         alert('Er bestaat al een team met deze naam. Kies een andere naam.');
       } else {
-        alert('Fout bij het aanmaken van het team. Probeer opnieuw.');
+        alert('Fout bij het aanmaken/bijwerken van het team. Probeer opnieuw.');
       }
     }
   }

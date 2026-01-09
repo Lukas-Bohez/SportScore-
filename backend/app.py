@@ -892,6 +892,18 @@ async def get_all_standalone_teams():
     teams = SessionTeamRepository.get_all_teams()
     return {"teams": teams}
 
+@app.get(
+    f"{ENDPOINT}/standalone-teams/{{team_id}}",
+    tags=["Standalone Teams"],
+    summary="Get a standalone team by ID"
+)
+async def get_standalone_team(team_id: int):
+    """Get a specific team that can be reused across sessions."""
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return {"team": team}
+
 @app.post(
     f"{ENDPOINT}/standalone-teams",
     tags=["Standalone Teams"],
