@@ -352,6 +352,31 @@
             border-color: rgba(255,255,255,0.8);
             transform: scale(1.05);
         }
+        /* Smaller buttons for step 2 */
+        #add-team-btn, #add-existing-team-btn, #save-team-btn, #cancel-team-btn, #prev-2, #next-2 {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            min-width: auto;
+            flex: none;
+            width: auto;
+            max-width: none;
+        }
+        /* Fix select styling in dark mode */
+        #existing-team-select {
+            background: var(--input-bg, #ffffff);
+            color: var(--input-text, #495057);
+            border: 1px solid var(--input-border, #ced4da);
+        }
+        /* Dark mode adjustments */
+        .dark-mode .empty-state {
+            background: rgba(0,0,0,0.2);
+            color: var(--text-secondary);
+        }
+        .dark-mode .team-card {
+            box-shadow: 0 2px 8px var(--shadow-color) !important;
+            background: #2c2c2c !important;
+        }
     </style>
 </head>
 <body>
@@ -363,7 +388,7 @@
                     <h1>SportScore - Eenvoudige Setup</h1>
                     <p>Stap-voor-stap sessie aanmaken</p>
                 </div>
-                <div></div> <!-- Spacer -->
+                <button id="qr-toggle" onclick="toggleQR()" class="control-btn">📱 QR</button>
             </div>
         </header>
 
@@ -376,57 +401,6 @@
                     <input type="text" id="session-name" placeholder="bijv. Team Building Dag 2025" required>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="sport-type">Activiteit Type <small>(stijl)</small>:</label>
-                        <select id="sport-type">
-                            <option value="custom">🎯 Aangepast</option>
-                            <option value="quiz">🧠 Quiz</option>
-                            <option value="voetbal">⚽ Voetbal</option>
-                            <option value="basketbal">🏀 Basketbal</option>
-                            <option value="volleybal">🏐 Volleybal</option>
-                            <option value="hockey">🏑 Hockey</option>
-                            <option value="tennis">🎾 Tennis</option>
-                            <option value="atletiek">🏃 Atletiek</option>
-                            <option value="zwemmen">🏊 Zwemmen</option>
-                            <option value="fietsen">🚴 Wielrennen</option>
-                            <option value="hardlopen">🏃 Hardlopen</option>
-                            <option value="esports">🎮 E-Sports</option>
-                            <option value="boardgame">🎲 Bordspel</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="scoring-mode">Scoring Mode:</label>
-                        <select id="scoring-mode">
-                            <option value="team">👥 Team Scores</option>
-                            <option value="team_with_players">👥👤 Team met Spelers</option>
-                            <option value="player">👤 Speler Scores</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="game-type">Game Type <small>(modus)</small>:</label>
-                    <select id="game-type">
-                        <option value="custom">🎯 Aangepast</option>
-                        <option value="quiz">🧠 Quiz Modus</option>
-                        <option value="sport_challenge">🏃 Sport Challenge</option>
-                        <option value="elimination">❌ Eliminatie Modus</option>
-                        <option value="team_vs_time">⏱️ Team vs Tijd</option>
-                    </select>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="total-rounds">Aantal Rondes:</label>
-                        <input type="number" id="total-rounds" value="1" min="1" max="10">
-                    </div>
-                    <div class="form-group">
-                        <label for="time-limit">Tijdslimiet (min):</label>
-                        <input type="number" id="time-limit" placeholder="Optioneel" min="1">
-                    </div>
-                </div>
-
                 <div id="step-1-error" class="error-message"></div>
                 <div class="step-navigation">
                     <button id="next-1" class="create-btn">Volgende</button>
@@ -434,7 +408,92 @@
             </div>
 
             <div id="step-2" class="step card">
-                <h2>Stap 2: Teams Toevoegen</h2>
+                <h2>Stap 2: Activiteiten Toevoegen</h2>
+                <div id="activities-section">
+                    <div class="section-header">
+                        <h2>Activiteit Beheer</h2>
+                        <button id="add-activity-btn" class="add-team-btn" style="flex-shrink: 0;">+ Nieuwe Activiteit</button>
+                    </div>
+
+                    <div id="activity-form-container" class="team-form-container hidden">
+                        <form id="activity-form" class="team-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="activity-name">Activiteit Naam:</label>
+                                    <input type="text" id="activity-name" placeholder="bijv. Basketbal 3-Punters" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="activity-sport">Stijl (sport type):</label>
+                                    <select id="activity-sport">
+                                        <option value="custom">🎯 Aangepast</option>
+                                        <option value="quiz">🧠 Quiz</option>
+                                        <option value="voetbal">⚽ Voetbal</option>
+                                        <option value="basketbal">🏀 Basketbal</option>
+                                        <option value="volleybal">🏐 Volleybal</option>
+                                        <option value="hockey">🏑 Hockey</option>
+                                        <option value="tennis">🎾 Tennis</option>
+                                        <option value="atletiek">🏃 Atletiek</option>
+                                        <option value="zwemmen">🏊 Zwemmen</option>
+                                        <option value="fietsen">🚴 Wielrennen</option>
+                                        <option value="hardlopen">🏃 Hardlopen</option>
+                                        <option value="esports">🎮 E-Sports</option>
+                                        <option value="boardgame">🎲 Bordspel</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="activity-scoring">Scoring Mode:</label>
+                                    <select id="activity-scoring">
+                                        <option value="team">👥 Team Scores</option>
+                                        <option value="team_with_players">👥👤 Team met Spelers</option>
+                                        <option value="player">👤 Speler Scores</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="activity-game-type">Game Type (modus):</label>
+                                    <select id="activity-game-type">
+                                        <option value="custom">🎯 Aangepast</option>
+                                        <option value="quiz">🧠 Quiz Modus</option>
+                                        <option value="sport_challenge">🏃 Sport Challenge</option>
+                                        <option value="elimination">❌ Eliminatie Modus</option>
+                                        <option value="team_vs_time">⏱️ Team vs Tijd</option>
+                                        <option value="golf">⛳ Golf Scoring</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="activity-rounds">Aantal Rondes:</label>
+                                    <input type="number" id="activity-rounds" value="1" min="1" max="10">
+                                </div>
+                                <div class="form-group">
+                                    <label for="activity-time">Tijdslimiet (min):</label>
+                                    <input type="number" id="activity-time" placeholder="Optioneel" min="1">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="activity-desc">Beschrijving (optioneel):</label>
+                                <input type="text" id="activity-desc" placeholder="bijv. Snelle 3-punters ronde">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="save-team-btn">Activiteit Opslaan</button>
+                                <button type="button" id="cancel-activity-btn" class="cancel-team-btn">Annuleren</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="activities-list" class="teams-list"></div>
+                </div>
+                <div id="step-2-error" class="error-message"></div>
+                <div class="step-navigation">
+                    <button id="prev-2" class="control-btn">Vorige</button>
+                    <button id="next-2" class="create-btn">Volgende</button>
+                </div>
+            </div>
+
+            <div id="step-3" class="step card">
+                <h2>Stap 3: Teams Toevoegen</h2>
                 <div class="team-management" id="team-management">
                     <div class="section-header">
                         <h2>Team Beheer</h2>
@@ -496,15 +555,15 @@
                     <div id="teams-list" class="teams-list">
                     </div>
                 </div>
-                <div id="step-2-error" class="error-message"></div>
+                <div id="step-3-error" class="error-message"></div>
                 <div class="step-navigation">
-                    <button id="prev-2" class="control-btn">Vorige</button>
-                    <button id="next-2" class="create-btn">Volgende</button>
+                    <button id="prev-3" class="control-btn">Vorige</button>
+                    <button id="next-3" class="create-btn">Volgende</button>
                 </div>
             </div>
 
-            <div id="step-3" class="step card">
-                <h2>Stap 3: Spelers Toevoegen</h2>
+            <div id="step-4" class="step card">
+                <h2>Stap 4: Spelers Toevoegen</h2>
                 <div id="players-section">
                     <div id="team-mode-message" style="display: none; text-align: center; color: #666; font-style: italic; margin: 20px 0;">
                         Geen spelers nodig voor team-modus. Ga door naar de volgende stap.
@@ -526,27 +585,26 @@
                         <div class="players-list" id="players-list"></div>
                     </div>
                 </div>
-                <div id="step-3-error" class="error-message"></div>
+                <div id="step-4-error" class="error-message"></div>
                 <div class="step-navigation">
-                    <button id="prev-3" class="control-btn">Vorige</button>
-                    <button id="next-3" class="create-btn">Volgende</button>
+                    <button id="prev-4" class="control-btn">Vorige</button>
+                    <button id="next-4" class="create-btn">Volgende</button>
                 </div>
             </div>
 
-            <div id="step-4" class="step card">
-                <h2>Stap 4: Overzicht</h2>
+            <div id="step-5" class="step card">
+                <h2>Stap 5: Overzicht</h2>
                 <div id="session-review">
                     <p><strong>Sessie Naam:</strong> <span id="review-session-name">-</span></p>
-                    <p><strong>Activiteit Type (stijl):</strong> <span id="review-sport-type">-</span></p>
-                    <p><strong>Scoring Mode:</strong> <span id="review-scoring-mode">-</span></p>
-                    <p><strong>Game Type (modus):</strong> <span id="review-game-type">-</span></p>
+                    <h3>Activiteiten:</h3>
+                    <ul id="review-activities"></ul>
                     <h3>Teams:</h3>
                     <ul id="review-teams"></ul>
                     <h3>Spelers:</h3>
                     <ul id="review-players"></ul>
                 </div>
                 <div class="step-navigation">
-                    <button id="prev-4" class="control-btn">Vorige</button>
+                    <button id="prev-5" class="control-btn">Vorige</button>
                     <button id="save-template" class="control-btn">Opslaan als Template</button>
                     <button id="start-scoring" class="create-btn">Start Sessie</button>
                 </div>
@@ -562,6 +620,22 @@
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/simple-setup.js"></script>
+    <script>
+        const socket = io('http://' + window.location.hostname + ':8000');
+
+        // Emit admin present when page loads
+        socket.emit('admin-present');
+
+        // Emit admin leave when page unloads
+        window.addEventListener('beforeunload', () => {
+            socket.emit('admin-leave');
+        });
+
+        // Function to toggle QR visibility
+        function toggleQR() {
+            socket.emit('toggle-qr');
+        }
+    </script>
 </body>
 </html></content>
 <parameter name="filePath">c:\Users\lukas\OneDrive - Hogeschool West-Vlaanderen\Documents\security\SportScore-\backend\voorbeeldGebruikBackend\frontend\simple-setup.html

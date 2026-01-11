@@ -3,26 +3,519 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SportScore - Live Scorebord</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>SportScore - Login</title>
     <link rel="stylesheet" href="css/themes.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: var(--card-bg, #ffffff);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            text-align: center;
+        }
+
+        .logo {
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 2.5em;
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: var(--text-secondary, #6c757d);
+            font-size: 0.95em;
+        }
+
+        .role-selection {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .role-button {
+            padding: 30px 20px;
+            border: 2px solid var(--border-color, #e1e5e9);
+            border-radius: 10px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .role-button:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .role-button.admin {
+            border-color: #ff6b6b;
+        }
+
+        .role-button.admin:hover {
+            background: rgba(255, 107, 107, 0.1);
+            border-color: #ff6b6b;
+        }
+
+        .role-button.player {
+            border-color: #51cf66;
+        }
+
+        .role-button.player:hover {
+            background: rgba(81, 207, 102, 0.1);
+            border-color: #51cf66;
+        }
+
+        .role-icon {
+            font-size: 3em;
+        }
+
+        .form-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .form-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.95em;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--input-border, #e1e5e9);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--input-text, #495057);
+            font-size: 0.95em;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--border-color, #e1e5e9);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--text-secondary, #6c757d);
+            color: white;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            background: #ffe0e0;
+            border: 1px solid #ffb3b3;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .back-button {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-button button {
+            background: transparent;
+            border: none;
+            color: var(--theme-primary, #667eea);
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: underline;
+            transition: color 0.2s ease;
+        }
+
+        .back-button button:hover {
+            color: #764ba2;
+        }
+
+        .dark-mode .login-box {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .dark-mode .role-button {
+            background: var(--card-bg);
+        }
+
+        .dark-mode .form-group input,
+        .dark-mode .form-group select {
+            background: var(--input-bg);
+            color: var(--input-text);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header class="header">
-            <h1 id="sport-name">SportScore</h1>
-        </header>
+        <div class="login-box">
+            <!-- Initial Role Selection -->
+            <div id="role-selection" class="form-section active">
+                <div class="logo">
+                    <h1>SportScore</h1>
+                    <p>Digitaal Scorebord voor Teambuildings</p>
+                </div>
 
-        <main class="main-content">
-            <div class="leaderboard-container" id="teams-container">
-                <!-- Teams will be dynamically generated by JavaScript -->
+                <p style="color: var(--text-secondary, #6c757d); margin-bottom: 30px;">
+                    Kies uw rol:
+                </p>
+
+                <div class="role-selection">
+                    <button class="role-button admin" onclick="selectRole('admin')">
+                        <div class="role-icon">👨‍💼</div>
+                        <div>Admin</div>
+                    </button>
+                    <button class="role-button player" onclick="selectRole('player')">
+                        <div class="role-icon">👥</div>
+                        <div>Speler</div>
+                    </button>
+                </div>
             </div>
-        </main>
+
+            <!-- Admin Login Form -->
+            <div id="admin-login" class="form-section">
+                <h2 style="margin-bottom: 30px; color: var(--text-color);">Admin Login</h2>
+
+                <div class="error-message" id="admin-error"></div>
+
+                <div class="form-group">
+                    <label for="admin-password">Wachtwoord:</label>
+                    <input type="password" id="admin-password" placeholder="Voer het admin wachtwoord in" required>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="loginAdmin()">Inloggen</button>
+                    <button class="btn btn-secondary" onclick="backToRoleSelection()">Terug</button>
+                </div>
+            </div>
+
+            <!-- Player Login Form -->
+            <div id="player-login" class="form-section">
+                <h2 style="margin-bottom: 30px; color: var(--text-color);">Speler Inloggen</h2>
+
+                <div class="error-message" id="player-error"></div>
+
+                <div class="form-group">
+                    <label for="session-select">Selecteer Sessie:</label>
+                    <select id="session-select" required>
+                        <option value="">-- Laden...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="team-select">Selecteer Team:</label>
+                    <select id="team-select" required>
+                        <option value="">-- Selecteer eerst een sessie</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="player-name">Spelernaam:</label>
+                    <input type="text" id="player-name" placeholder="Voer je spelernaam in" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-select">Kies Activiteit:</label>
+                    <select id="activity-select" required>
+                        <option value="">-- Selecteer eerst een team</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="loginPlayer()">Deelnemen</button>
+                    <button class="btn btn-secondary" onclick="backToRoleSelection()">Terug</button>
+                </div>
+            </div>
+
+            <!-- Dark Mode Toggle -->
+            <div style="position: absolute; top: 20px; right: 20px;">
+                <button id="theme-toggle" onclick="toggleDarkMode()" 
+                    style="background: transparent; border: none; font-size: 1.5em; cursor: pointer;">
+                    🌙
+                </button>
+            </div>
+        </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/dark_mode_toggle.js"></script>
-    <script src="js/bigscreen.js"></script>
+    <script>
+        // Initialize dark mode
+        const darkModeEnabled = localStorage.getItem('darkMode') === 'true';
+        if (darkModeEnabled) {
+            document.body.classList.add('dark-mode');
+            document.getElementById('theme-toggle').textContent = '☀️';
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+        }
+
+        function selectRole(role) {
+            if (role === 'admin') {
+                document.getElementById('role-selection').classList.remove('active');
+                document.getElementById('admin-login').classList.add('active');
+                document.getElementById('admin-password').focus();
+            } else if (role === 'player') {
+                document.getElementById('role-selection').classList.remove('active');
+                document.getElementById('player-login').classList.add('active');
+                loadSessions();
+            }
+        }
+
+        function backToRoleSelection() {
+            document.getElementById('role-selection').classList.add('active');
+            document.getElementById('admin-login').classList.remove('active');
+            document.getElementById('player-login').classList.remove('active');
+            document.getElementById('admin-password').value = '';
+            document.getElementById('player-name').value = '';
+            clearError('admin');
+            clearError('player');
+        }
+
+        function clearError(type) {
+            const errorEl = document.getElementById(`${type}-error`);
+            errorEl.classList.remove('show');
+            errorEl.textContent = '';
+        }
+
+        function showError(type, message) {
+            const errorEl = document.getElementById(`${type}-error`);
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+
+        function loginAdmin() {
+            const password = document.getElementById('admin-password').value;
+            const correctPassword = 'SuperAdminKami';
+
+            if (password === correctPassword) {
+                localStorage.setItem('isAdmin', 'true');
+                localStorage.setItem('adminSession', JSON.stringify({
+                    timestamp: new Date().toISOString(),
+                    authenticated: true
+                }));
+                window.location.href = 'homescreen.html';
+            } else {
+                showError('admin', 'Onjuist wachtwoord. Probeer opnieuw.');
+                document.getElementById('admin-password').focus();
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/v1/sessions');
+                const data = await response.json();
+                const sessions = data.sessions || [];
+
+                const sessionSelect = document.getElementById('session-select');
+                sessionSelect.innerHTML = '<option value="">-- Selecteer een sessie</option>';
+                sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.id;
+                    option.textContent = session.name;
+                    sessionSelect.appendChild(option);
+                });
+
+                sessionSelect.onchange = loadTeamsForSession;
+            } catch (error) {
+                showError('player', 'Fout bij laden van sessies: ' + error.message);
+            }
+        }
+
+        async function loadTeamsForSession() {
+            const sessionId = document.getElementById('session-select').value;
+            if (!sessionId) {
+                document.getElementById('team-select').innerHTML = '<option value="">-- Selecteer eerst een sessie</option>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/sessions/${sessionId}/teams`);
+                const data = await response.json();
+                const teams = data.teams || [];
+
+                const teamSelect = document.getElementById('team-select');
+                teamSelect.innerHTML = '<option value="">-- Selecteer een team</option>';
+                teams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team.id;
+                    option.textContent = `${team.name}`;
+                    teamSelect.appendChild(option);
+                });
+
+                teamSelect.onchange = loadActivitiesForTeam;
+            } catch (error) {
+                showError('player', 'Fout bij laden van teams: ' + error.message);
+            }
+        }
+
+        async function loadActivitiesForTeam() {
+            const sessionId = document.getElementById('session-select').value;
+            const teamId = document.getElementById('team-select').value;
+
+            if (!sessionId || !teamId) {
+                document.getElementById('activity-select').innerHTML = '<option value="">-- Selecteer eerst een team</option>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/sessions/${sessionId}/activities`);
+                const data = await response.json();
+                const activities = data.activities || [];
+
+                const activitySelect = document.getElementById('activity-select');
+                activitySelect.innerHTML = '<option value="">-- Selecteer een activiteit</option>';
+                activities.forEach(activity => {
+                    const option = document.createElement('option');
+                    option.value = activity.id;
+                    option.textContent = activity.name;
+                    activitySelect.appendChild(option);
+                });
+            } catch (error) {
+                showError('player', 'Fout bij laden van activiteiten: ' + error.message);
+            }
+        }
+
+        function loginPlayer() {
+            const sessionId = document.getElementById('session-select').value;
+            const teamId = document.getElementById('team-select').value;
+            const playerName = document.getElementById('player-name').value.trim();
+            const activityId = document.getElementById('activity-select').value;
+
+            if (!sessionId) {
+                showError('player', 'Selecteer alstublieft een sessie.');
+                return;
+            }
+            if (!teamId) {
+                showError('player', 'Selecteer alstublieft een team.');
+                return;
+            }
+            if (!playerName) {
+                showError('player', 'Voer alstublieft uw spelernaam in.');
+                return;
+            }
+            if (!activityId) {
+                showError('player', 'Selecteer alstublieft een activiteit.');
+                return;
+            }
+
+            // Store player session info
+            const playerSession = {
+                sessionId: parseInt(sessionId),
+                teamId: parseInt(teamId),
+                playerName: playerName,
+                activityId: parseInt(activityId),
+                timestamp: new Date().toISOString(),
+                isAdmin: false
+            };
+
+            localStorage.setItem('playerSession', JSON.stringify(playerSession));
+            localStorage.setItem('isAdmin', 'false');
+
+            // Redirect to scoreboard/player view
+            window.location.href = 'simple-scoreinput.html';
+        }
+
+        // Load sessions on player tab selection
+        window.addEventListener('load', () => {
+            clearError('admin');
+            clearError('player');
+        });
+    </script>
 </body>
 </html>

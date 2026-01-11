@@ -2,7 +2,21 @@
 class ScoreInput {
   constructor() {
     this.sessionId = new URLSearchParams(window.location.search).get('session');
+    // Load player session from localStorage (preferred for activity flow)
+    try {
+      const stored = localStorage.getItem('playerSession');
+      if (stored) {
+        const ps = JSON.parse(stored);
+        if (ps && ps.sessionId) {
+          this.sessionId = String(ps.sessionId);
+          this.activityId = ps.activityId ? String(ps.activityId) : null;
+          this.defaultTeamId = ps.teamId ? String(ps.teamId) : null;
+          this.defaultPlayerName = ps.playerName || null;
+        }
+      }
+    } catch (_) {}
     this.session = null;
+    this.activity = null;
     this.teams = [];
     this.recentScores = [];
     this.timer = null;
@@ -24,6 +38,9 @@ class ScoreInput {
     this.setupEventListeners();
     this.loadCustomQuickActions();
     await this.loadSession();
+    if (this.activityId) {
+      await this.loadActivity();
+    }
     await this.loadTeams();
     await this.loadLeaderboard();
     this.loadRecentScores();
@@ -169,9 +186,21 @@ class ScoreInput {
     }
   }
 
+  async loadActivity() {
+    try {
+      this.activity = await api.getActivity(this.activityId);
+      this.updateSessionDisplay();
+    } catch (error) {
+      api.handleError(error, 'loading activity');
+      // Keep working in session mode if activity fails
+      this.activityId = null;
+    }
+  }
+
   applyTheme() {
-    if (!this.session || !this.session.sport_type) return;
-    document.body.setAttribute('data-sport', this.session.sport_type);
+    const sportType = (this.activity && this.activity.sport_type) || (this.session && this.session.sport_type);
+    if (!sportType) return;
+    document.body.setAttribute('data-sport', sportType);
   }
 
   loadSportQuickButtons() {
@@ -281,9 +310,11 @@ class ScoreInput {
 
   updateSessionDisplay() {
     if (this.sessionName) {
-      const scoringModeIndicator = this.session.scoring_mode === 'player' ? ' 👤' : ' 👥';
-      const scoringModeTitle = this.session.scoring_mode === 'player' ? 'Speler Scores Modus' : 'Team Scores Modus';
-      this.sessionName.innerHTML = `${this.session.name} <span title="${scoringModeTitle}">${scoringModeIndicator}</span>`;
+      const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+      const scoringModeIndicator = mode === 'player' ? ' 👤' : ' 👥';
+      const scoringModeTitle = mode === 'player' ? 'Speler Scores Modus' : 'Team Scores Modus';
+      const activityLabel = this.activity ? ` • Activiteit: ${this.escapeHtml(this.activity.name)}` : '';
+      this.sessionName.innerHTML = `${this.session.name}${activityLabel} <span title="${scoringModeTitle}">${scoringModeIndicator}</span>`;
     }
     if (this.roundInfo) {
       this.roundInfo.textContent = `Ronde ${this.session.current_round}/${this.session.total_rounds}`;
@@ -296,16 +327,17 @@ class ScoreInput {
   }
 
   updateScoringModeUI() {
-    if (!this.session) return;
+    const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
+    if (!mode) return;
 
-    if (this.session.scoring_mode === 'team') {
+    if (mode === 'team') {
       // Team mode: disable player selection
       if (this.playerSelect) {
         this.playerSelect.disabled = true;
         this.playerSelect.innerHTML = '<option value="">Team modus - spelers uitgeschakeld</option>';
         this.playerSelect.title = 'In team modus kunnen alleen punten aan teams worden gegeven';
       }
-    } else if (this.session.scoring_mode === 'player') {
+    } else if (mode === 'player') {
       // Player mode: enable player selection and show warning for team-only scoring
       if (this.playerSelect) {
         this.playerSelect.disabled = false;
@@ -333,7 +365,12 @@ class ScoreInput {
       const currentTeamId = this.teamSelect.value;
       const currentPlayerId = this.playerSelect.value;
 
-      const response = await api.get(`/api/v1/sessions/${this.sessionId}/teams`);
+      let response;
+      if (this.activityId) {
+        response = await api.getActivityTeams(this.activityId);
+      } else {
+        response = await api.getSessionTeams(this.sessionId);
+      }
       const newTeams = response.teams || [];
 
       // Preserve existing player data if it exists
@@ -356,7 +393,8 @@ class ScoreInput {
       this.populateTeamSelect();
 
       // Check if we need to load players for all teams (for team_with_players mode)
-      const showPlayers = this.session && (this.session.scoring_mode === 'player' || this.session.scoring_mode === 'team_with_players');
+      const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
+      const showPlayers = mode && (mode === 'player' || mode === 'team_with_players');
       if (showPlayers) {
         await this.loadPlayersForAllTeams();
       }
@@ -371,6 +409,18 @@ class ScoreInput {
           if (currentPlayerId) {
             this.playerSelect.value = currentPlayerId;
           }
+        }
+      }
+
+      // Preselect defaults from player session if available
+      if (!currentTeamId && this.defaultTeamId) {
+        this.teamSelect.value = this.defaultTeamId;
+        await this.onTeamChange();
+        // Try to select the player by name if provided
+        if (this.defaultPlayerName) {
+          const options = Array.from(this.playerSelect.options);
+          const found = options.find((o) => o.textContent && o.textContent.toLowerCase().includes(this.defaultPlayerName.toLowerCase()));
+          if (found) this.playerSelect.value = found.value;
         }
       }
     } catch (error) {
@@ -421,8 +471,18 @@ class ScoreInput {
   async loadPlayersForTeam(teamId) {
     try {
       this.playerSelect.innerHTML = '<option value="">Laden...</option>';
-      const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
-      const players = resp && resp.players ? resp.players : [];
+      let players = [];
+      if (this.activityId) {
+        // For activity, get opted-in players for the activity, then filter to those in this team
+        const activityResp = await api.getActivityPlayers(this.activityId);
+        const activityPlayerIds = new Set((activityResp.players || []).map(p => p.id));
+        const teamResp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
+        const teamPlayers = teamResp && teamResp.players ? teamResp.players : [];
+        players = teamPlayers.filter(p => activityPlayerIds.has(p.id));
+      } else {
+        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${teamId}/players`);
+        players = resp && resp.players ? resp.players : [];
+      }
       // Sort players alphabetically by name
       players.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
 
@@ -470,9 +530,23 @@ class ScoreInput {
 
   async loadLeaderboard() {
     try {
-      // Load all scores for this session to calculate leaderboard
-      const scoresResponse = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
-      const allScores = scoresResponse.scores || [];
+      let allScores = [];
+      if (this.activityId) {
+        // Prefer dedicated activity leaderboard if available
+        const lb = await api.getActivityLeaderboard(this.activityId).catch(() => null);
+        if (lb && lb.leaderboard) {
+          // Map leaderboard to expected structure when available
+          // Fallback to computing from raw scores if shape differs
+          allScores = [];
+          // We'll recompute from raw scores below if needed
+        }
+        const scoresResponse = await api.getActivityScores(this.activityId).catch(() => ({ scores: [] }));
+        allScores = scoresResponse.scores || [];
+      } else {
+        // Session-based leaderboard
+        const scoresResponse = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
+        allScores = scoresResponse.scores || [];
+      }
 
       // Load players for all teams
       await this.loadPlayersForAllTeams();
@@ -490,17 +564,34 @@ class ScoreInput {
   }
 
   async loadPlayersForAllTeams() {
+    let activityPlayerIds = null;
+    if (this.activityId) {
+      try {
+        const activityResp = await api.getActivityPlayers(this.activityId);
+        activityPlayerIds = new Set((activityResp.players || []).map(p => p.id));
+      } catch (_) {
+        activityPlayerIds = new Set();
+      }
+    }
     for (const team of this.teams) {
       try {
         const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
-        team.players = resp && resp.players ? resp.players : [];
+        let players = resp && resp.players ? resp.players : [];
+        if (activityPlayerIds) {
+          players = players.filter(p => activityPlayerIds.has(p.id));
+        }
+        team.players = players;
       } catch (err) {
         const msg = err && err.message ? err.message : '';
         const status405 = (err && err.status === 405) || msg.indexOf('405') !== -1;
         if (status405) {
           try {
             const fallback = await api.get(`/api/v1/players`);
-            team.players = fallback && fallback.players ? fallback.players : [];
+            let players2 = fallback && fallback.players ? fallback.players : [];
+            if (activityPlayerIds) {
+              players2 = players2.filter(p => activityPlayerIds.has(p.id));
+            }
+            team.players = players2;
           } catch (err2) {
             team.players = [];
           }
@@ -650,7 +741,9 @@ class ScoreInput {
 
   async loadRecentScores() {
     try {
-      const response = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
+      const response = this.activityId
+        ? await api.getActivityScores(this.activityId)
+        : await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
       const scores = response.scores || [];
       // Show most recent 10 scores (newest first)
       this.recentScoresData = scores.slice(0, 10);
@@ -748,7 +841,8 @@ class ScoreInput {
     }
 
     // Validate scoring mode
-    if (this.session.scoring_mode === 'player' && !playerId) {
+    const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+    if (mode === 'player' && !playerId) {
       this.showInlineError('player-select', '⚠️ Selecteer een specifieke speler in Speler Modus');
       this.playerSelect.focus();
       this.isSubmitting = false;
@@ -782,21 +876,33 @@ class ScoreInput {
     });
 
     try {
-      const scoreData = {
-        session_id: parseInt(this.sessionId),
-        team_id: teamId,
-        points: points,
-        reason: reason || 'Handmatig',
-        round_number: this.session.current_round,
-      };
+      const scoreData = this.activityId
+        ? {
+            activity_id: parseInt(this.activityId),
+            team_id: teamId,
+            points: points,
+            reason: reason || 'Handmatig',
+            round_number: this.session.current_round,
+          }
+        : {
+            session_id: parseInt(this.sessionId),
+            team_id: teamId,
+            points: points,
+            reason: reason || 'Handmatig',
+            round_number: this.session.current_round,
+          };
 
       // Include player_id if a specific player was selected
       if (playerId) {
         scoreData.player_id = playerId;
       }
 
-      // posting score
-      await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+      // posting score: use activity flow when available
+      if (this.activityId) {
+        await api.createActivityScore(this.activityId, scoreData);
+      } else {
+        await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+      }
 
       // Treat as success
       this.onScoreSubmitSuccess(teamId, points);

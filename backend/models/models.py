@@ -20,14 +20,18 @@ class SportResponse(SportBase):
 # Team Models
 class TeamBase(BaseModel):
     name: str
-    sport_id: Optional[int] = None
+    color: str = "#333333"
+    icon: str = "team"
+    description: Optional[str] = None
 
 class TeamCreate(TeamBase):
     pass
 
 class TeamUpdate(BaseModel):
     name: Optional[str] = None
-    sport_id: Optional[int] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    description: Optional[str] = None
 
 class TeamResponse(TeamBase):
     id: int
@@ -48,6 +52,104 @@ class PlayerUpdate(BaseModel):
 
 class PlayerResponse(PlayerBase):
     id: int
+
+# Activity Models (NEW)
+class ActivityBase(BaseModel):
+    name: str
+    sport_type: str = "custom"
+    game_type: str = "custom"
+    scoring_mode: str = "team"  # "team", "team_with_players", or "player"
+    total_rounds: int = 1
+    time_limit: Optional[int] = None
+    description: Optional[str] = None
+
+class ActivityCreate(ActivityBase):
+    session_id: int
+
+class ActivityUpdate(BaseModel):
+    name: Optional[str] = None
+    sport_type: Optional[str] = None
+    game_type: Optional[str] = None
+    scoring_mode: Optional[str] = None
+    status: Optional[str] = None
+    current_round: Optional[int] = None
+    total_rounds: Optional[int] = None
+    time_limit: Optional[int] = None
+    description: Optional[str] = None
+
+class ActivityResponse(ActivityBase):
+    id: int
+    session_id: int
+    status: str = "setup"
+    current_round: int = 1
+    created_at: datetime
+    updated_at: datetime
+
+class ActivityListResponse(BaseModel):
+    activities: List[ActivityResponse]
+
+# Activity Team Models (NEW)
+class ActivityTeamBase(BaseModel):
+    activity_id: int
+    team_id: int
+    opted_in: int = 1
+
+class ActivityTeamCreate(ActivityTeamBase):
+    pass
+
+class ActivityTeamUpdate(BaseModel):
+    opted_in: Optional[int] = None
+
+class ActivityTeamResponse(ActivityTeamBase):
+    id: int
+    joined_at: datetime
+
+class ActivityTeamListResponse(BaseModel):
+    teams: List[ActivityTeamResponse]
+
+# Activity Player Models (NEW)
+class ActivityPlayerBase(BaseModel):
+    activity_id: int
+    player_id: int
+    opted_in: int = 1
+
+class ActivityPlayerCreate(ActivityPlayerBase):
+    pass
+
+class ActivityPlayerUpdate(BaseModel):
+    opted_in: Optional[int] = None
+
+class ActivityPlayerResponse(ActivityPlayerBase):
+    id: int
+    joined_at: datetime
+
+class ActivityPlayerListResponse(BaseModel):
+    players: List[ActivityPlayerResponse]
+
+# Activity Score Models (NEW)
+class ActivityScoreBase(BaseModel):
+    activity_id: int
+    team_id: Optional[int] = None
+    player_id: Optional[int] = None
+    points: int
+    reason: Optional[str] = None
+    round_number: int = 1
+
+class ActivityScoreCreate(ActivityScoreBase):
+    pass
+
+class ActivityScoreUpdate(BaseModel):
+    points: Optional[int] = None
+    reason: Optional[str] = None
+    round_number: Optional[int] = None
+
+class ActivityScoreResponse(ActivityScoreBase):
+    id: int
+    score_type: str
+    timestamp: datetime
+
+class ActivityScoreListResponse(BaseModel):
+    scores: List[ActivityScoreResponse]
 
 # Session player assignment models
 class SessionPlayerBase(BaseModel):
@@ -88,10 +190,11 @@ class ScoreTypeResponse(ScoreTypeBase):
 # Game Models
 class GameBase(BaseModel):
     sport_id: int
-    team1_id: int
-    team2_id: int
-    start_time: datetime
-    status: str = "scheduled"  # scheduled, ongoing, finished
+    team1_id: Optional[int] = None
+    team2_id: Optional[int] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: Optional[str] = None
 
 class GameCreate(GameBase):
     pass

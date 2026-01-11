@@ -31,6 +31,7 @@
         <a href="homescreen.html" class="control-btn" style="text-decoration: none; margin-bottom: 10px; display: inline-block;">← Terug naar Home</a>
         <header class="header">
             <h1>SportScore - Score Invoer</h1>
+            <button id="qr-toggle" onclick="toggleQR()" class="control-btn" style="float: right;">📱 QR</button>
             <div class="session-info">
                 <span id="session-name">Sessie laden...</span>
                 <span id="round-info">Ronde 1/1</span>
@@ -132,5 +133,21 @@
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/simple-scoreinput.js"></script>
+    <script>
+        const socket = io('http://' + window.location.hostname + ':8000');
+
+        // Emit admin present when page loads
+        socket.emit('admin-present');
+
+        // Emit admin leave when page unloads
+        window.addEventListener('beforeunload', () => {
+            socket.emit('admin-leave');
+        });
+
+        // Function to toggle QR visibility
+        function toggleQR() {
+            socket.emit('toggle-qr');
+        }
+    </script>
 </body>
 </html>

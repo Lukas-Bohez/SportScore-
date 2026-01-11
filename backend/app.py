@@ -19,7 +19,8 @@ from database.datarepository import (
     SportRepository, TeamRepository, PlayerRepository,
     ScoreTypeRepository, GameRepository, ScoreRepository,
     SessionRepository, SessionTeamRepository, SessionScoreRepository,
-    SessionPlayerRepository, SessionTemplateRepository
+    SessionPlayerRepository, SessionTemplateRepository,
+    ActivityRepository, ActivityTeamRepository, ActivityPlayerRepository, ActivityScoreRepository
 )
 
 # Import models
@@ -34,6 +35,10 @@ from models.models import (
     SessionTeamBase, SessionTeamCreate, SessionTeamUpdate, SessionTeamResponse, SessionTeamListResponse,
     SessionScoreBase, SessionScoreCreate, SessionScoreUpdate, SessionScoreResponse, SessionScoreListResponse,
     SessionPlayerBase, SessionPlayerCreate, SessionPlayerUpdate, SessionPlayerResponse, SessionPlayerListResponse,
+    ActivityCreate, ActivityUpdate, ActivityResponse, ActivityListResponse,
+    ActivityTeamResponse, ActivityTeamListResponse,
+    ActivityPlayerResponse, ActivityPlayerListResponse,
+    ActivityScoreCreate, ActivityScoreResponse, ActivityScoreListResponse,
     ErrorMessage, ErrorNotFound, ScoreUpdateMessage, GameStatusUpdate
 )
 
@@ -102,6 +107,9 @@ ENDPOINT = "/api/v1"  # API base endpoint
 # Store connected clients
 connected_clients = set()
 
+# Track admin presence
+admin_count = 0
+
 
 # Expose Socket.IO as the top-level ASGI app to avoid duplicate CORS headers on /socket.io
 asgi = socketio.ASGIApp(sio, app, socketio_path='socket.io')
@@ -127,6 +135,29 @@ async def disconnect(sid):
     print(f"Client {sid} disconnected - Total clients: {len(connected_clients) - 1}")
     if sid in connected_clients:
         connected_clients.remove(sid)
+
+@sio.event
+async def admin_present(sid):
+    global admin_count
+    admin_count += 1
+    print(f"Admin present - Admin count: {admin_count}")
+    if admin_count == 1:
+        await sio.emit('hide-qr')
+
+@sio.event
+async def admin_leave(sid):
+    global admin_count
+    admin_count -= 1
+    if admin_count < 0:
+        admin_count = 0
+    print(f"Admin leave - Admin count: {admin_count}")
+    if admin_count == 0:
+        await sio.emit('show-qr')
+
+@sio.event
+async def toggle_qr(sid, data=None):
+    print(f"Toggle QR requested")
+    await sio.emit('toggle-qr', data)
 
 # ----------------------------------------------------
 # API Routes
@@ -747,6 +778,155 @@ async def delete_session_team(session_id: int, team_id: int):
     })
 
     return {"message": "Team deleted successfully"}
+
+# Activities Endpoints
+@app.get(
+    f"{ENDPOINT}/sessions/{{session_id}}/activities",
+    response_model=ActivityListResponse,
+    tags=["Activities"],
+    summary="List activities in a session"
+)
+async def get_session_activities(session_id: int):
+    activities = ActivityRepository.get_activities_by_session(session_id)
+    return ActivityListResponse(activities=[ActivityResponse(**a) for a in activities])
+
+@app.post(
+    f"{ENDPOINT}/sessions/{{session_id}}/activities",
+    response_model=ActivityResponse,
+    tags=["Activities"],
+    summary="Create activity in a session"
+)
+async def create_activity_in_session(session_id: int, activity: ActivityCreate):
+    if activity.session_id != session_id:
+        raise HTTPException(status_code=400, detail="Session ID mismatch")
+    activity_id = ActivityRepository.create_activity(
+        session_id=activity.session_id,
+        name=activity.name,
+        sport_type=activity.sport_type,
+        game_type=activity.game_type,
+        scoring_mode=activity.scoring_mode,
+        total_rounds=activity.total_rounds,
+        time_limit=activity.time_limit,
+        description=activity.description
+    )
+    created = ActivityRepository.get_activity_by_id(activity_id)
+    return ActivityResponse(**created)
+
+@app.get(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Get activity by id")
+async def get_activity(activity_id: int):
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return ActivityResponse(**activity)
+
+@app.put(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Update activity")
+async def update_activity(activity_id: int, activity_update: ActivityUpdate):
+    success = ActivityRepository.update_activity(
+        activity_id,
+        name=activity_update.name,
+        sport_type=activity_update.sport_type,
+        game_type=activity_update.game_type,
+        scoring_mode=activity_update.scoring_mode,
+        status=activity_update.status,
+        current_round=activity_update.current_round,
+        total_rounds=activity_update.total_rounds,
+        time_limit=activity_update.time_limit,
+        description=activity_update.description
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update activity")
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    return ActivityResponse(**updated)
+
+@app.delete(f"{ENDPOINT}/activities/{{activity_id}}", tags=["Activities"], summary="Delete activity")
+async def delete_activity(activity_id: int):
+    success = ActivityRepository.delete_activity(activity_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete activity")
+    return {"message": "Activity deleted successfully"}
+
+# Activity Teams (opt-in)
+@app.get(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamListResponse, tags=["Activity Teams"], summary="List teams for activity")
+async def get_activity_teams(activity_id: int):
+    teams = ActivityTeamRepository.get_teams(activity_id)
+    return ActivityTeamListResponse(teams=[ActivityTeamResponse(**t) for t in teams])
+
+@app.post(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamResponse, tags=["Activity Teams"], summary="Add team to activity")
+async def add_team_to_activity(activity_id: int, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    team_id = payload.get('team_id')
+    if not team_id:
+        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
+    ActivityTeamRepository.add_team(activity_id, team_id, 1)
+    # Return joined record
+    teams = ActivityTeamRepository.get_teams(activity_id)
+    team = next((t for t in teams if int(t['id']) == int(team_id)), None)
+    return ActivityTeamResponse(**team) if team else ActivityTeamResponse(activity_id=activity_id, team_id=team_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
+
+@app.delete(f"{ENDPOINT}/activities/{{activity_id}}/teams/{{team_id}}", tags=["Activity Teams"], summary="Remove team from activity")
+async def remove_team_from_activity(activity_id: int, team_id: int):
+    success = ActivityTeamRepository.remove_team(activity_id, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to remove team from activity")
+    return {"message": "Team removed from activity"}
+
+# Activity Players (opt-in)
+@app.get(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerListResponse, tags=["Activity Players"], summary="List players for activity")
+async def get_activity_players(activity_id: int):
+    players = ActivityPlayerRepository.get_players(activity_id)
+    return ActivityPlayerListResponse(players=[ActivityPlayerResponse(**p) for p in players])
+
+@app.post(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerResponse, tags=["Activity Players"], summary="Add player to activity")
+async def add_player_to_activity(activity_id: int, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    player_id = payload.get('player_id')
+    if not player_id:
+        raise HTTPException(status_code=422, detail="Field 'player_id' is required")
+    ActivityPlayerRepository.add_player(activity_id, player_id, 1)
+    players = ActivityPlayerRepository.get_players(activity_id)
+    player = next((p for p in players if int(p['id']) == int(player_id)), None)
+    return ActivityPlayerResponse(**player) if player else ActivityPlayerResponse(activity_id=activity_id, player_id=player_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
+
+@app.delete(f"{ENDPOINT}/activities/{{activity_id}}/players/{{player_id}}", tags=["Activity Players"], summary="Remove player from activity")
+async def remove_player_from_activity(activity_id: int, player_id: int):
+    success = ActivityPlayerRepository.remove_player(activity_id, player_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to remove player from activity")
+    return {"message": "Player removed from activity"}
+
+# Activity Scores and Leaderboard
+@app.get(f"{ENDPOINT}/activities/{{activity_id}}/scores", response_model=ActivityScoreListResponse, tags=["Activity Scores"], summary="List scores for activity")
+async def get_activity_scores(activity_id: int):
+    scores = ActivityScoreRepository.get_scores_by_activity(activity_id)
+    return ActivityScoreListResponse(scores=[ActivityScoreResponse(**s) for s in scores])
+
+@app.post(f"{ENDPOINT}/activities/{{activity_id}}/scores", response_model=ActivityScoreResponse, tags=["Activity Scores"], summary="Create score for activity")
+async def create_activity_score(activity_id: int, score: ActivityScoreCreate):
+    if score.activity_id != activity_id:
+        raise HTTPException(status_code=400, detail="Activity ID mismatch")
+    score_id = ActivityScoreRepository.create_score(
+        activity_id=score.activity_id,
+        points=score.points,
+        team_id=score.team_id,
+        player_id=score.player_id,
+        reason=score.reason,
+        round_number=score.round_number,
+        timestamp=datetime.now(CET),
+    )
+    created_list = ActivityScoreRepository.get_scores_by_activity(activity_id)
+    created = next((s for s in created_list if s['id'] == score_id), None)
+    return ActivityScoreResponse(**created) if created else ActivityScoreResponse(activity_id=activity_id, team_id=score.team_id, player_id=score.player_id, points=score.points, reason=score.reason, round_number=score.round_number, id=score_id, score_type='point', timestamp=datetime.now(CET))
+
+@app.get(f"{ENDPOINT}/activities/{{activity_id}}/leaderboard", tags=["Activities"], summary="Get activity leaderboard")
+async def get_activity_leaderboard(activity_id: int):
+    leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
+    return {"leaderboard": leaderboard}
 
 # Session Scores Endpoints
 @app.get(
