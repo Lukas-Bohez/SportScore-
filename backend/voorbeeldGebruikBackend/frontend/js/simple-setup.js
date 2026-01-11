@@ -4,6 +4,7 @@ class SimpleSetup {
     this.currentStep = 1;
     this.sessionData = {};
     this.teams = [];
+    this.activities = [];
     this.players = [];
     this.allPlayers = []; // All players from API
     this.apiTeams = []; // Teams from API
@@ -33,20 +34,25 @@ class SimpleSetup {
     if (this.sessionData.name) {
       this.sessionNameInput.value = this.sessionData.name;
     }
-    if (this.sessionData.sport_type) {
-      this.sportTypeSelect.value = this.sessionData.sport_type;
-    }
-    if (this.sessionData.scoring_mode) {
-      this.scoringModeSelect.value = this.sessionData.scoring_mode;
-    }
-    if (this.sessionData.game_type) {
-      this.gameTypeSelect.value = this.sessionData.game_type;
-    }
-    if (this.sessionData.total_rounds) {
-      this.totalRoundsInput.value = this.sessionData.total_rounds;
-    }
-    if (this.sessionData.time_limit) {
-      this.timeLimitInput.value = this.sessionData.time_limit;
+    // Load activities if available (new format)
+    if (this.sessionData.activities) {
+      this.activities = this.sessionData.activities;
+      this.updateActivitiesList();
+    } else {
+      // Legacy: if no activities, create one from global settings
+      if (this.sessionData.sport_type || this.sessionData.scoring_mode) {
+        const act = {
+          name: 'Hoofdactiviteit',
+          sport_type: this.sessionData.sport_type || 'custom',
+          scoring_mode: this.sessionData.scoring_mode || 'team',
+          game_type: this.sessionData.game_type || 'custom',
+          total_rounds: this.sessionData.total_rounds || 1,
+          time_limit: this.sessionData.time_limit || null,
+          description: null,
+        };
+        this.activities = [act];
+        this.updateActivitiesList();
+      }
     }
     // Load teams and players if available
     if (this.sessionData.teams) {
@@ -72,7 +78,6 @@ class SimpleSetup {
         }
         this.setupEventListeners();
         this.loadTeamsFromAPI();
-        this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
       });
     } else {
       this.bindElements();
@@ -84,24 +89,33 @@ class SimpleSetup {
       }
       this.setupEventListeners();
       this.loadTeamsFromAPI().then(() => this.loadAllPlayers());
-      this.handleGameTypeChange({ target: { value: this.gameTypeSelect.value } });
     }
   }
 
   bindElements() {
     // Step elements
     this.steps = {};
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
       this.steps[i] = document.getElementById(`step-${i}`);
     }
 
     // Step 1 inputs
     this.sessionNameInput = document.getElementById('session-name');
-    this.sportTypeSelect = document.getElementById('sport-type');
-    this.scoringModeSelect = document.getElementById('scoring-mode');
-    this.gameTypeSelect = document.getElementById('game-type');
-    this.totalRoundsInput = document.getElementById('total-rounds');
-    this.timeLimitInput = document.getElementById('time-limit');
+
+    // Team management elements
+    // Activities management elements
+    this.addActivityBtn = document.getElementById('add-activity-btn');
+    this.activityFormContainer = document.getElementById('activity-form-container');
+    this.activityForm = document.getElementById('activity-form');
+    this.activityNameInput = document.getElementById('activity-name');
+    this.activitySportSelect = document.getElementById('activity-sport');
+    this.activityScoringSelect = document.getElementById('activity-scoring');
+    this.activityGameTypeSelect = document.getElementById('activity-game-type');
+    this.activityRoundsInput = document.getElementById('activity-rounds');
+    this.activityTimeInput = document.getElementById('activity-time');
+    this.activityDescInput = document.getElementById('activity-desc');
+    this.cancelActivityBtn = document.getElementById('cancel-activity-btn');
+    this.activitiesList = document.getElementById('activities-list');
 
     // Team management elements
     this.addTeamBtn = document.getElementById('add-team-btn');
@@ -131,16 +145,14 @@ class SimpleSetup {
 
     // Review elements
     this.reviewSessionName = document.getElementById('review-session-name');
-    this.reviewSportType = document.getElementById('review-sport-type');
-    this.reviewScoringMode = document.getElementById('review-scoring-mode');
-    this.reviewGameType = document.getElementById('review-game-type');
+    this.reviewActivities = document.getElementById('review-activities');
     this.reviewTeams = document.getElementById('review-teams');
     this.reviewPlayers = document.getElementById('review-players');
 
     // Navigation
     this.nextBtns = {};
     this.prevBtns = {};
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
       this.nextBtns[i] = document.getElementById(`next-${i}`);
       this.prevBtns[i] = document.getElementById(`prev-${i}`);
     }
@@ -150,7 +162,7 @@ class SimpleSetup {
 
   setupEventListeners() {
     // Navigation
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 4; i++) {
       if (this.nextBtns[i]) {
         this.nextBtns[i].addEventListener('click', this.handleNextClick.bind(this));
       }
@@ -158,14 +170,26 @@ class SimpleSetup {
         this.prevBtns[i].addEventListener('click', this.handlePrevClick.bind(this));
       }
     }
-    if (this.prevBtns[4]) {
-      this.prevBtns[4].addEventListener('click', this.handlePrevClick.bind(this));
+    if (this.prevBtns[5]) {
+      this.prevBtns[5].addEventListener('click', this.handlePrevClick.bind(this));
     }
     if (this.startScoringBtn) {
       this.startScoringBtn.addEventListener('click', this.handleStartClick.bind(this));
     }
     if (this.saveTemplateBtn) {
       this.saveTemplateBtn.addEventListener('click', this.handleSaveTemplateClick.bind(this));
+    }
+
+    // Team management
+    // Activity management
+    if (this.addActivityBtn) {
+      this.addActivityBtn.addEventListener('click', this.handleAddActivityClick.bind(this));
+    }
+    if (this.activityForm) {
+      this.activityForm.addEventListener('submit', this.handleActivityFormSubmit.bind(this));
+    }
+    if (this.cancelActivityBtn) {
+      this.cancelActivityBtn.addEventListener('click', this.handleCancelActivity.bind(this));
     }
 
     // Team management
@@ -205,16 +229,6 @@ class SimpleSetup {
     // Player search
     if (this.playerSearchInput) {
       this.playerSearchInput.addEventListener('input', this.handlePlayerSearch.bind(this));
-    }
-
-    // Scoring mode change
-    if (this.scoringModeSelect) {
-      this.scoringModeSelect.addEventListener('change', this.handleScoringModeChange.bind(this));
-    }
-
-    // Game type change
-    if (this.gameTypeSelect) {
-      this.gameTypeSelect.addEventListener('change', this.handleGameTypeChange.bind(this));
     }
   }
 
@@ -317,9 +331,12 @@ class SimpleSetup {
     Object.values(this.steps).forEach((step) => step.classList.remove('active'));
     this.steps[this.currentStep].classList.add('active');
     if (this.currentStep === 2) {
-      this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
+      this.updateActivitiesList();
     }
     if (this.currentStep === 3) {
+      this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
+    }
+    if (this.currentStep === 4) {
       this.playersSection.style.display = 'block';
       this.updatePlayerSection();
       // Load players if not loaded yet
@@ -329,14 +346,14 @@ class SimpleSetup {
         this.updatePlayersList();
       }
     }
-    if (this.currentStep === 4) {
+    if (this.currentStep === 5) {
       this.populateReview();
     }
   }
 
   validateCurrentStep() {
     // Clear previous error messages
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
       const errorDiv = document.getElementById(`step-${i}-error`);
       if (errorDiv) {
         errorDiv.textContent = '';
@@ -352,34 +369,24 @@ class SimpleSetup {
         if (this.sessionNameInput.value.trim() === '') {
           errorMessage = 'Voer een sessie naam in.';
           isValid = false;
-        } else if (this.sportTypeSelect.value === '') {
-          errorMessage = 'Selecteer een sport type.';
-          isValid = false;
-        } else if (this.scoringModeSelect.value === '') {
-          errorMessage = 'Selecteer een scoring mode.';
-          isValid = false;
-        } else if (this.totalRoundsInput && (parseInt(this.totalRoundsInput.value) < 1 || parseInt(this.totalRoundsInput.value) > 10)) {
-          errorMessage = 'Aantal rondes moet tussen 1 en 10 liggen.';
-          isValid = false;
         }
         break;
       case 2:
+        if (this.activities.length === 0) {
+          errorMessage = 'Voeg minstens één activiteit toe.';
+          isValid = false;
+        }
+        break;
+      case 3:
         if (this.teams.length === 0) {
           errorMessage = 'Voeg minstens één team toe.';
           isValid = false;
         }
         break;
-      case 3:
-        // Only validate players if scoring mode requires them
-        if (this.scoringModeSelect.value === 'team') {
-          // Skip validation for team-only mode
-          break;
-        }
-        if (this.scoringModeSelect.value === 'player') {
-          // For player mode, players are individual, no team assignment required
-          break;
-        } else if (this.scoringModeSelect.value === 'team_with_players') {
-          // Check that all session teams have at least one player assigned via API
+      case 4:
+        // Validate players only if any activity needs them
+        const hasTeamWithPlayers = this.activities.some(act => act.scoring_mode === 'team_with_players');
+        if (hasTeamWithPlayers) {
           const teamsWithoutPlayers = this.teams.filter((team) => {
             return !this.allPlayers.some((player) => player.team_id == team.id);
           });
@@ -408,11 +415,124 @@ class SimpleSetup {
     switch (this.currentStep) {
       case 1:
         this.sessionData.name = this.sessionNameInput.value.trim();
-        this.sessionData.sportType = this.sportTypeSelect.value;
-        this.sessionData.scoringMode = this.scoringModeSelect.value;
-        this.sessionData.gameType = this.gameTypeSelect.value;
         break;
     }
+  }
+
+  // Activity management methods
+  handleAddActivityClick(e) {
+    e.preventDefault();
+    this.showActivityForm();
+  }
+
+  handleActivityFormSubmit(e) {
+    e.preventDefault();
+    this.addActivity();
+  }
+
+  handleCancelActivity(e) {
+    e.preventDefault();
+    this.hideActivityForm();
+  }
+
+  showActivityForm(activity = null) {
+    this.activityFormContainer.classList.remove('hidden');
+    if (activity) {
+      this.activityNameInput.value = activity.name;
+      this.activitySportSelect.value = activity.sport_type || 'custom';
+      this.activityScoringSelect.value = activity.scoring_mode || 'team';
+      this.activityGameTypeSelect.value = activity.game_type || 'custom';
+      this.activityRoundsInput.value = activity.total_rounds || 1;
+      this.activityTimeInput.value = activity.time_limit || '';
+      this.activityDescInput.value = activity.description || '';
+      this.editingActivityIndex = this.activities.indexOf(activity);
+    } else {
+      this.activityNameInput.value = '';
+      this.activitySportSelect.value = 'custom';
+      this.activityScoringSelect.value = 'team';
+      this.activityGameTypeSelect.value = 'custom';
+      this.activityRoundsInput.value = 1;
+      this.activityTimeInput.value = '';
+      this.activityDescInput.value = '';
+      this.editingActivityIndex = null;
+    }
+    this.activityNameInput.focus();
+  }
+
+  hideActivityForm() {
+    this.activityFormContainer.classList.add('hidden');
+    if (this.activityForm) this.activityForm.reset();
+    this.editingActivityIndex = null;
+  }
+
+  addActivity() {
+    const name = this.activityNameInput.value.trim();
+    const sport = this.activitySportSelect.value;
+    const scoring = this.activityScoringSelect.value;
+    const gameType = this.activityGameTypeSelect.value;
+    const rounds = parseInt(this.activityRoundsInput.value) || 1;
+    const time = this.activityTimeInput.value ? parseInt(this.activityTimeInput.value) : null;
+    const desc = this.activityDescInput.value.trim();
+    if (!name) {
+      alert('Voer een activiteit naam in.');
+      return;
+    }
+    const act = {
+      name,
+      sport_type: sport,
+      scoring_mode: scoring,
+      game_type: gameType,
+      total_rounds: rounds,
+      time_limit: time,
+      description: desc || null,
+    };
+    if (this.editingActivityIndex != null) {
+      this.activities[this.editingActivityIndex] = act;
+    } else {
+      this.activities.push(act);
+    }
+    this.hideActivityForm();
+    this.updateActivitiesList();
+  }
+
+  editActivity(index) {
+    const act = this.activities[index];
+    if (act) this.showActivityForm(act);
+  }
+
+  deleteActivity(index) {
+    if (!confirm(`Activiteit "${this.activities[index].name}" verwijderen?`)) return;
+    this.activities.splice(index, 1);
+    this.updateActivitiesList();
+  }
+
+  updateActivitiesList() {
+    if (!this.activitiesList) return;
+    if (this.activities.length === 0) {
+      this.activitiesList.innerHTML = "<div class=\"empty-state\">Nog geen activiteiten. Voeg je eerste activiteit toe met \"+ Nieuwe Activiteit\".</div>";
+      return;
+    }
+    this.activitiesList.innerHTML = this.activities
+      .map((act, index) => {
+        return `
+        <div class="team-card" data-activity-id="${index + 1}">
+          <div class="team-card-header">
+            <div class="team-title">
+              <span class="team-icon">🎯</span>
+              <div class="team-name-wrap">
+                <span class="team-name">${this.escapeHtml(act.name)}</span>
+                <span class="team-color-hex">${this.escapeHtml(act.sport_type)} • ${this.escapeHtml(act.scoring_mode)} • ${this.escapeHtml(act.game_type)}</span>
+              </div>
+            </div>
+          </div>
+          <p class="team-description">${this.escapeHtml(act.description || '')} Rondes: ${act.total_rounds}${act.time_limit ? ' • Tijd: ' + act.time_limit + 'min' : ''}</p>
+          <div class="team-actions">
+            <button class="delete-team-btn" onclick="simpleSetup.deleteActivity(${index})">Verwijderen</button>
+            <button class="save-team-btn compact" onclick="simpleSetup.editActivity(${index})">Bewerken</button>
+          </div>
+        </div>`;
+      })
+      .join('');
   }
 
   showTeamForm(team = null) {
@@ -523,7 +643,7 @@ class SimpleSetup {
       .map((team, index) => {
         const teamColor = (team.color || '').trim() || '#3B82F6';
         return `
-      <div class="team-card" data-team-id="${index + 1}" style="border-color: ${teamColor}; box-shadow: 0 10px 24px rgba(0,0,0,0.06);">
+      <div class="team-card" data-team-id="${index + 1}" style="border-color: ${teamColor};">
         <div class="team-card-header">
           <div class="team-color-badge" style="background-color: ${teamColor} !important;"></div>
           <div class="team-title">
@@ -560,7 +680,7 @@ class SimpleSetup {
           ${
             this.sessionData.scoringMode === 'team_with_players'
               ? `
-          <div class="unassigned-players-dropdown" id="unassigned-players-${index + 1}" style="display:none; margin-top:8px; background:#fff; padding:8px; border-radius:6px;">
+          <div class="unassigned-players-dropdown" id="unassigned-players-${index + 1}" style="display:none; margin-top:8px; background: var(--card-bg); padding:8px; border-radius:6px;">
             <div style="margin-bottom:8px;">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
             <div class="unassigned-list" id="unassigned-list-${index + 1}">Laden...</div>
           </div>
@@ -1289,38 +1409,42 @@ class SimpleSetup {
     this.playersSection.style.display = 'block';
     const teamModeMessage = document.getElementById('team-mode-message');
     const playerFormSection = document.getElementById('player-form-section');
-    if (this.scoringModeSelect.value === 'team') {
+    const showPlayers = this.activities.some(act => act.scoring_mode !== 'team');
+    if (!showPlayers) {
       if (teamModeMessage) teamModeMessage.style.display = 'block';
       if (playerFormSection) playerFormSection.style.display = 'none';
-    } else if (this.scoringModeSelect.value === 'player' || this.scoringModeSelect.value === 'team_with_players') {
-      if (teamModeMessage) teamModeMessage.style.display = 'none';
-      if (playerFormSection) playerFormSection.style.display = 'block';
-      // Hide team select for player mode
-      const teamSelectGroup = document.getElementById('team-select-group');
-      if (teamSelectGroup) {
-        teamSelectGroup.style.display = this.scoringModeSelect.value === 'player' ? 'none' : 'block';
-      }
     } else {
       if (teamModeMessage) teamModeMessage.style.display = 'none';
-      if (playerFormSection) playerFormSection.style.display = 'none';
+      if (playerFormSection) playerFormSection.style.display = 'block';
+      // Hide team select for player mode - but since per activity, perhaps show always or check
+      const teamSelectGroup = document.getElementById('team-select-group');
+      if (teamSelectGroup) {
+        // For simplicity, show team select if any activity is team_with_players
+        const hasTeamWithPlayers = this.activities.some(act => act.scoring_mode === 'team_with_players');
+        const hasPlayerOnly = this.activities.some(act => act.scoring_mode === 'player');
+        teamSelectGroup.style.display = hasPlayerOnly ? 'none' : 'block';
+      }
     }
   }
 
   populateReview() {
     this.reviewSessionName.textContent = this.sessionData.name;
-    this.reviewSportType.textContent = this.sportTypeSelect.options[this.sportTypeSelect.selectedIndex].text;
-    this.reviewScoringMode.textContent = this.scoringModeSelect.options[this.scoringModeSelect.selectedIndex].text;
-    this.reviewGameType.textContent = this.gameTypeSelect.options[this.gameTypeSelect.selectedIndex].text;
+    if (this.reviewActivities) {
+      this.reviewActivities.innerHTML = this.activities
+        .map((a) => `<li>${this.escapeHtml(a.name)} — ${this.escapeHtml(a.scoring_mode)} (${this.escapeHtml(a.sport_type)}, ${this.escapeHtml(a.game_type)}, ${a.total_rounds} rondes${a.time_limit ? `, ${a.time_limit} min` : ''})</li>`)
+        .join('');
+    }
     this.reviewTeams.innerHTML = this.teams.map((team) => `<li><span style="color: ${team.color};">●</span> ${team.name}</li>`).join('');
 
-    // Only show players section if scoring mode requires players
+    // Only show players section if any activity requires players
     const playersHeading = this.reviewPlayers.previousElementSibling;
-    if (this.scoringModeSelect.value === 'team') {
-      // Hide players section for team-only mode
+    const showPlayers = this.activities.some(act => act.scoring_mode !== 'team');
+    if (!showPlayers) {
+      // Hide players section for team-only activities
       if (playersHeading) playersHeading.style.display = 'none';
       this.reviewPlayers.style.display = 'none';
     } else {
-      // Show players section for player modes
+      // Show players section for activities that require players
       if (playersHeading) playersHeading.style.display = 'block';
       this.reviewPlayers.style.display = 'block';
       // Collect players assigned to session teams
@@ -1339,23 +1463,33 @@ class SimpleSetup {
   async createSession() {
     try {
       // Gather all session data
-      const totalRounds = parseInt(this.totalRoundsInput?.value) || 1;
-      const timeLimit = this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null; // Convert minutes to seconds
-      const showPlayers = this.sessionData.scoringMode !== 'team'; // Derived from scoring mode
+      const showPlayers = this.activities.some(act => act.scoring_mode !== 'team'); // Show players if any activity requires them
 
       // Create session
       const sessionData = {
         name: this.sessionData.name,
-        sport_type: this.sessionData.sportType,
-        game_type: this.sessionData.gameType,
-        scoring_mode: this.sessionData.scoringMode,
-        total_rounds: totalRounds,
-        time_limit: timeLimit,
         show_players: showPlayers,
       };
 
       const session = await this.api.createSession(sessionData);
       const sessionId = session.id;
+
+      // Create activities for this session
+      const createdActivities = [];
+      for (const act of this.activities) {
+        const payload = {
+          session_id: sessionId,
+          name: act.name,
+          sport_type: act.sport_type,
+          scoring_mode: act.scoring_mode,
+          game_type: act.game_type,
+          total_rounds: act.total_rounds,
+          time_limit: act.time_limit,
+          description: act.description,
+        };
+        const created = await this.api.createSessionActivity(sessionId, payload);
+        createdActivities.push(created);
+      }
 
       // Add teams - use API team ids if available
       const sessionTeams = [];
@@ -1367,6 +1501,19 @@ class SimpleSetup {
         const createdTeam = await this.api.createSessionTeam(sessionId, teamData);
         sessionTeams.push(createdTeam);
       }
+
+      // Auto opt-in teams to all activities
+      try {
+        for (const a of createdActivities) {
+          const actId = a.id || a.activity_id || a.activity?.id;
+          if (!actId) continue;
+          for (const t of sessionTeams) {
+            const tid = t.id || t.team_id || t.team?.id;
+            if (!tid) continue;
+            await this.api.addActivityTeam(actId, { team_id: tid, opted_in: true });
+          }
+        }
+      } catch (_) {}
 
       // Add players if player scoring mode or team_with_players mode
       if (this.sessionData.scoringMode === 'player' || this.sessionData.scoringMode === 'team_with_players') {
@@ -1402,11 +1549,7 @@ class SimpleSetup {
 
     const templateData = {
       name: this.sessionData.name,
-      sport_type: this.sessionData.sportType,
-      scoring_mode: this.sessionData.scoringMode,
-      game_type: this.sessionData.gameType,
-      total_rounds: parseInt(this.totalRoundsInput?.value) || 1,
-      time_limit: this.timeLimitInput?.value ? parseInt(this.timeLimitInput.value) * 60 : null,
+      activities: this.activities,
       teams: this.teams,
       players: this.players,
     };

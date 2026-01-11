@@ -572,6 +572,84 @@ class ScoreboardAPI {
     });
   }
 
+  // Activities Management
+  async getSessionActivities(sessionId) {
+    return this.request(`/api/v1/sessions/${sessionId}/activities`);
+  }
+
+  async createSessionActivity(sessionId, data) {
+    return this.request(`/api/v1/sessions/${sessionId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getActivity(activityId) {
+    return this.request(`/api/v1/activities/${activityId}`);
+  }
+
+  async updateActivity(activityId, data) {
+    return this.request(`/api/v1/activities/${activityId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteActivity(activityId) {
+    return this.request(`/api/v1/activities/${activityId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActivityTeams(activityId) {
+    return this.request(`/api/v1/activities/${activityId}/teams`);
+  }
+
+  async addActivityTeam(activityId, data) {
+    return this.request(`/api/v1/activities/${activityId}/teams`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeActivityTeam(activityId, teamId) {
+    return this.request(`/api/v1/activities/${activityId}/teams/${teamId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActivityPlayers(activityId) {
+    return this.request(`/api/v1/activities/${activityId}/players`);
+  }
+
+  async addActivityPlayer(activityId, data) {
+    return this.request(`/api/v1/activities/${activityId}/players`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeActivityPlayer(activityId, playerId) {
+    return this.request(`/api/v1/activities/${activityId}/players/${playerId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getActivityScores(activityId) {
+    return this.request(`/api/v1/activities/${activityId}/scores`);
+  }
+
+  async createActivityScore(activityId, data) {
+    return this.request(`/api/v1/activities/${activityId}/scores`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getActivityLeaderboard(activityId) {
+    return this.request(`/api/v1/activities/${activityId}/leaderboard`);
+  }
+
   // Session Teams Management
   async getSessionTeams(sessionId) {
     return this.request(`/api/v1/sessions/${sessionId}/teams`);
@@ -689,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Only initialize Socket.IO for pages that need it
   const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
   console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
-  const pagesNeedingSocket = ['index.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'homescreen.html'];
+  const pagesNeedingSocket = ['index.html', 'simple-scoreinput.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'homescreen.html'];
 
   if (pagesNeedingSocket.includes(currentPage)) {
     console.log('API: Page needs Socket.IO, initializing...');

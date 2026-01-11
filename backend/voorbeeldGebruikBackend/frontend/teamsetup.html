@@ -15,6 +15,7 @@
                 <span id="session-name">Sessie laden...</span>
                 <span id="session-status">Status: Setup</span>
             </div>
+            <button id="qr-toggle" onclick="toggleQR()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; margin-left: 20px;">📱</button>
         </header>
 
         <main class="main-content">
@@ -192,5 +193,21 @@
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/teamsetup.js"></script>
+    <script>
+        const socket = io('http://' + window.location.hostname + ':8000');
+
+        // Emit admin present when page loads
+        socket.emit('admin-present');
+
+        // Emit admin leave when page unloads
+        window.addEventListener('beforeunload', () => {
+            socket.emit('admin-leave');
+        });
+
+        // Function to toggle QR visibility
+        function toggleQR() {
+            socket.emit('toggle-qr');
+        }
+    </script>
 </body>
 </html>

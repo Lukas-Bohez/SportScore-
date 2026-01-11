@@ -930,6 +930,185 @@ class SessionScoreRepository:
         result = Database.get_one_row(sql, [session_id, team_id])
         return result['total_score'] if result else 0
 
+class ActivityRepository:
+    """
+    Repository for managing activities within a session.
+    """
+
+    @staticmethod
+    def create_activity(session_id: int, name: str, sport_type: str = 'custom', game_type: str = 'custom',
+                        scoring_mode: str = 'team', total_rounds: int = 1, time_limit: Optional[int] = None,
+                        description: Optional[str] = None) -> int:
+        sql = """
+        INSERT INTO activities (session_id, name, sport_type, game_type, scoring_mode, total_rounds, time_limit, description, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'setup')
+        """
+        return Database.execute_sql(sql, [session_id, name, sport_type, game_type, scoring_mode, total_rounds, time_limit, description])
+
+    @staticmethod
+    def get_activities_by_session(session_id: int) -> List[Dict[str, Any]]:
+        sql = """
+        SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+               created_at, updated_at
+        FROM activities
+        WHERE session_id = ?
+        ORDER BY created_at ASC
+        """
+        return Database.get_rows(sql, [session_id])
+
+    @staticmethod
+    def get_activity_by_id(activity_id: int) -> Optional[Dict[str, Any]]:
+        sql = """
+        SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+               created_at, updated_at
+        FROM activities
+        WHERE id = ?
+        """
+        return Database.get_one_row(sql, [activity_id])
+
+    @staticmethod
+    def update_activity(activity_id: int, name: Optional[str] = None, sport_type: Optional[str] = None,
+                        game_type: Optional[str] = None, scoring_mode: Optional[str] = None, status: Optional[str] = None,
+                        current_round: Optional[int] = None, total_rounds: Optional[int] = None,
+                        time_limit: Optional[int] = None, description: Optional[str] = None) -> bool:
+        updates = []
+        params: List[Any] = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if sport_type is not None:
+            updates.append("sport_type = ?")
+            params.append(sport_type)
+        if game_type is not None:
+            updates.append("game_type = ?")
+            params.append(game_type)
+        if scoring_mode is not None:
+            updates.append("scoring_mode = ?")
+            params.append(scoring_mode)
+        if status is not None:
+            updates.append("status = ?")
+            params.append(status)
+        if current_round is not None:
+            updates.append("current_round = ?")
+            params.append(current_round)
+        if total_rounds is not None:
+            updates.append("total_rounds = ?")
+            params.append(total_rounds)
+        if time_limit is not None:
+            updates.append("time_limit = ?")
+            params.append(time_limit)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if not updates:
+            return False
+        sql = f"UPDATE activities SET {', '.join(updates)} WHERE id = ?"
+        params.append(activity_id)
+        return Database.execute_sql(sql, params) is not None
+
+    @staticmethod
+    def delete_activity(activity_id: int) -> bool:
+        sql = "DELETE FROM activities WHERE id = ?"
+        return Database.execute_sql(sql, [activity_id]) is not None
+
+class ActivityTeamRepository:
+    """
+    Manage team opt-ins for activities.
+    """
+    @staticmethod
+    def add_team(activity_id: int, team_id: int, opted_in: int = 1) -> int:
+        sql = """
+        INSERT OR IGNORE INTO activity_teams (activity_id, team_id, opted_in)
+        VALUES (?, ?, ?)
+        """
+        return Database.execute_sql(sql, [activity_id, team_id, opted_in])
+
+    @staticmethod
+    def remove_team(activity_id: int, team_id: int) -> bool:
+        sql = "DELETE FROM activity_teams WHERE activity_id = ? AND team_id = ?"
+        return Database.execute_sql(sql, [activity_id, team_id]) is not None
+
+    @staticmethod
+    def get_teams(activity_id: int) -> List[Dict[str, Any]]:
+        sql = """
+        SELECT t.id, t.name, t.color, t.icon, at.opted_in, at.joined_at
+        FROM activity_teams at
+        JOIN teams t ON t.id = at.team_id
+        WHERE at.activity_id = ?
+        ORDER BY t.name ASC
+        """
+        return Database.get_rows(sql, [activity_id])
+
+class ActivityPlayerRepository:
+    """
+    Manage player opt-ins for activities.
+    """
+    @staticmethod
+    def add_player(activity_id: int, player_id: int, opted_in: int = 1) -> int:
+        sql = """
+        INSERT OR IGNORE INTO activity_players (activity_id, player_id, opted_in)
+        VALUES (?, ?, ?)
+        """
+        return Database.execute_sql(sql, [activity_id, player_id, opted_in])
+
+    @staticmethod
+    def remove_player(activity_id: int, player_id: int) -> bool:
+        sql = "DELETE FROM activity_players WHERE activity_id = ? AND player_id = ?"
+        return Database.execute_sql(sql, [activity_id, player_id]) is not None
+
+    @staticmethod
+    def get_players(activity_id: int) -> List[Dict[str, Any]]:
+        sql = """
+        SELECT p.id, p.name, p.team_id, ap.opted_in, ap.joined_at
+        FROM activity_players ap
+        JOIN players p ON p.id = ap.player_id
+        WHERE ap.activity_id = ?
+        ORDER BY p.name ASC
+        """
+        return Database.get_rows(sql, [activity_id])
+
+class ActivityScoreRepository:
+    """
+    Scores associated to specific activities.
+    """
+    @staticmethod
+    def create_score(activity_id: int, points: int, team_id: Optional[int] = None, player_id: Optional[int] = None,
+                     reason: Optional[str] = None, round_number: int = 1, timestamp: Optional[datetime] = None,
+                     score_type: str = 'point') -> int:
+        if timestamp is None:
+            timestamp = datetime.now(CET)
+        sql = """
+        INSERT INTO activity_scores (activity_id, team_id, player_id, points, score_type, reason, round_number, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        return Database.execute_sql(sql, [activity_id, team_id, player_id, points, score_type, reason, round_number, timestamp])
+
+    @staticmethod
+    def get_scores_by_activity(activity_id: int) -> List[Dict[str, Any]]:
+        sql = """
+        SELECT s.id, s.activity_id, s.team_id, s.player_id, s.points, s.score_type, s.reason, s.round_number, s.timestamp,
+               t.name as team_name, p.name as player_name
+        FROM activity_scores s
+        LEFT JOIN teams t ON s.team_id = t.id
+        LEFT JOIN players p ON s.player_id = p.id
+        WHERE s.activity_id = ?
+        ORDER BY s.timestamp DESC
+        """
+        return Database.get_rows(sql, [activity_id])
+
+    @staticmethod
+    def get_leaderboard(activity_id: int) -> List[Dict[str, Any]]:
+        sql = """
+        SELECT COALESCE(t.id, -1) as team_id, COALESCE(t.name, 'N/A') as team_name,
+               COALESCE(SUM(s.points), 0) as total_score
+        FROM activity_scores s
+        LEFT JOIN teams t ON s.team_id = t.id
+        WHERE s.activity_id = ?
+        GROUP BY t.id, t.name
+        ORDER BY total_score DESC, team_name ASC
+        """
+        return Database.get_rows(sql, [activity_id])
+
 class SessionTemplateRepository:
     """
     Repository for managing session templates.

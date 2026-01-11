@@ -9,7 +9,45 @@
     <link rel="stylesheet" href="css/themes.css">
     <style>
         body {
-            /* Removed padding-bottom so nav appears on top of content */
+            padding-bottom: 80px; /* Ensure content isn't hidden behind fixed nav */
+        }
+        .main-content {
+            display: flex;
+            justify-content: center;
+        }
+        .right-column {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .control-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+        .control-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+        .power-user-link {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .power-user-link:hover {
+            opacity: 1;
         }
         .content-section {
             display: none;
@@ -88,6 +126,14 @@
         .manage-teams .team-icon {
             font-size: 4em;
             margin-bottom: 20px;
+        }
+        .active-session-view {
+            text-align: center;
+        }
+        .session-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
         }
         .sessions-view {
             max-width: 800px;
@@ -188,7 +234,7 @@
             border-radius: 8px;
         }
         .nav-item:hover, .nav-item.active {
-            border: 2px solid #000; /* Black border for active/hover state */
+            border: 2px solid var(--text-color); /* Dynamic border color for active/hover state */
         }
         .nav-item .icon {
             font-size: 1.5em;
@@ -198,6 +244,17 @@
             font-size: 0.8em;
             color: var(--text-color);
         }
+        /* Highscores embedded styles */
+        .highscores-container { max-width: 980px; margin: 0 auto; }
+        .highscores-header { text-align: center; margin-bottom: 20px; }
+        .highscores-header h2 { margin: 0; }
+        .highscores-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; justify-content: center; flex-wrap: wrap; }
+        .highscores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .highscores-card, .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; box-shadow: 0 2px 8px var(--shadow-color); }
+        .highscores-card h3, .card h3 { margin: 0 0 8px; color: var(--text-color); }
+        .highscores-row, .row { display: flex; justify-content: space-between; margin: 6px 0; color: var(--text-color); }
+        .highscores-row .label, .row .label { color: var(--text-secondary); }
+        .highscores-controls select, .highscores-controls input { background: var(--input-bg); color: var(--input-text); border: 1px solid var(--input-border); border-radius: 6px; padding: 8px; }
         @media (max-width: 768px) {
             .templates-grid {
                 grid-template-columns: 1fr;
@@ -228,17 +285,89 @@
                 </div>
             </div>
 
-            <!-- Manage Teams Section -->
-            <div id="teams-section" class="content-section">
-                <div class="manage-teams">
-                    <div class="team-icon">👥</div>
-                    <h2>Teams Beheren</h2>
-                    <p>Beheer bestaande teams en spelers.</p>
-                    <a href="startscreen.html" class="btn">Naar Team Beheer</a>
+            <!-- Active Session Section -->
+            <div id="active-section" class="content-section">
+                <div class="right-column">
+                    <div class="active-session-view">
+                        <h2>Actieve Sessie</h2>
+                        <div id="active-overview">Laden...</div>
+                        <div class="session-actions">
+                            <button id="active-open-score" class="control-btn">Open Score Invoer</button>
+                            <button id="active-end" class="control-btn">Sessie Beëindigen</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Old Sessions Section -->
+            <!-- Manage Teams Section -->
+            <div id="teams-section" class="content-section">
+                <div class="right-column">
+                    <div class="team-management" id="team-management">
+                        <div class="section-header">
+                            <h2>Team Beheer</h2>
+                            <button id="add-team-btn" class="add-team-btn">+ Nieuw Team</button>
+                        </div>
+                        
+                        <div id="team-form-container" class="team-form-container hidden">
+                            <form id="team-form" class="team-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="team-name">Team Naam:</label>
+                                        <input type="text" id="team-name" placeholder="bijv. Team Blauw" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="team-color">Kleur:</label>
+                                        <input type="color" id="team-color" value="#3B82F6" style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+                                        <div id="color-preview" class="color-preview">#3B82F6</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="team-icon">Icoon:</label>
+                                        <select id="team-icon">
+                                            <option value="team">👥 Team</option>
+                                            <option value="star">⭐ Ster</option>
+                                            <option value="trophy">🏆 Trofee</option>
+                                            <option value="fire">🔥 Vuur</option>
+                                            <option value="rocket">🚀 Raket</option>
+                                            <option value="crown">👑 Kroon</option>
+                                            <option value="lightning">⚡ Bliksem</option>
+                                            <option value="heart">❤️ Hart</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="team-description">Beschrijving (optioneel):</label>
+                                        <input type="text" id="team-description" placeholder="bijv. De beste spelers">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="save-team-btn">Team Opslaan</button>
+                                    <button type="button" id="cancel-team-btn" class="cancel-team-btn">Annuleren</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div id="teams-list" class="teams-list">Laden...</div>
+                    </div>
+
+                    <div class="player-management" id="player-management">
+                        <div class="section-header">
+                            <h2>Speler Beheer</h2>
+                            <button id="show-player-manager" class="view-all-btn">Open Speler Manager</button>
+                        </div>
+                        <div id="player-manager" style="display:none;">
+                            <div class="player-manager-input-row">
+                                <input class="input player-manager-input" type="text" id="pm-player-name" placeholder="Speler naam">
+                                <!-- position input removed; positions are assigned alphabetically on creation -->
+                                <button id="pm-add-player" class="save-team-btn">Toevoegen</button>
+                            </div>
+                            <div id="pm-players-list">Laden spelers…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div id="sessions-section" class="content-section">
                 <div class="sessions-view">
                     <h2>Oude Sessies</h2>
@@ -248,6 +377,40 @@
                     </div>
                     <div class="sessions-list" id="sessions-list">
                         <!-- Sessions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            <!-- Highscores Section (embedded) -->
+            <div id="highscores-section" class="content-section">
+                <div class="highscores-container">
+                    <div class="highscores-header">
+                        <div>
+                            <h2>🏆 Global Highscores</h2>
+                            <div style="color: var(--text-secondary);">Beste resultaten per activiteit over alle sessies</div>
+                        </div>
+                    </div>
+                    <div class="highscores-controls">
+                        <label for="filter-sport" class="label">Filter sport/stijl:</label>
+                        <select id="filter-sport">
+                            <option value="">Alle</option>
+                            <option value="quiz">Quiz</option>
+                            <option value="voetbal">Voetbal</option>
+                            <option value="basketbal">Basketbal</option>
+                            <option value="volleybal">Volleybal</option>
+                            <option value="hockey">Hockey</option>
+                            <option value="tennis">Tennis</option>
+                            <option value="atletiek">Atletiek</option>
+                            <option value="zwemmen">Zwemmen</option>
+                            <option value="fietsen">Wielrennen</option>
+                            <option value="hardlopen">Hardlopen</option>
+                            <option value="esports">E-Sports</option>
+                            <option value="boardgame">Bordspel</option>
+                        </select>
+                        <label for="search-activity" class="label">Zoek activiteit:</label>
+                        <input id="search-activity" placeholder="bv. Basketbal 3-Punters" />
+                    </div>
+                    <div id="highscores-grid" class="highscores-grid">
+                        <!-- Cards will be injected -->
                     </div>
                 </div>
             </div>
@@ -263,9 +426,21 @@
                 <div class="icon">🚀</div>
                 <div class="label">Start</div>
             </div>
+            <div class="nav-item" data-section="active">
+                <div class="icon">⚡</div>
+                <div class="label">Actief</div>
+            </div>
             <div class="nav-item" data-section="sessions">
                 <div class="icon">🕐</div>
                 <div class="label">Sessies</div>
+            </div>
+            <div class="nav-item" data-section="highscores">
+                <div class="icon">🏆</div>
+                <div class="label">Highscores</div>
+            </div>
+            <div class="nav-item" id="qr-toggle" onclick="toggleQR()">
+                <div class="icon">📱</div>
+                <div class="label">QR</div>
             </div>
         </nav>
     </div>
@@ -273,6 +448,30 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
+    <script src="js/highscores.js"></script>
     <script src="js/homepage.js"></script>
+    <script>
+        const socket = io('http://' + window.location.hostname + ':8000');
+        socket.emit('admin-present');
+
+        window.addEventListener('beforeunload', () => {
+            socket.emit('admin-leave');
+        });
+
+        function toggleQR() {
+            const qrBtn = document.getElementById('qr-toggle');
+            const icon = qrBtn.querySelector('.icon');
+            const isActive = qrBtn.classList.contains('active');
+            if (isActive) {
+                qrBtn.classList.remove('active');
+                icon.textContent = '📴'; // Phone off, QR hidden
+                socket.emit('toggle-qr', false);
+            } else {
+                qrBtn.classList.add('active');
+                icon.textContent = '📱'; // Phone, QR shown
+                socket.emit('toggle-qr', true);
+            }
+        }
+    </script>
 </body>
 </html>

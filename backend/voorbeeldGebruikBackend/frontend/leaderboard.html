@@ -17,6 +17,13 @@
             </div>
             <div class="nav-links">
                 <a href="startscreen.html" class="nav-link">← Terug naar Admin pagina</a>
+                <button id="qr-toggle" onclick="toggleQR()" class="nav-link" style="background: none; border: none; color: var(--theme-primary); cursor: pointer;">📱 QR</button>
+            </div>
+            <div class="form-group" style="margin-top: 10px;">
+                <label for="activity-select">Activiteit:</label>
+                <select id="activity-select">
+                    <option value="">Alle sessie scores</option>
+                </select>
             </div>
         </header>
 
@@ -75,5 +82,27 @@
     <script src="js/api.js"></script>
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/leaderboard.js"></script>
+    <script>
+        const socket = io('http://' + window.location.hostname + ':8000');
+        socket.emit('admin-present');
+
+        window.addEventListener('beforeunload', () => {
+            socket.emit('admin-leave');
+        });
+
+        function toggleQR() {
+            const qrBtn = document.getElementById('qr-toggle');
+            const isActive = qrBtn.style.color === 'var(--theme-primary)' || !qrBtn.dataset.active;
+            if (isActive) {
+                qrBtn.style.color = 'var(--text-secondary)';
+                qrBtn.dataset.active = 'false';
+                socket.emit('toggle-qr', false);
+            } else {
+                qrBtn.style.color = 'var(--theme-primary)';
+                qrBtn.dataset.active = 'true';
+                socket.emit('toggle-qr', true);
+            }
+        }
+    </script>
 </body>
 </html>

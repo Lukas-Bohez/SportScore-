@@ -2,6 +2,7 @@
 class LeaderboardView {
   constructor() {
     this.sessionId = null;
+    this.activityId = null;
     this.sessionData = null;
     this.teamsData = [];
     this.scoresData = [];
@@ -32,6 +33,7 @@ class LeaderboardView {
   getSessionIdFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     this.sessionId = urlParams.get('session');
+    this.activityId = urlParams.get('activity') || null;
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
       window.location.href = 'homescreen.html';
@@ -49,6 +51,22 @@ class LeaderboardView {
     this.leaderboard = document.getElementById('leaderboard');
     this.teamsGrid = document.getElementById('teams-grid');
     this.scoreHistory = document.getElementById('score-history');
+    this.activitySelect = document.getElementById('activity-select');
+    if (this.activitySelect) {
+      this.activitySelect.addEventListener('change', () => {
+        this.activityId = this.activitySelect.value || null;
+        this.loadSessionData();
+        // Update URL without reloading
+        const params = new URLSearchParams(window.location.search);
+        if (this.activityId) {
+          params.set('activity', this.activityId);
+        } else {
+          params.delete('activity');
+        }
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+      });
+    }
   }
 
   async loadSessionData() {
@@ -61,7 +79,10 @@ class LeaderboardView {
       this.showPlayers = showPlayersFlag && scoringModeShowsPlayers;
       this.displaySessionInfo();
 
-      // Load teams and scores
+      // Load activity options
+      await this.loadActivities();
+
+      // Load teams and scores (session or activity)
       await this.loadTeamsAndScores();
 
       // Display data
@@ -74,6 +95,27 @@ class LeaderboardView {
     }
   }
 
+  async loadActivities() {
+    try {
+      if (!this.activitySelect) return;
+      const resp = await api.getSessionActivities(this.sessionId);
+      const activities = resp.activities || [];
+      this.activitySelect.innerHTML = '<option value="">Alle sessie scores</option>';
+      activities.forEach((a) => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.name;
+        this.activitySelect.appendChild(opt);
+      });
+      // Preselect from URL
+      if (this.activityId) {
+        this.activitySelect.value = this.activityId;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   async loadTeamsAndScores() {
     try {
       // Load teams
@@ -81,8 +123,13 @@ class LeaderboardView {
       this.teamsData = teamsResponse.teams || teamsResponse || [];
 
       // Load scores
-      const scoresResponse = await api.getSessionScores(this.sessionId);
-      this.scoresData = scoresResponse.scores || scoresResponse || [];
+      if (this.activityId) {
+        const resp = await api.getActivityScores(this.activityId);
+        this.scoresData = resp.scores || resp || [];
+      } else {
+        const scoresResponse = await api.getSessionScores(this.sessionId);
+        this.scoresData = scoresResponse.scores || scoresResponse || [];
+      }
 
       // Load players for all teams
       await this.loadPlayersForAllTeams();
@@ -129,7 +176,8 @@ class LeaderboardView {
     if (!this.sessionData) return;
 
     // Update header info
-    this.sessionName.textContent = this.sessionData.name || 'Onbekende Sessie';
+    const activityLabel = this.activityId ? await this.getActivityLabel() : '';
+    this.sessionName.textContent = `${this.sessionData.name || 'Onbekende Sessie'}${activityLabel ? ' • ' + activityLabel : ''}`;
     this.sessionStatus.textContent = `Status: ${this.getStatusText(this.sessionData.status)}`;
 
     // Update session details
@@ -146,6 +194,16 @@ class LeaderboardView {
     this.rounds.textContent = `${this.sessionData.current_round || 0}/${this.sessionData.total_rounds || 0}`;
     this.teamCount.textContent = this.teamsData.length;
     this.createdAt.textContent = new Date(this.sessionData.created_at).toLocaleString('nl-NL');
+  }
+
+  async getActivityLabel() {
+    try {
+      if (!this.activityId) return '';
+      const a = await api.getActivity(this.activityId);
+      return a && a.name ? `Activiteit: ${a.name}` : '';
+    } catch (_) {
+      return '';
+    }
   }
 
   displayLeaderboard() {
