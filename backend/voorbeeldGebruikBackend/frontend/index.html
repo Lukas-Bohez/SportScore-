@@ -284,7 +284,7 @@
 
             <!-- Player Login Form -->
             <div id="player-login" class="form-section">
-                <h2 style="margin-bottom: 30px; color: var(--text-color);">Speler Inloggen</h2>
+                <h2 style="margin-bottom: 30px; color: var(--text-color);">Deelnemer Registratie</h2>
 
                 <div class="error-message" id="player-error"></div>
 
@@ -296,26 +296,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="team-select">Selecteer Team:</label>
-                    <select id="team-select" required>
-                        <option value="">-- Selecteer eerst een sessie</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="player-name">Spelernaam:</label>
-                    <input type="text" id="player-name" placeholder="Voer je spelernaam in" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="activity-select">Kies Activiteit:</label>
-                    <select id="activity-select" required>
-                        <option value="">-- Selecteer eerst een team</option>
-                    </select>
+                    <label for="player-name">Naam:</label>
+                    <input type="text" id="player-name" placeholder="Voer je naam in" required>
                 </div>
 
                 <div class="button-group">
-                    <button class="btn btn-primary" onclick="loginPlayer()">Deelnemen</button>
+                    <button class="btn btn-primary" onclick="registerParticipant()">Deelnemen</button>
                     <button class="btn btn-secondary" onclick="backToRoleSelection()">Terug</button>
                 </div>
             </div>
@@ -411,103 +397,39 @@
                     sessionSelect.appendChild(option);
                 });
 
-                sessionSelect.onchange = loadTeamsForSession;
+                sessionSelect.onchange = null;
             } catch (error) {
                 showError('player', 'Fout bij laden van sessies: ' + error.message);
             }
         }
 
-        async function loadTeamsForSession() {
-            const sessionId = document.getElementById('session-select').value;
-            if (!sessionId) {
-                document.getElementById('team-select').innerHTML = '<option value="">-- Selecteer eerst een sessie</option>';
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/v1/sessions/${sessionId}/teams`);
-                const data = await response.json();
-                const teams = data.teams || [];
-
-                const teamSelect = document.getElementById('team-select');
-                teamSelect.innerHTML = '<option value="">-- Selecteer een team</option>';
-                teams.forEach(team => {
-                    const option = document.createElement('option');
-                    option.value = team.id;
-                    option.textContent = `${team.name}`;
-                    teamSelect.appendChild(option);
-                });
-
-                teamSelect.onchange = loadActivitiesForTeam;
-            } catch (error) {
-                showError('player', 'Fout bij laden van teams: ' + error.message);
-            }
         }
 
-        async function loadActivitiesForTeam() {
+        function registerParticipant() {
             const sessionId = document.getElementById('session-select').value;
-            const teamId = document.getElementById('team-select').value;
-
-            if (!sessionId || !teamId) {
-                document.getElementById('activity-select').innerHTML = '<option value="">-- Selecteer eerst een team</option>';
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/v1/sessions/${sessionId}/activities`);
-                const data = await response.json();
-                const activities = data.activities || [];
-
-                const activitySelect = document.getElementById('activity-select');
-                activitySelect.innerHTML = '<option value="">-- Selecteer een activiteit</option>';
-                activities.forEach(activity => {
-                    const option = document.createElement('option');
-                    option.value = activity.id;
-                    option.textContent = activity.name;
-                    activitySelect.appendChild(option);
-                });
-            } catch (error) {
-                showError('player', 'Fout bij laden van activiteiten: ' + error.message);
-            }
-        }
-
-        function loginPlayer() {
-            const sessionId = document.getElementById('session-select').value;
-            const teamId = document.getElementById('team-select').value;
             const playerName = document.getElementById('player-name').value.trim();
-            const activityId = document.getElementById('activity-select').value;
 
             if (!sessionId) {
                 showError('player', 'Selecteer alstublieft een sessie.');
                 return;
             }
-            if (!teamId) {
-                showError('player', 'Selecteer alstublieft een team.');
-                return;
-            }
             if (!playerName) {
-                showError('player', 'Voer alstublieft uw spelernaam in.');
-                return;
-            }
-            if (!activityId) {
-                showError('player', 'Selecteer alstublieft een activiteit.');
+                showError('player', 'Voer alstublieft je naam in.');
                 return;
             }
 
-            // Store player session info
-            const playerSession = {
+            // Store participant session info
+            const participantSession = {
                 sessionId: parseInt(sessionId),
-                teamId: parseInt(teamId),
                 playerName: playerName,
-                activityId: parseInt(activityId),
                 timestamp: new Date().toISOString(),
                 isAdmin: false
             };
 
-            localStorage.setItem('playerSession', JSON.stringify(playerSession));
+            localStorage.setItem('playerSession', JSON.stringify(participantSession));
             localStorage.setItem('isAdmin', 'false');
 
-            // Redirect to scoreboard/player view
+            // Redirect to scoring page
             window.location.href = 'simple-scoreinput.html';
         }
 

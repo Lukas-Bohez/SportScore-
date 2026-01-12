@@ -236,10 +236,45 @@ body {
     font-size: 1.5rem;
 }
 
-.team-score {
+.participant-item {
+    border-left-color: var(--primary-color);
+}
+
+.participant-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.participant-name {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.activity-scores {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.activity-score {
+    background: var(--light-color);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-color);
+    min-width: 40px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.participant-total {
     font-size: 1.2rem;
     font-weight: bold;
-    color: var(--text-color); /* Dark grey instead of gold */
+    color: var(--primary-color);
     text-align: right;
     min-width: 120px;
 }

@@ -87,7 +87,7 @@ class LeaderboardView {
 
       // Display data
       this.displayLeaderboard();
-      this.displayTeamsGrid();
+      // For participant-based scoring, we don't show teams grid
       this.displayScoreHistory();
     } catch (error) {
       api.handleError(error, 'loading session data');
@@ -118,26 +118,24 @@ class LeaderboardView {
 
   async loadTeamsAndScores() {
     try {
-      // Load teams
-      const teamsResponse = await api.getSessionTeams(this.sessionId);
-      this.teamsData = teamsResponse.teams || teamsResponse || [];
-
-      // Load scores
+      // For participant-based scoring, we don't load teams
+      // Instead, we'll load participant scores directly
+      this.participantLeaderboard = null;
+      
       if (this.activityId) {
-        const resp = await api.getActivityScores(this.activityId);
-        this.scoresData = resp.scores || resp || [];
+        // Load activity leaderboard (participant-based)
+        const resp = await api.getActivityLeaderboard(this.activityId);
+        this.participantLeaderboard = resp.leaderboard || [];
       } else {
-        const scoresResponse = await api.getSessionScores(this.sessionId);
-        this.scoresData = scoresResponse.scores || scoresResponse || [];
+        // Load session participant leaderboard
+        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/participant-leaderboard`);
+        this.participantLeaderboard = resp.leaderboard || [];
+        this.activities = resp.activities || [];
       }
-
-      // Load players for all teams
-      await this.loadPlayersForAllTeams();
     } catch (error) {
-      api.handleError(error, 'loading teams and scores');
-      // Continue with empty arrays if loading fails
-      this.teamsData = [];
-      this.scoresData = [];
+      api.handleError(error, 'loading participant scores');
+      this.participantLeaderboard = [];
+      this.activities = [];
     }
   }
 
@@ -209,26 +207,48 @@ class LeaderboardView {
   displayLeaderboard() {
     if (!this.leaderboard) return;
 
-    // Calculate team scores
-    const SportScores = this.calculateSportScores();
-
-    // Filter out eliminated teams if game type is elimination
-    let filteredTeams = SportScores;
-    if (this.sessionData && this.sessionData.game_type === 'elimination') {
-      filteredTeams = SportScores.filter((team) => !team.is_eliminated);
-    }
-
-    // Sort by score descending
-    const sortedTeams = filteredTeams.sort((a, b) => b.score - a.score);
-
-    if (sortedTeams.length === 0) {
-      this.leaderboard.innerHTML = '<div class="no-data">Geen teams gevonden voor deze sessie.</div>';
+    if (!this.participantLeaderboard || this.participantLeaderboard.length === 0) {
+      this.leaderboard.innerHTML = '<div class="no-data">Geen deelnemers gevonden.</div>';
       return;
     }
 
-    const leaderboardHtml = sortedTeams.map((team, index) => this.createLeaderboardItem(team, index + 1)).join('');
+    const leaderboardHtml = this.participantLeaderboard.map((participant, index) => 
+      this.createParticipantLeaderboardItem(participant, index + 1)
+    ).join('');
 
     this.leaderboard.innerHTML = leaderboardHtml;
+  }
+
+  createParticipantLeaderboardItem(participant, position) {
+    const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🏅';
+    
+    let activityScoresHtml = '';
+    if (this.activities && this.activities.length > 0) {
+      activityScoresHtml = '<div class="activity-scores">';
+      this.activities.forEach(activity => {
+        const score = participant.activity_scores[activity.id] || 0;
+        activityScoresHtml += `<div class="activity-score" title="${activity.name}">${score}</div>`;
+      });
+      activityScoresHtml += '</div>';
+    }
+
+    return `
+      <div class="leaderboard-item participant-item">
+        <div class="position">${position}</div>
+        <div class="medal">${medal}</div>
+        <div class="participant-info">
+          <div class="participant-name">${this.escapeHtml(participant.player_name)}</div>
+          ${activityScoresHtml}
+        </div>
+        <div class="participant-total">${participant.total_score} punten</div>
+      </div>
+    `;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   calculateSportScores() {

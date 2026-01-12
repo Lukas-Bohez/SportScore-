@@ -123,6 +123,12 @@ class PlayerRepository:
         return Database.get_one_row(sql, params)
 
     @staticmethod
+    def get_player_by_name(name: str) -> Optional[Dict[str, Any]]:
+        sql = "SELECT * FROM players WHERE name = ?"
+        params = [name]
+        return Database.get_one_row(sql, params)
+
+    @staticmethod
     def get_players_by_team(team_id: int) -> List[Dict[str, Any]]:
         sql = "SELECT * FROM players WHERE team_id = ? ORDER BY id ASC"
         params = [team_id]
@@ -515,37 +521,56 @@ class SessionRepository:
         # Settings without max_teams
         settings = json.dumps({})
         
-        sql = """INSERT INTO games (name, sport_id, game_type, status, total_rounds, time_limit, settings, scoring_mode, sport_type, show_players)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""  
-        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', total_rounds, time_limit, settings, scoring_mode, sport_type, 1 if show_players else 0])
+        sql = """INSERT INTO games (name, sport_id, game_type, status, sport_type, show_players)
+                 VALUES (?, ?, ?, ?, ?, ?)"""  
+        return Database.execute_sql(sql, [name, sport_id, game_type, 'setup', sport_type, 1 if show_players else 0])
     def get_all_sessions() -> List[Dict[str, Any]]:
-        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
+        sql = """SELECT g.id, g.name, g.game_type, g.status, 
+                        g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g
                  WHERE g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.created_at DESC"""
         sessions = Database.get_rows(sql)
         
+        # Add default values for missing columns
+        for session in sessions:
+            session['current_round'] = 1
+            session['total_rounds'] = 1
+            session['time_limit'] = None
+            session['scoring_mode'] = 'team'
+        
         return sessions
 
     @staticmethod
     def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
-        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
+        sql = """SELECT g.id, g.name, g.game_type, g.status, 
+                        g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g WHERE g.id = ?"""
         session = Database.get_one_row(sql, [session_id])
+        
+        if session:
+            session['current_round'] = 1
+            session['total_rounds'] = 1
+            session['time_limit'] = None
+            session['scoring_mode'] = 'team'
         
         return session
 
     @staticmethod
     def get_active_session() -> Optional[Dict[str, Any]]:
-        sql = """SELECT g.id, g.name, g.game_type, g.status, g.current_round, g.total_rounds, g.time_limit,
-                        g.scoring_mode, g.sport_type, g.show_players, g.created_at, g.updated_at
+        sql = """SELECT g.id, g.name, g.game_type, g.status, 
+                        g.sport_type, g.show_players, g.created_at, g.updated_at
                  FROM games g
                  WHERE g.status IN ('setup', 'active', 'paused')
                  AND g.game_type IN ('quiz', 'challenge', 'custom', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time')
                  ORDER BY g.updated_at DESC LIMIT 1"""
         session = Database.get_one_row(sql)
+        
+        if session:
+            session['current_round'] = 1
+            session['total_rounds'] = 1
+            session['time_limit'] = None
+            session['scoring_mode'] = 'team'
         
         return session
 
@@ -567,18 +592,7 @@ class SessionRepository:
         if status is not None:
             updates.append("status = ?")
             params.append(status)
-        if current_round is not None:
-            updates.append("current_round = ?")
-            params.append(current_round)
-        if total_rounds is not None:
-            updates.append("total_rounds = ?")
-            params.append(total_rounds)
-        if time_limit is not None:
-            updates.append("time_limit = ?")
-            params.append(time_limit)
-        if scoring_mode is not None:
-            updates.append("scoring_mode = ?")
-            params.append(scoring_mode)
+        # Skip current_round, total_rounds, time_limit, scoring_mode as they don't exist in games table
         if sport_type is not None:
             updates.append("sport_type = ?")
             params.append(sport_type)
@@ -1099,13 +1113,13 @@ class ActivityScoreRepository:
     @staticmethod
     def get_leaderboard(activity_id: int) -> List[Dict[str, Any]]:
         sql = """
-        SELECT COALESCE(t.id, -1) as team_id, COALESCE(t.name, 'N/A') as team_name,
+        SELECT COALESCE(p.id, -1) as player_id, COALESCE(p.name, 'N/A') as player_name,
                COALESCE(SUM(s.points), 0) as total_score
         FROM activity_scores s
-        LEFT JOIN teams t ON s.team_id = t.id
+        LEFT JOIN players p ON s.player_id = p.id
         WHERE s.activity_id = ?
-        GROUP BY t.id, t.name
-        ORDER BY total_score DESC, team_name ASC
+        GROUP BY p.id, p.name
+        ORDER BY total_score DESC, player_name ASC
         """
         return Database.get_rows(sql, [activity_id])
 
