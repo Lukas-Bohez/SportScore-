@@ -2,22 +2,19 @@
 class ScoreInput {
   constructor() {
     this.sessionId = new URLSearchParams(window.location.search).get('session');
-    // Load player session from localStorage (preferred for activity flow)
+    // Load participant session from localStorage
     try {
       const stored = localStorage.getItem('playerSession');
       if (stored) {
         const ps = JSON.parse(stored);
         if (ps && ps.sessionId) {
           this.sessionId = String(ps.sessionId);
-          this.activityId = ps.activityId ? String(ps.activityId) : null;
-          this.defaultTeamId = ps.teamId ? String(ps.teamId) : null;
-          this.defaultPlayerName = ps.playerName || null;
+          this.participantName = ps.playerName || null;
         }
       }
     } catch (_) {}
     this.session = null;
-    this.activity = null;
-    this.teams = [];
+    this.activities = []; // Stations
     this.recentScores = [];
     this.timer = null;
     this.timeRemaining = 0;
@@ -26,7 +23,7 @@ class ScoreInput {
 
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
       return;
     }
 
@@ -38,12 +35,16 @@ class ScoreInput {
     this.setupEventListeners();
     this.loadCustomQuickActions();
     await this.loadSession();
-    if (this.activityId) {
-      await this.loadActivity();
-    }
-    await this.loadTeams();
-    await this.loadLeaderboard();
+    await this.loadActivities();
     this.loadRecentScores();
+    this.displayParticipantName();
+  }
+
+  displayParticipantName() {
+    const participantNameEl = document.getElementById('participant-name');
+    if (participantNameEl && this.participantName) {
+      participantNameEl.textContent = `Welkom, ${this.participantName}!`;
+    }
   }
 
   bindElements() {
@@ -359,31 +360,49 @@ class ScoreInput {
     }
   }
 
-  async loadTeams() {
+  async loadActivities() {
     try {
-      // Save current selections
-      const currentTeamId = this.teamSelect.value;
-      const currentPlayerId = this.playerSelect.value;
+      const response = await api.getSessionActivities(this.sessionId);
+      this.activities = response.activities || [];
+      this.renderActivities();
+    } catch (error) {
+      console.error('Error loading activities:', error);
+    }
+  }
 
-      let response;
-      if (this.activityId) {
-        response = await api.getActivityTeams(this.activityId);
-      } else {
-        response = await api.getSessionTeams(this.sessionId);
+  renderActivities() {
+    // Render activities as scoring stations
+    const container = document.getElementById('activities-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    this.activities.forEach(activity => {
+      const stationDiv = document.createElement('div');
+      stationDiv.className = 'station-card';
+      stationDiv.innerHTML = `
+        <h3>${this.escapeHtml(activity.name)}</h3>
+        <p>${this.escapeHtml(activity.description || '')}</p>
+        <button onclick="scoreInput.scoreForActivity(${activity.id})">Score Ingeven</button>
+      `;
+      container.appendChild(stationDiv);
+    });
+  }
+
+  async scoreForActivity(activityId) {
+    const score = prompt(`Voer je score in voor ${this.activities.find(a => a.id == activityId)?.name}:`);
+    if (score !== null && score !== '') {
+      try {
+        await api.createStudentActivityScore(this.sessionId, activityId, {
+          player_name: this.participantName,
+          points: parseInt(score) || 0
+        });
+        alert('Score ingegeven!');
+      } catch (error) {
+        console.error('Error submitting score:', error);
+        alert('Fout bij ingeven score');
       }
-      const newTeams = response.teams || [];
-
-      // Preserve existing player data if it exists
-      const existingPlayers = {};
-      this.teams.forEach((team) => {
-        if (team.players) {
-          existingPlayers[team.id] = team.players;
-        }
-      });
-
-      this.teams = newTeams;
-
-      // Restore player data for teams that had it
+    }
+  }
       this.teams.forEach((team) => {
         if (existingPlayers[team.id]) {
           team.players = existingPlayers[team.id];

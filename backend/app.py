@@ -109,6 +109,12 @@ connected_clients = set()
 
 # Track admin presence
 admin_count = 0
+show_qr_task = None
+
+# Delayed QR show task
+async def delayed_show_qr():
+    await asyncio.sleep(120)  # 2 minutes
+    await sio.emit('show-qr')
 
 
 # Expose Socket.IO as the top-level ASGI app to avoid duplicate CORS headers on /socket.io
@@ -138,21 +144,25 @@ async def disconnect(sid):
 
 @sio.event
 async def admin_present(sid):
-    global admin_count
+    global admin_count, show_qr_task
     admin_count += 1
     print(f"Admin present - Admin count: {admin_count}")
-    if admin_count == 1:
-        await sio.emit('hide-qr')
+    # Cancel any pending QR show task
+    if show_qr_task and not show_qr_task.done():
+        show_qr_task.cancel()
+        show_qr_task = None
 
 @sio.event
 async def admin_leave(sid):
-    global admin_count
+    global admin_count, show_qr_task
     admin_count -= 1
     if admin_count < 0:
         admin_count = 0
     print(f"Admin leave - Admin count: {admin_count}")
     if admin_count == 0:
-        await sio.emit('show-qr')
+        # Start delayed QR show
+        if show_qr_task is None or show_qr_task.done():
+            show_qr_task = asyncio.create_task(delayed_show_qr())
 
 @sio.event
 async def toggle_qr(sid, data=None):
@@ -162,6 +172,85 @@ async def toggle_qr(sid, data=None):
 # ----------------------------------------------------
 # API Routes
 # ----------------------------------------------------
+
+# Student endpoints
+@app.get(f"{ENDPOINT}/student/active-sessions")
+async def get_active_student_sessions():
+    # Get sessions that are active (assuming sessions with activities are active)
+    sessions = SessionRepository.get_all_sessions()
+    active_sessions = []
+    for session in sessions:
+        activities = ActivityRepository.get_activities_by_session(session['id'])
+        if activities:
+            # Get teams and players for the session
+            teams = SessionTeamRepository.get_teams_by_session(session['id'])
+            players = SessionPlayerRepository.get_players_by_session(session['id'])
+            session_data = {
+                "session": session,
+                "activities": activities,
+                "teams": teams,
+                "players": players
+            }
+            active_sessions.append(session_data)
+    return {"active_sessions": active_sessions}
+
+@app.get(f"{ENDPOINT}/student/session/{{session_id}}/activities")
+async def get_student_activities(session_id: int):
+    activities = ActivityRepository.get_activities_by_session(session_id)
+    return {"activities": activities}
+
+@app.get(f"{ENDPOINT}/student/session/{{session_id}}/teams")
+async def get_student_teams(session_id: int):
+    teams = SessionTeamRepository.get_teams_by_session(session_id)
+    return {"teams": teams}
+
+@app.get(f"{ENDPOINT}/student/session/{{session_id}}/players")
+async def get_student_players(session_id: int):
+    players = SessionPlayerRepository.get_players_by_session(session_id)
+    return {"players": players}
+
+@app.post(f"{ENDPOINT}/student/session/{{session_id}}/activity/{{activity_id}}/score")
+async def create_student_activity_score(session_id: int, activity_id: int, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    player_name = payload.get('player_name', '').strip()
+    points = payload.get('points', 0)
+    
+    if not player_name:
+        raise HTTPException(status_code=422, detail="Field 'player_name' is required")
+    
+    # Find or create player
+    player = PlayerRepository.get_player_by_name(player_name)
+    if not player:
+        # Create new player without team
+        player_id = PlayerRepository.create_player(player_name, None, None)
+        player = PlayerRepository.get_player_by_id(player_id)
+    
+    # Create activity score
+    score_id = ActivityScoreRepository.create_score(
+        activity_id=activity_id,
+        points=points,
+        team_id=None,  # No team for individual participants
+        player_id=player['id'],
+        reason=f"Score by {player_name}",
+        round_number=1,
+        timestamp=datetime.now(CET),
+    )
+    
+    # Emit real-time update
+    await sio.emit('activity_score_update', _jsonable({
+        'session_id': session_id,
+        'activity_id': activity_id,
+        'player_id': player['id'],
+        'player_name': player_name,
+        'points': points,
+        'timestamp': datetime.now(CET).isoformat()
+    }))
+    
+    return {"message": "Score submitted successfully", "score_id": score_id}
 
 # Sports endpoints
 @app.get(f"{ENDPOINT}/sports", response_model=SportListResponse)
@@ -1012,10 +1101,48 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
 
     return SessionScoreResponse(**created_score)
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/leaderboard", tags=["Sessions"], summary="Get session leaderboard")
-async def get_session_leaderboard(session_id: int):
-    summary = SessionScoreRepository.get_session_score_summary(session_id)
-    return {"leaderboard": summary}
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/participant-leaderboard", tags=["Sessions"], summary="Get session participant leaderboard")
+async def get_session_participant_leaderboard(session_id: int):
+    # Get all activities for the session
+    activities = ActivityRepository.get_activities_by_session(session_id)
+    activity_ids = [a['id'] for a in activities]
+    
+    if not activity_ids:
+        return {"leaderboard": []}
+    
+    # Get all scores for these activities
+    scores = []
+    for activity_id in activity_ids:
+        activity_scores = ActivityScoreRepository.get_scores_by_activity(activity_id)
+        scores.extend(activity_scores)
+    
+    # Group by player
+    from collections import defaultdict
+    player_scores = defaultdict(lambda: {'player_name': '', 'activity_scores': {}, 'total_score': 0})
+    
+    for score in scores:
+        player_id = score['player_id']
+        activity_id = score['activity_id']
+        points = score['points']
+        player_name = score['player_name'] or f'Player {player_id}'
+        
+        player_scores[player_id]['player_name'] = player_name
+        player_scores[player_id]['activity_scores'][activity_id] = points
+        player_scores[player_id]['total_score'] += points
+    
+    # Convert to list and sort by total score
+    leaderboard = []
+    for player_id, data in player_scores.items():
+        leaderboard.append({
+            'player_id': player_id,
+            'player_name': data['player_name'],
+            'activity_scores': data['activity_scores'],
+            'total_score': data['total_score']
+        })
+    
+    leaderboard.sort(key=lambda x: x['total_score'], reverse=True)
+    
+    return {"leaderboard": leaderboard, "activities": activities}
 
 @app.get(
     f"{ENDPOINT}/live/leaderboard",
@@ -1029,8 +1156,17 @@ async def get_live_leaderboard():
     if not session:
         return {"leaderboard": [], "session": None}
     
-    summary = SessionScoreRepository.get_session_score_summary(session['id'])
-    return {"leaderboard": summary, "session": session}
+    # For participant-based scoring, return participant leaderboard
+    # Check if session has activities (indicating station-based scoring)
+    activities = ActivityRepository.get_activities_by_session(session['id'])
+    if activities:
+        # Participant-based leaderboard
+        leaderboard_data = await get_session_participant_leaderboard(session['id'])
+        return {"leaderboard": leaderboard_data["leaderboard"], "session": session, "activities": leaderboard_data["activities"]}
+    else:
+        # Fallback to team-based leaderboard
+        summary = SessionScoreRepository.get_session_score_summary(session['id'])
+        return {"leaderboard": summary, "session": session}
 
 @app.delete(f"{ENDPOINT}/sessions/{{session_id}}/scores/{{score_id}}")
 async def delete_session_score(session_id: int, score_id: int):

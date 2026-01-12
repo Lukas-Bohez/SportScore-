@@ -7,7 +7,7 @@ class ScoreboardAPI {
     const fromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('apiBase') : null;
     const detected = fromGlobal || fromQuery;
 
-    this.baseURL = (baseURL || detected || 'http://localhost:8000').replace(/\/$/, '');
+    this.baseURL = (baseURL || detected || ('http://' + window.location.hostname + ':8000')).replace(/\/$/, '');
     this.API_PREFIX = '/api/v1';
     this.socket = null;
     this.eventListeners = {};
@@ -703,6 +703,14 @@ class ScoreboardAPI {
   // Live Leaderboard
   async getLiveLeaderboard() {
     return this.request('/api/v1/live/leaderboard');
+  }
+
+  // Student Activity Scoring
+  async createStudentActivityScore(sessionId, activityId, data) {
+    return this.request(`/api/v1/student/session/${sessionId}/activity/${activityId}/score`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Standalone Teams Management

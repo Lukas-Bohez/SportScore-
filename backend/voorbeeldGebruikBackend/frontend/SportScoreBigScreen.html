@@ -6,7 +6,7 @@
     <title>SportScore - Live Scorebord</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/themes.css">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -36,29 +36,34 @@
     <script src="js/dark_mode_toggle.js"></script>
     <script src="js/bigscreen.js"></script>
     <script>
-        const socket = io('http://' + window.location.hostname + ':8000');
-        let adminPresent = false;
+        // Auto-detect backend base URL (same as api.js)
+        const fromGlobal = typeof window !== 'undefined' && window.SCOREBOARD_API_BASE;
+        const fromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('apiBase') : null;
+        const detected = fromGlobal || fromQuery;
+        const backendURL = detected || 'http://192.168.123.241:8000'; // Default to known backend IP
+
+        const socket = io(backendURL);
         let qrVisible = true;
 
         // Generate QR code for WiFi
         const wifiString = 'WIFI:S:PiHotspot;T:WPA;P:raspberry;;';
-        QRCode.toCanvas(document.getElementById('qrcode'), wifiString, { width: 256 }, function (error) {
-            if (error) console.error(error);
-        });
+        try {
+            new QRCode(document.getElementById('qrcode'), {
+                text: wifiString,
+                width: 256,
+                height: 256
+            });
+        } catch (e) {
+            console.error('QRCode generation failed:', e);
+            document.getElementById('qrcode').innerHTML = '<p>QR Code: ' + wifiString + '</p>';
+        }
 
         // Initially show QR
         showQR();
 
-        socket.on('hide-qr', () => {
-            adminPresent = true;
-            hideQR();
-        });
-
         socket.on('show-qr', () => {
-            adminPresent = false;
-            if (qrVisible) {
-                showQR();
-            }
+            qrVisible = true;
+            showQR();
         });
 
         socket.on('toggle-qr', (data) => {
@@ -67,7 +72,7 @@
             } else {
                 qrVisible = !qrVisible;
             }
-            if (qrVisible && !adminPresent) {
+            if (qrVisible) {
                 showQR();
             } else {
                 hideQR();

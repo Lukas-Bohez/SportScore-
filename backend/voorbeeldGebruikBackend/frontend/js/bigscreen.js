@@ -236,6 +236,16 @@ class BigScreenDisplay {
       alert('Test event received: ' + JSON.stringify(data));
     });
 
+    api.on('show-qr', (data) => {
+      console.log('BigScreen: Received show-qr event');
+      this.showQR();
+    });
+
+    api.on('toggle-qr', (data) => {
+      console.log('BigScreen: Received toggle-qr event');
+      this.toggleQR();
+    });
+
     api.on('connected', () => {
       console.log('BigScreen: Socket.IO connected');
       this.showConnectionStatus('Connected', 'success');
@@ -247,6 +257,21 @@ class BigScreenDisplay {
       console.log('BigScreen: Socket.IO disconnected');
       this.showConnectionStatus('Disconnected', 'error');
     });
+  }
+
+  showQR() {
+    const qrOverlay = document.getElementById('qr-overlay');
+    if (qrOverlay) {
+      qrOverlay.style.display = 'flex';
+    }
+  }
+
+  toggleQR() {
+    const qrOverlay = document.getElementById('qr-overlay');
+    if (qrOverlay) {
+      const isVisible = qrOverlay.style.display !== 'none';
+      qrOverlay.style.display = isVisible ? 'none' : 'flex';
+    }
   }
 
   async loadInitialData() {
@@ -541,10 +566,36 @@ class BigScreenDisplay {
     this.teamsContainer.innerHTML = '';
 
     if (!leaderboard || leaderboard.length === 0) {
-      this.teamsContainer.innerHTML = '<div class="no-teams">No teams in session</div>';
+      this.teamsContainer.innerHTML = '<div class="no-teams">Geen deelnemers in sessie</div>';
       return;
     }
 
+    // Check if this is participant-based data (has player_name) or team-based
+    const isParticipantData = leaderboard.length > 0 && leaderboard[0].hasOwnProperty('player_name');
+
+    if (isParticipantData) {
+      this.updateParticipantLeaderboard(leaderboard);
+    } else {
+      this.updateTeamLeaderboard(leaderboard);
+    }
+  }
+
+  updateParticipantLeaderboard(participants) {
+    // Sort by total score descending
+    participants.sort((a, b) => b.total_score - a.total_score);
+
+    // Add class for layout
+    this.teamsContainer.className = 'leaderboard-container participant-leaderboard';
+
+    // Create participant leaderboard
+    participants.forEach((participant, index) => {
+      const participantElement = this.createParticipantElement(participant, index + 1);
+      this.teamsContainer.appendChild(participantElement);
+    });
+  }
+
+  updateTeamLeaderboard(leaderboard) {
+    // Original team-based logic
     // Filter eliminated teams in elimination mode
     if (this.currentSession && this.currentSession.game_mode === 'elimination') {
       leaderboard = leaderboard.filter((team) => !team.is_eliminated);
@@ -619,6 +670,44 @@ class BigScreenDisplay {
     `;
 
     return teamDiv;
+  }
+
+  createParticipantElement(participant, position) {
+    const participantDiv = document.createElement('div');
+    participantDiv.className = 'leaderboard-team participant-item';
+    
+    // Medal for top 3
+    let medal = '';
+    if (position === 1) medal = '🥇';
+    else if (position === 2) medal = '🥈';
+    else if (position === 3) medal = '🥉';
+    else medal = '🏅';
+
+    // Activity scores
+    let activityScoresHtml = '';
+    if (participant.activity_scores && Object.keys(participant.activity_scores).length > 0) {
+      activityScoresHtml = '<div class="participant-activity-scores">';
+      Object.entries(participant.activity_scores).forEach(([activityId, score]) => {
+        activityScoresHtml += `<span class="activity-score-badge">${score}</span>`;
+      });
+      activityScoresHtml += '</div>';
+    }
+
+    participantDiv.innerHTML = `
+      <div class="team-position">${position}</div>
+      <div class="participant-medal">${medal}</div>
+      <div class="participant-name">${this.escapeHtml(participant.player_name)}</div>
+      ${activityScoresHtml}
+      <div class="participant-total">${participant.total_score} punten</div>
+    `;
+
+    return participantDiv;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   sortTeams() {
