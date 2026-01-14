@@ -635,7 +635,12 @@ class SessionTeamRepository:
         
         if existing_team:
             team_id = existing_team['id']
-            # Do not update existing team properties, just link to session
+            # Update color and icon when adding existing team to session
+            logger.info(f"Reusing existing team {team_id} '{name}', updating color to '{color}' and icon to '{icon}'")
+            Database.execute_sql(
+                "UPDATE teams SET color = ?, icon = ? WHERE id = ?",
+                [color, icon, team_id]
+            )
         else:
             # Maak nieuw team aan
             sql = """INSERT INTO teams (name, color, icon) VALUES (?, ?, ?)"""

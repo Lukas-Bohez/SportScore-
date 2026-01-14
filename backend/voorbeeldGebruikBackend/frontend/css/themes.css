@@ -37,21 +37,6 @@
     --transition: all 0.3s ease;
 }
 
-/* Dark mode variable overrides */
-.dark-mode {
-    --background-color: #121212;
-    --text-color: #e6e6e6;
-    --text-secondary: #b0b0b0;
-    --border-color: #333333;
-    --card-bg: #1e1e1e;
-    --shadow-color: rgba(0, 0, 0, 0.6);
-    --input-bg: #1e1e1e;
-    --input-border: #3a3a3a;
-    --input-text: #e6e6e6;
-    --link-color: #9bb4ff;
-    --link-hover: #b3c6ff;
-}
-
 /* Quiz Theme */
 body[data-sport="quiz"] {
     --theme-primary: #007bff;
@@ -300,8 +285,15 @@ body:not([data-sport]) .header h1::before {
 } */
 
 @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
 /* Sports field pattern for voetbal */
@@ -325,7 +317,7 @@ body:not([data-sport]) .header h1::before {
 } */
 
 /* Ensure content stays above patterns */
-.container > * {
+.container>* {
     position: relative;
     z-index: 1;
 }

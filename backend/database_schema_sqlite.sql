@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(200) NOT NULL,
     sport_id INTEGER NOT NULL,
-    game_type TEXT CHECK(game_type IN ('custom', 'quiz', 'sport_challenge', 'elimination', 'team_vs_time', 'golf')) DEFAULT 'custom',
+    game_type TEXT CHECK(game_type IN ('custom', 'quiz', 'challenge', 'tournament', 'sport_challenge', 'elimination', 'team_vs_time', 'golf')) DEFAULT 'custom',
     status TEXT CHECK(status IN ('setup', 'active', 'paused', 'completed', 'cancelled')) DEFAULT 'setup',
     sport_type VARCHAR(50) DEFAULT 'custom',
     show_players INTEGER DEFAULT 1,

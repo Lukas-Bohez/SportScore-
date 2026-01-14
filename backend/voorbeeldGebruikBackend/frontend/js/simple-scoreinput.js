@@ -44,6 +44,55 @@ class ScoreInput {
     const participantNameEl = document.getElementById('participant-name');
     if (participantNameEl && this.participantName) {
       participantNameEl.textContent = `Welkom, ${this.participantName}!`;
+      
+      // Hide admin controls for participants
+      this.hideAdminControls();
+    }
+  }
+
+  hideAdminControls() {
+    // Hide admin-only elements
+    const adminElements = [
+      '.session-controls', // Footer controls
+      '.score-input-section .form-group', // Team/player selection form
+      '.quick-actions', // Quick action buttons
+      '.custom-quick-actions-section', // Custom actions
+      '#qr-toggle' // QR toggle (admin feature)
+    ];
+    
+    adminElements.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        el.style.display = 'none';
+      });
+    });
+
+    // Hide the admin home link and show participant back link
+    const homeLink = document.querySelector('a[href="index.html"]');
+    const backLink = document.getElementById('back-btn');
+    if (homeLink) {
+      homeLink.style.display = 'none';
+    }
+    if (backLink) {
+      backLink.style.display = 'inline-block';
+    }
+
+    // Simplify the header
+    const header = document.querySelector('.header h1');
+    if (header) {
+      header.textContent = 'SportScore - Mijn Scores';
+    }
+
+    // Hide leaderboard for participants (they don't need to see admin view)
+    const leaderboardSection = document.querySelector('.leaderboard-section');
+    if (leaderboardSection) {
+      leaderboardSection.style.display = 'none';
+    }
+
+    // Hide recent scores section for participants
+    const recentScoresSection = document.querySelector('.recent-scores-section');
+    if (recentScoresSection) {
+      recentScoresSection.style.display = 'none';
     }
   }
 
@@ -183,7 +232,7 @@ class ScoreInput {
     } catch (error) {
       api.handleError(error, 'loading session');
       alert('Fout bij het laden van de sessie.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     }
   }
 
@@ -379,30 +428,113 @@ class ScoreInput {
     this.activities.forEach(activity => {
       const stationDiv = document.createElement('div');
       stationDiv.className = 'station-card';
-      stationDiv.innerHTML = `
-        <h3>${this.escapeHtml(activity.name)}</h3>
-        <p>${this.escapeHtml(activity.description || '')}</p>
-        <button onclick="scoreInput.scoreForActivity(${activity.id})">Score Ingeven</button>
-      `;
+      
+      if (this.participantName) {
+        // Participant mode: simple scoring buttons
+        stationDiv.innerHTML = `
+          <h3>${this.escapeHtml(activity.name)}</h3>
+          <p>${this.escapeHtml(activity.description || '')}</p>
+          <div class="score-buttons">
+            <button onclick="scoreInput.scoreForActivity(${activity.id}, 1)" class="score-btn small">+1</button>
+            <button onclick="scoreInput.scoreForActivity(${activity.id}, 5)" class="score-btn medium">+5</button>
+            <button onclick="scoreInput.scoreForActivity(${activity.id}, 10)" class="score-btn large">+10</button>
+          </div>
+        `;
+      } else {
+        // Admin mode: single score input button
+        stationDiv.innerHTML = `
+          <h3>${this.escapeHtml(activity.name)}</h3>
+          <p>${this.escapeHtml(activity.description || '')}</p>
+          <button onclick="scoreInput.scoreForActivity(${activity.id})">Score Ingeven</button>
+        `;
+      }
+      
       container.appendChild(stationDiv);
     });
   }
 
-  async scoreForActivity(activityId) {
-    const score = prompt(`Voer je score in voor ${this.activities.find(a => a.id == activityId)?.name}:`);
-    if (score !== null && score !== '') {
-      try {
-        await api.createStudentActivityScore(this.sessionId, activityId, {
-          player_name: this.participantName,
-          points: parseInt(score) || 0
-        });
+  async scoreForActivity(activityId, points = null) {
+    let score;
+    
+    if (points !== null) {
+      // Participant mode: points provided directly
+      score = points;
+    } else {
+      // Admin mode: prompt for score
+      score = prompt(`Voer je score in voor ${this.activities.find(a => a.id == activityId)?.name}:`);
+      if (score === null || score === '') {
+        return; // Cancelled
+      }
+      score = parseInt(score) || 0;
+    }
+    
+    try {
+      await api.createStudentActivityScore(this.sessionId, activityId, {
+        player_name: this.participantName,
+        points: score
+      });
+      
+      // Show success feedback
+      if (this.participantName) {
+        this.showScoreFeedback(`+${score} punten toegevoegd!`, 'success');
+      } else {
         alert('Score ingegeven!');
-      } catch (error) {
-        console.error('Error submitting score:', error);
+      }
+    } catch (error) {
+      console.error('Error submitting score:', error);
+      if (this.participantName) {
+        this.showScoreFeedback('Fout bij ingeven score', 'error');
+      } else {
         alert('Fout bij ingeven score');
       }
     }
   }
+
+  showScoreFeedback(message, type) {
+    // Create a temporary feedback element
+    const feedback = document.createElement('div');
+    feedback.className = `score-feedback ${type}`;
+    feedback.textContent = message;
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${type === 'success' ? '#28a745' : '#dc3545'};
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease-in;
+    `;
+    
+    document.body.appendChild(feedback);
+    
+    setTimeout(() => {
+      feedback.style.animation = 'fadeOut 0.3s ease-out';
+      setTimeout(() => {
+        document.body.removeChild(feedback);
+      }, 300);
+    }, 2000);
+  }
+
+  async loadTeams() {
+    try {
+      // Load teams from API
+      const response = await api.getSessionTeams(this.sessionId);
+      this.teams = response.teams || [];
+
+      // Store current selections before reloading
+      const currentTeamId = this.teamSelect ? this.teamSelect.value : null;
+      const currentPlayerId = this.playerSelect ? this.playerSelect.value : null;
+
+      // Keep track of existing players to avoid losing them during reload
+      const existingPlayers = {};
+      this.teams.forEach(team => {
+        if (team.players) {
+          existingPlayers[team.id] = team.players;
+        }
+      });
+
       this.teams.forEach((team) => {
         if (existingPlayers[team.id]) {
           team.players = existingPlayers[team.id];
@@ -1051,7 +1183,7 @@ class ScoreInput {
     try {
       await api.put(`/api/v1/sessions/${this.sessionId}`, { status: 'completed' });
       alert('Sessie beëindigd!');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     } catch (error) {
       api.handleError(error, 'ending session');
     }

@@ -4,6 +4,7 @@
 
 echo "🚀 Starting SportScore Application Setup..."
 
+# sportscore-backend is the systemd service unit for the SportScore backend application
 # Check if backend service is running
 if systemctl is-active --quiet sportscore-backend; then
     echo "✅ Backend service is running"

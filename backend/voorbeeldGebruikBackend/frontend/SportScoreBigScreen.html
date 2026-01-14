@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="nl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SportScore - Live Scorebord</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/themes.css">
     <script src="http://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header class="header">
@@ -33,17 +37,31 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/dark_mode_toggle.js"></script>
     <script src="js/bigscreen.js"></script>
     <script>
-        // Auto-detect backend base URL (same as api.js)
-        const fromGlobal = typeof window !== 'undefined' && window.SCOREBOARD_API_BASE;
-        const fromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('apiBase') : null;
-        const detected = fromGlobal || fromQuery;
-        const backendURL = detected || 'http://192.168.123.241:8000'; // Default to known backend IP
+        // Wait for API to initialize socket, then set up logging
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = api.socket;
+            if (socket) {
+                console.log('BigScreen: Using global API socket, connecting to:', api.baseURL);
+                socket.on('connect', () => {
+                    console.log('BigScreen: Socket connected');
+                });
+                socket.on('disconnect', () => {
+                    console.log('BigScreen: Socket disconnected');
+                });
+                socket.on('connect_error', (error) => {
+                    console.error('BigScreen: Socket connection error:', error);
+                });
 
-        const socket = io(backendURL);
-        let qrVisible = true;
+                // Socket is already connected if already available
+                if (socket.connected) {
+                    console.log('BigScreen: Socket already connected');
+                }
+            } else {
+                console.error('BigScreen: No socket available from API');
+            }
+        });
 
         // Generate QR code for WiFi
         const wifiString = 'WIFI:S:PiHotspot;T:WPA;P:raspberry;;';
@@ -58,38 +76,8 @@
             document.getElementById('qrcode').innerHTML = '<p>QR Code: ' + wifiString + '</p>';
         }
 
-        // Initially show QR
-        showQR();
-
-        socket.on('show-qr', () => {
-            qrVisible = true;
-            showQR();
-        });
-
-        socket.on('toggle-qr', (data) => {
-            if (typeof data === 'boolean') {
-                qrVisible = data;
-            } else {
-                qrVisible = !qrVisible;
-            }
-            if (qrVisible) {
-                showQR();
-            } else {
-                hideQR();
-            }
-        });
-
-        function showQR() {
-            document.getElementById('qr-overlay').style.display = 'flex';
-        }
-
-        function hideQR() {
-            document.getElementById('qr-overlay').style.display = 'none';
-        }
+        // QR functionality is handled by BigScreenDisplay class in bigscreen.js
     </script>
-        if (adminCount === 0) {
-            showQR();
-        }
     </script>
     <style>
         .qr-overlay {
@@ -105,6 +93,7 @@
             align-items: center;
             z-index: 1000;
         }
+
         .qr-container {
             background: white;
             padding: 20px;
@@ -112,12 +101,15 @@
             text-align: center;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
+
         .qr-container h2 {
             margin-bottom: 20px;
         }
+
         .qr-container p {
             margin: 10px 0;
         }
     </style>
 </body>
+
 </html>

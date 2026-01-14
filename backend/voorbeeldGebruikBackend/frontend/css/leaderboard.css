@@ -7,8 +7,10 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--background-color); /* White background */
-    color: var(--text-color); /* Dark grey text */
+    background: var(--background-color);
+    /* White background */
+    color: var(--text-color);
+    /* Dark grey text */
     line-height: 1.6;
     min-height: 100vh;
 }
@@ -47,7 +49,8 @@ body {
     font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 15px;
-    color: var(--theme-text); /* Dark grey text */
+    color: var(--theme-text);
+    /* Dark grey text */
 }
 
 @media (min-width: 768px) {
@@ -73,7 +76,8 @@ body {
 .session-info span {
     font-size: 1.1rem;
     font-weight: 600;
-    color: var(--text-secondary); /* Medium grey text */
+    color: var(--text-secondary);
+    /* Medium grey text */
 }
 
 .nav-links {
@@ -123,7 +127,8 @@ body {
 .session-details h2 {
     text-align: center;
     margin-bottom: 20px;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
     font-size: 1.5rem;
 }
 
@@ -153,11 +158,13 @@ body {
 
 .stat-label {
     font-weight: 600;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
 }
 
 .stat-value {
-    color: var(--text-secondary); /* Medium grey text */
+    color: var(--text-secondary);
+    /* Medium grey text */
     white-space: nowrap;
 }
 
@@ -173,7 +180,8 @@ body {
 .leaderboard-section h2 {
     text-align: center;
     margin-bottom: 25px;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
     font-size: 1.8rem;
 }
 
@@ -203,13 +211,15 @@ body {
 
 .leaderboard-item.eliminated {
     opacity: 0.6;
-    background: var(--light-color); /* Very light grey */
+    background: var(--light-color);
+    /* Very light grey */
 }
 
 .position {
     font-size: 1.5rem;
     font-weight: bold;
-    color: var(--text-color); /* Dark grey instead of gold */
+    color: var(--text-color);
+    /* Dark grey instead of gold */
     min-width: 40px;
     text-align: center;
 }
@@ -229,7 +239,8 @@ body {
 .team-name {
     font-size: 1.3rem;
     font-weight: 600;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
 }
 
 .team-icon {
@@ -291,7 +302,8 @@ body {
 .teams-section h2 {
     text-align: center;
     margin-bottom: 25px;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
     font-size: 1.8rem;
 }
 
@@ -319,51 +331,6 @@ body {
     border-color: var(--primary-color);
 }
 
-/* Dark mode styles */
-.dark-mode .session-details,
-.dark-mode .leaderboard-section,
-.dark-mode .teams-section,
-.dark-mode .score-history-section {
-    background: linear-gradient(135deg, #343a40 0%, #495057 100%);
-    color: #ffffff;
-}
-
-.dark-mode .leaderboard-item,
-.dark-mode .team-card,
-.dark-mode .stat-item,
-.dark-mode .score-history-item,
-.dark-mode .no-data {
-    background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.dark-mode .nav-link {
-    background: var(--primary-color);
-    color: #ffffff;
-    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
-}
-
-.dark-mode .nav-link:hover {
-    background: var(--theme-secondary);
-    box-shadow: 0 3px 6px rgba(0, 123, 255, 0.3);
-}
-
-.dark-mode .stat-label,
-.dark-mode .stat-value,
-.dark-mode .score-team,
-.dark-mode .score-reason,
-.dark-mode .score-time,
-.dark-mode .no-data {
-    color: #ffffff;
-}
-
-.dark-mode .team-name,
-.dark-mode .players-label,
-.dark-mode .players-list {
-    color: #ffffff;
-}
-
 .team-header {
     display: flex;
     align-items: center;
@@ -383,10 +350,6 @@ body {
     color: var(--text-secondary);
 }
 
-.dark-mode .team-players {
-    border-top-color: white;
-}
-
 .team-players .players-label {
     font-weight: 600;
     margin-right: 8px;
@@ -399,7 +362,8 @@ body {
 .team-header .team-name {
     font-size: 1.3rem;
     font-weight: 600;
-    color: #333333; /* Dark grey text */
+    color: #333333;
+    /* Dark grey text */
 }
 
 .team-stats {
@@ -416,20 +380,24 @@ body {
 
 .stat-label {
     font-weight: 600;
-    color: #666666; /* Medium grey text */
+    color: #666666;
+    /* Medium grey text */
 }
 
 .stat-value {
     font-weight: bold;
-    color: #333333; /* Dark grey text */
+    color: #333333;
+    /* Dark grey text */
 }
 
 .stat-value.eliminated {
-    color: #cc0000; /* Red for eliminated */
+    color: #cc0000;
+    /* Red for eliminated */
 }
 
 .stat-value.active {
-    color: #00aa00; /* Green for active */
+    color: #00aa00;
+    /* Green for active */
 }
 
 /* Score History Section */
@@ -478,13 +446,15 @@ body {
 }
 
 .score-time {
-    color: var(--text-secondary); /* Medium grey text */
+    color: var(--text-secondary);
+    /* Medium grey text */
     font-size: 0.8rem;
 }
 
 .score-team {
     font-weight: 600;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
 }
 
 .score-points {
@@ -496,17 +466,22 @@ body {
 }
 
 .score-points.positive {
-    background: var(--success-color); /* Light green */
-    color: #ffffff; /* White text for contrast */
+    background: var(--success-color);
+    /* Light green */
+    color: #ffffff;
+    /* White text for contrast */
 }
 
 .score-points.negative {
-    background: var(--danger-color); /* Light red */
-    color: #ffffff; /* White text for contrast */
+    background: var(--danger-color);
+    /* Light red */
+    color: #ffffff;
+    /* White text for contrast */
 }
 
 .score-reason {
-    color: var(--text-secondary); /* Medium grey text */
+    color: var(--text-secondary);
+    /* Medium grey text */
     font-style: italic;
 }
 
@@ -529,8 +504,10 @@ body {
     top: 20px;
     right: 20px;
     padding: 15px 20px;
-    background: #f8d7da; /* Light red */
-    color: #721c24; /* Dark red */
+    background: #f8d7da;
+    /* Light red */
+    color: #721c24;
+    /* Dark red */
     border-radius: 8px;
     border: 1px solid #f5c6cb;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -600,7 +577,7 @@ body {
         gap: 5px;
     }
 
-    .score-history-item > div {
+    .score-history-item>div {
         padding: 2px 0;
     }
 }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="nl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="css/teamsetup.css">
     <link rel="stylesheet" href="css/buttons.css">
 </head>
+
 <body>
     <div class="container">
         <header class="header">
@@ -15,7 +17,8 @@
                 <span id="session-name">Sessie laden...</span>
                 <span id="session-status">Status: Setup</span>
             </div>
-            <button id="qr-toggle" onclick="toggleQR()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; margin-left: 20px;">📱</button>
+            <button id="qr-toggle" onclick="toggleQR()"
+                style="background: none; border: none; font-size: 1.5em; cursor: pointer; margin-left: 20px;">📱</button>
         </header>
 
         <main class="main-content">
@@ -27,7 +30,8 @@
                     <div class="existing-teams-section">
                         <h3>Bestaand Team Toevoegen</h3>
                         <div class="flex-row">
-                            <select id="existing-team-select" title="Selecteer een bestaand team" aria-label="Bestaand team selecteren">
+                            <select id="existing-team-select" title="Selecteer een bestaand team"
+                                aria-label="Bestaand team selecteren">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
                             <button id="add-existing-team-btn" class="save-team-btn">Team Toevoegen</button>
@@ -77,7 +81,8 @@
                 <div class="players-manager-section">
                     <h2>Spelers Beheren</h2>
                     <div class="player-create">
-                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam" maxlength="100">
+                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam"
+                            maxlength="100">
                         <button id="add-player-global-btn" class="save-team-btn">Speler aanmaken</button>
                     </div>
 
@@ -100,7 +105,7 @@
                         <p>Aantal teams: <span id="teams-count">0</span></p>
                         <p>Speltype: <span id="game-type">Aangepast</span></p>
                     </div>
-                    
+
                     <h3>Score Modus</h3>
                     <div class="scoring-mode-selector">
                         <label>
@@ -111,7 +116,8 @@
                             </span>
                         </label>
                         <label>
-                            <input type="radio" name="scoring-mode" value="team_with_players" id="scoring-mode-team-players">
+                            <input type="radio" name="scoring-mode" value="team_with_players"
+                                id="scoring-mode-team-players">
                             <span class="radio-label">
                                 <strong>👥👤 Team met Spelers</strong><br>
                                 <small>Team scores, spelers zichtbaar</small>
@@ -125,9 +131,11 @@
                             </span>
                         </label>
                     </div>
-                    <div id="player-mode-hint" style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
+                    <div id="player-mode-hint"
+                        style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
                         <strong>💡 Tip voor Speler Scores:</strong><br>
-                        <small style="color: #856404;">Voeg spelers toe aan je teams om hun individuele scores bij te kunnen houden!</small>
+                        <small style="color: #856404;">Voeg spelers toe aan je teams om hun individuele scores bij te
+                            kunnen houden!</small>
                     </div>
                     <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
                         <em>Bij speler scores zie je individuele bijdragen per speler in het scorebord</em>
@@ -191,23 +199,15 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/dark_mode_toggle.js"></script>
     <script src="js/teamsetup.js"></script>
     <script>
-        const socket = io('http://' + window.location.hostname + ':8000');
-
-        // Emit admin present when page loads
-        socket.emit('admin-present');
-
-        // Emit admin leave when page unloads
-        window.addEventListener('beforeunload', () => {
-            socket.emit('admin-leave');
-        });
-
         // Function to toggle QR visibility
         function toggleQR() {
-            socket.emit('toggle-qr');
+            if (api && api.socket) {
+                api.toggleQR();
+            }
         }
     </script>
 </body>
+
 </html>
