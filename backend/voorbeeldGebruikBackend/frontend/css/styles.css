@@ -173,7 +173,8 @@ body {
     margin-bottom: 25px;
     font-size: 1.8rem;
     font-weight: 600;
-    color: #333333; /* Dark grey text */
+    color: #333333;
+    /* Dark grey text */
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -365,36 +366,52 @@ body {
 }
 
 .admin-modal .login-btn {
-    background: #b8860b; /* Dark goldenrod - 10% primary color */
+    background: #b8860b;
+    /* Dark goldenrod - 10% primary color */
     color: #ffffff;
 }
 
 .admin-modal .login-btn:hover {
-    background: #a0780a; /* Darker goldenrod on hover */
+    background: #a0780a;
+    /* Darker goldenrod on hover */
 }
 
 .admin-modal .cancel-btn {
-    background: #cccccc; /* Light grey background */
-    color: #333333; /* Dark grey text */
+    background: #cccccc;
+    /* Light grey background */
+    color: #333333;
+    /* Dark grey text */
 }
 
 .admin-modal .cancel-btn:hover {
-    background: #aaaaaa; /* Medium grey on hover */
+    background: #aaaaaa;
+    /* Medium grey on hover */
 }
 
 /* Animations */
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
 @keyframes scoreFlash {
-    0%, 100% { 
+
+    0%,
+    100% {
         background-color: transparent;
         transform: scale(1);
     }
-    50% { 
+
+    50% {
         background-color: #4CAF50;
         color: white;
         transform: scale(1.2);
@@ -552,7 +569,8 @@ body {
         text-align: center;
     }
 
-    .no-session, .no-teams {
+    .no-session,
+    .no-teams {
         padding: 40px 15px;
         font-size: 1.2rem;
     }
@@ -636,9 +654,10 @@ body {
     position: relative;
     color: var(--text-color);
 }
-    animation: fadeInUp 0.6s ease-out forwards;
-    opacity: 0;
-    transform: translateY(20px);
+
+animation: fadeInUp 0.6s ease-out forwards;
+opacity: 0;
+transform: translateY(20px);
 }
 
 @keyframes fadeInUp {
@@ -680,10 +699,6 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-}
-
-.dark-mode .team-players-bigscreen {
-    border-top-color: white;
 }
 
 .team-position {
@@ -806,7 +821,8 @@ body {
     justify-content: flex-end;
 }
 
-.no-session, .no-teams {
+.no-session,
+.no-teams {
     text-align: center;
     padding: 60px 20px;
     background: var(--card-bg);
@@ -924,13 +940,13 @@ body {
         gap: 15px;
         padding: 15px 20px;
     }
-    
+
     .participant-leaderboard .participant-activity-scores {
         margin-right: 0;
         justify-content: center;
         width: 100%;
     }
-    
+
     .participant-leaderboard .participant-total {
         align-self: flex-end;
         margin-top: 10px;

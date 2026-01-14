@@ -6,14 +6,24 @@ class ScoreboardAPI {
     const fromGlobal = typeof window !== 'undefined' && window.SCOREBOARD_API_BASE;
     const fromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('apiBase') : null;
     const detected = fromGlobal || fromQuery;
+    const fallback = typeof window !== 'undefined' ? `http://${window.location.hostname}:8000` : 'http://localhost:8000';
 
-    this.baseURL = (baseURL || detected || ('http://' + window.location.hostname + ':8000')).replace(/\/$/, '');
+    this.baseURL = (baseURL || detected || fallback).replace(/\/$/, '');
     this.API_PREFIX = '/api/v1';
     this.socket = null;
     this.eventListeners = {};
     this.pollingInterval = null;
     this.lastLeaderboardData = null;
     this.pollingFallbackActive = false;
+
+    // Initialize socket immediately for pages that need it
+    if (typeof window !== 'undefined') {
+      const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+      const pagesNeedingSocket = ['index.html', 'simple-scoreinput.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'index.html', 'SportScoreBigScreen.html'];
+      if (pagesNeedingSocket.includes(currentPage)) {
+        this.initSocket();
+      }
+    }
   }
 
   // Initialize Socket.IO connection
@@ -36,6 +46,7 @@ class ScoreboardAPI {
         withCredentials: false, // Disable credentials for CORS
         autoConnect: true, // Auto connect on creation
       });
+      window.socket = this.socket;
       console.log('API: Socket.IO connection created, setting up listeners...');
       this.setupSocketListeners();
 
@@ -180,6 +191,11 @@ class ScoreboardAPI {
         console.log('API: Socket.IO connected, stopping polling fallback');
         this.stopPollingFallback();
       }
+      // Emit admin_connected if not big screen
+      const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+      if (currentPage !== 'SportScoreBigScreen.html') {
+        this.adminConnected();
+      }
     });
 
     this.socket.on('disconnect', () => {
@@ -188,6 +204,11 @@ class ScoreboardAPI {
       // Start polling fallback if Socket.IO disconnects
       if (!this.pollingFallbackActive) {
         this.startPollingFallback();
+      }
+      // Emit admin_disconnected if not big screen
+      const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+      if (currentPage !== 'SportScoreBigScreen.html') {
+        this.adminDisconnected();
       }
     });
 
@@ -241,6 +262,21 @@ class ScoreboardAPI {
     this.socket.on('game_status_change', (data) => {
       console.log('API: Received game_status_change event:', data);
       this.emit('game_status_change', data);
+    });
+
+    this.socket.on('show-qr', (data) => {
+      console.log('API: Received show-qr event:', data);
+      this.emit('show-qr', data);
+    });
+
+    this.socket.on('set-qr', (data) => {
+      console.log('API: Received set-qr event:', data);
+      this.emit('set-qr', data);
+    });
+
+    this.socket.on('toggle-qr', (data) => {
+      console.log('API: Received toggle-qr event:', data);
+      this.emit('toggle-qr', data);
     });
   }
   on(event, callback) {
@@ -759,6 +795,28 @@ class ScoreboardAPI {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
+  // Socket.IO API methods
+  adminConnected() {
+    if (this.socket && this.socket.connected) {
+      console.log('API: Emitting admin_connected');
+      this.socket.emit('admin_connected');
+    }
+  }
+
+  adminDisconnected() {
+    if (this.socket && this.socket.connected) {
+      console.log('API: Emitting admin_disconnected');
+      this.socket.emit('admin_disconnected');
+    }
+  }
+
+  toggleQR(state) {
+    if (this.socket && this.socket.connected) {
+      console.log('API: Emitting toggle-qr:', state);
+      this.socket.emit('toggle-qr', state);
+    }
+  }
+
   // Error handling
   handleError(error, context = '') {
     console.error(`API Error${context ? ` (${context})` : ''}:`, error);
@@ -769,18 +827,4 @@ class ScoreboardAPI {
 
 // Create global API instance
 const api = new ScoreboardAPI();
-
-// Initialize socket connection when DOM is ready - only for pages that need real-time updates
-document.addEventListener('DOMContentLoaded', () => {
-  // Only initialize Socket.IO for pages that need it
-  const currentPage = window.location.pathname.split('/').pop() || 'index.html'; // Handle root path
-  console.log('API: Current page detected as:', currentPage, '(from pathname:', window.location.pathname + ')');
-  const pagesNeedingSocket = ['index.html', 'simple-scoreinput.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'homescreen.html'];
-
-  if (pagesNeedingSocket.includes(currentPage)) {
-    console.log('API: Page needs Socket.IO, initializing...');
-    api.initSocket();
-  } else {
-    console.log('API: Page does not need Socket.IO, skipping initialization');
-  }
-});
+window.scoreboardAPI = api;

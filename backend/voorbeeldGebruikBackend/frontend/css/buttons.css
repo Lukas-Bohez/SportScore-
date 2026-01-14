@@ -1,16 +1,17 @@
 /* Shared button styles for team/save actions */
 .save-team-btn {
-    padding: 12px 24px;
+    padding: 8px 16px;
     background: linear-gradient(135deg, #b8860b 0%, #daa520 100%);
     color: #ffffff;
     border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(184, 134, 11, 0.2);
+    box-shadow: 0 2px 4px rgba(184, 134, 11, 0.2);
     flex: 1;
+    min-height: 36px;
 }
 
 .save-team-btn:hover {
@@ -21,17 +22,18 @@
 
 /* Compact variant for small action buttons */
 .save-team-btn.compact {
-    padding: 6px 10px;
-    font-size: 0.9rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(184,134,11,0.12);
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(184, 134, 11, 0.12);
     flex: initial;
-    min-width: 44px;
+    min-width: 36px;
+    min-height: 28px;
 }
 
 .save-team-btn.compact:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(184,134,11,0.16);
+    box-shadow: 0 4px 8px rgba(184, 134, 11, 0.16);
 }
 
 /* Delete button styles */

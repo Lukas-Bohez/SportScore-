@@ -1,6 +1,7 @@
 import socketio
 import asyncio
 import uvicorn
+import time
 from datetime import datetime, timezone, timedelta
 import pytz
 from fastapi import FastAPI, HTTPException, status, Body, Header, File, Form, UploadFile
@@ -105,16 +106,8 @@ sio = socketio.AsyncServer(
 ENDPOINT = "/api/v1"  # API base endpoint
 
 # Store connected clients
-connected_clients = set()
-
-# Track admin presence
-admin_count = 0
-show_qr_task = None
-
-# Delayed QR show task
-async def delayed_show_qr():
-    await asyncio.sleep(120)  # 2 minutes
-    await sio.emit('show-qr')
+connected_clients = {}  # sid: type ('admin' or 'bigscreen')
+admin_clients = set()  # Track admin client sids
 
 
 # Expose Socket.IO as the top-level ASGI app to avoid duplicate CORS headers on /socket.io
@@ -127,7 +120,7 @@ asgi = socketio.ASGIApp(sio, app, socketio_path='socket.io')
 @sio.event
 async def connect(sid, environ):
     print(f"Client {sid} connected - Total clients: {len(connected_clients) + 1}")
-    connected_clients.add(sid)
+    connected_clients[sid] = None  # not identified yet
 
     # Send welcome message
     await sio.emit('welcome', {
@@ -137,120 +130,58 @@ async def connect(sid, environ):
     }, room=sid)
 
 @sio.event
-async def disconnect(sid):
+async def disconnect(sid, reason=None):
     print(f"Client {sid} disconnected - Total clients: {len(connected_clients) - 1}")
+    
+    # Check if this was an admin
+    was_admin = sid in admin_clients
+    if was_admin:
+        admin_clients.discard(sid)
+        print(f"Admin {sid} removed - Remaining admins: {len(admin_clients)}")
+        
+        # If no more admins, show QR code
+        if len(admin_clients) == 0:
+            print("No admins connected - showing QR code")
+            await sio.emit('set-qr', True)
+    
     if sid in connected_clients:
-        connected_clients.remove(sid)
+        del connected_clients[sid]
 
 @sio.event
-async def admin_present(sid):
-    global admin_count, show_qr_task
-    admin_count += 1
-    print(f"Admin present - Admin count: {admin_count}")
-    # Cancel any pending QR show task
-    if show_qr_task and not show_qr_task.done():
-        show_qr_task.cancel()
-        show_qr_task = None
+async def admin_connected(sid):
+    print(f"Admin connected: {sid}")
+    admin_clients.add(sid)
+    connected_clients[sid] = 'admin'
+    print(f"Total admins: {len(admin_clients)}")
+    
+    # Hide QR code when admin connects
+    await sio.emit('set-qr', False)
 
 @sio.event
-async def admin_leave(sid):
-    global admin_count, show_qr_task
-    admin_count -= 1
-    if admin_count < 0:
-        admin_count = 0
-    print(f"Admin leave - Admin count: {admin_count}")
-    if admin_count == 0:
-        # Start delayed QR show
-        if show_qr_task is None or show_qr_task.done():
-            show_qr_task = asyncio.create_task(delayed_show_qr())
+async def admin_disconnected(sid):
+    print(f"Admin disconnected: {sid}")
+    if sid in admin_clients:
+        admin_clients.discard(sid)
+        print(f"Remaining admins: {len(admin_clients)}")
+        
+        # If no more admins, show QR code
+        if len(admin_clients) == 0:
+            print("No admins connected - showing QR code")
+            await sio.emit('set-qr', True)
 
-@sio.event
-async def toggle_qr(sid, data=None):
-    print(f"Toggle QR requested")
-    await sio.emit('toggle-qr', data)
+@sio.on('set-qr')
+async def set_qr(sid, data=None):
+    print(f"Set QR requested: {data}")
+    await sio.emit('set-qr', data)
+
+@sio.on('qr-state')
+async def qr_state(sid, data=None):
+    print(f"QR state update: {data}")
+    await sio.emit('qr-state', data)
 
 # ----------------------------------------------------
 # API Routes
 # ----------------------------------------------------
-
-# Student endpoints
-@app.get(f"{ENDPOINT}/student/active-sessions")
-async def get_active_student_sessions():
-    # Get sessions that are active (assuming sessions with activities are active)
-    sessions = SessionRepository.get_all_sessions()
-    active_sessions = []
-    for session in sessions:
-        activities = ActivityRepository.get_activities_by_session(session['id'])
-        if activities:
-            # Get teams and players for the session
-            teams = SessionTeamRepository.get_teams_by_session(session['id'])
-            players = SessionPlayerRepository.get_players_by_session(session['id'])
-            session_data = {
-                "session": session,
-                "activities": activities,
-                "teams": teams,
-                "players": players
-            }
-            active_sessions.append(session_data)
-    return {"active_sessions": active_sessions}
-
-@app.get(f"{ENDPOINT}/student/session/{{session_id}}/activities")
-async def get_student_activities(session_id: int):
-    activities = ActivityRepository.get_activities_by_session(session_id)
-    return {"activities": activities}
-
-@app.get(f"{ENDPOINT}/student/session/{{session_id}}/teams")
-async def get_student_teams(session_id: int):
-    teams = SessionTeamRepository.get_teams_by_session(session_id)
-    return {"teams": teams}
-
-@app.get(f"{ENDPOINT}/student/session/{{session_id}}/players")
-async def get_student_players(session_id: int):
-    players = SessionPlayerRepository.get_players_by_session(session_id)
-    return {"players": players}
-
-@app.post(f"{ENDPOINT}/student/session/{{session_id}}/activity/{{activity_id}}/score")
-async def create_student_activity_score(session_id: int, activity_id: int, request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    player_name = payload.get('player_name', '').strip()
-    points = payload.get('points', 0)
-    
-    if not player_name:
-        raise HTTPException(status_code=422, detail="Field 'player_name' is required")
-    
-    # Find or create player
-    player = PlayerRepository.get_player_by_name(player_name)
-    if not player:
-        # Create new player without team
-        player_id = PlayerRepository.create_player(player_name, None, None)
-        player = PlayerRepository.get_player_by_id(player_id)
-    
-    # Create activity score
-    score_id = ActivityScoreRepository.create_score(
-        activity_id=activity_id,
-        points=points,
-        team_id=None,  # No team for individual participants
-        player_id=player['id'],
-        reason=f"Score by {player_name}",
-        round_number=1,
-        timestamp=datetime.now(CET),
-    )
-    
-    # Emit real-time update
-    await sio.emit('activity_score_update', _jsonable({
-        'session_id': session_id,
-        'activity_id': activity_id,
-        'player_id': player['id'],
-        'player_name': player_name,
-        'points': points,
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-    
-    return {"message": "Score submitted successfully", "score_id": score_id}
 
 # Sports endpoints
 @app.get(f"{ENDPOINT}/sports", response_model=SportListResponse)
@@ -427,13 +358,22 @@ async def remove_player_from_session_team(session_id: int, team_id: int, player_
     return {"message": "Assignment removed"}
 
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/players", response_model=SessionPlayerListResponse)
-async def get_session_players(session_id: int):
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/participants", response_model=List[str])
+async def get_session_participants(session_id: int):
+    """Get unique participant names for a session"""
     session = SessionRepository.get_session_by_id(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    assignments = SessionPlayerRepository.get_players_by_session(session_id)
-    return SessionPlayerListResponse(assignments=[SessionPlayerResponse(**a) for a in assignments])
+    
+    # Get unique player names from activity scores
+    sql = """
+    SELECT DISTINCT player_name 
+    FROM activity_scores 
+    WHERE game_id = ? AND player_name IS NOT NULL AND player_name != ''
+    ORDER BY player_name
+    """
+    participants = Database.get_rows(sql, [session_id])
+    return [p['player_name'] for p in participants]
 
 
 @app.get(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players")

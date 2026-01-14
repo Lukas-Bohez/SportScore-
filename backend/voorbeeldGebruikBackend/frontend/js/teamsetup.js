@@ -24,7 +24,7 @@ class TeamSetup {
     this.sessionId = urlParams.get('session');
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     }
   }
 
@@ -68,7 +68,7 @@ class TeamSetup {
     this.addExistingTeamBtn.addEventListener('click', () => this.addExistingTeam());
     this.startSessionBtn.addEventListener('click', () => this.startSession());
     this.backBtn.addEventListener('click', () => {
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     });
     this.deleteSessionBtn.addEventListener('click', () => this.deleteSession());
 
@@ -113,7 +113,7 @@ class TeamSetup {
     } catch (error) {
       api.handleError(error, 'loading session');
       alert('Fout bij het laden van de sessie.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     }
   }
 
@@ -1017,7 +1017,7 @@ class TeamSetup {
     try {
       await api.delete(`/api/v1/sessions/${this.sessionId}`);
       alert('Sessie succesvol verwijderd.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
     } catch (error) {
       api.handleError(error, 'deleting session');
       alert('Fout bij het verwijderen van de sessie.');

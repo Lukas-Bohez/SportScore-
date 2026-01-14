@@ -2,8 +2,7 @@
 
 class Homepage {
   constructor() {
-    this.api = new ScoreboardAPI();
-    this.api.initSocket();
+    this.api = window.api;
     this.templatesGrid = document.getElementById('templates-grid');
     this.sessionsList = document.getElementById('sessions-list');
     this.currentView = 'simple'; // 'simple' or 'detailed'
@@ -20,7 +19,7 @@ class Homepage {
       this.startScreen = new StartScreen(this.api);
     }
     await this.loadTemplates();
-    await this.loadSessions();
+    // await this.loadSessions(); // Temporarily disabled
   }
 
   setupNavigation() {

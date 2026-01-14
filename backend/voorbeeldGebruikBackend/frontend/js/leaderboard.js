@@ -36,7 +36,7 @@ class LeaderboardView {
     this.activityId = urlParams.get('activity') || null;
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'homescreen.html';
+      window.location.href = 'index.html';
       return;
     }
   }
@@ -170,7 +170,7 @@ class LeaderboardView {
     }
   }
 
-  displaySessionInfo() {
+  async displaySessionInfo() {
     if (!this.sessionData) return;
 
     // Update header info

@@ -5,6 +5,9 @@ class BigScreenDisplay {
     this.lastUpdate = null;
     this.updateInterval = null;
     this.sessionStatusBadge = null;
+    this.listenersSet = false;
+    this.isToggling = false;
+    this.initialQREmitted = false;
     this.init();
   }
 
@@ -173,11 +176,23 @@ class BigScreenDisplay {
     return emojiMap[emojiName.toLowerCase()] || emojiName || '🏆';
   }
 
+  isQRVisible() {
+    const qrOverlay = document.getElementById('qr-overlay');
+    return qrOverlay && qrOverlay.style.display !== 'none';
+  }
+
   init() {
     this.bindElements();
     this.setupEventListeners();
     this.startAutoUpdate();
     this.loadInitialData();
+    // Show QR code initially
+    this.showQR();
+    // Emit initial QR state
+    if (api && api.socket && api.socket.connected) {
+      console.log('BigScreen: Emitting initial qr-state:', this.isQRVisible());
+      api.socket.emit('qr-state', this.isQRVisible());
+    }
   }
 
   bindElements() {
@@ -188,6 +203,15 @@ class BigScreenDisplay {
   }
 
   setupEventListeners() {
+    // Set up socket event listeners if socket is available
+    if (typeof api !== 'undefined' && api.socket && !this.listenersSet) {
+      console.log('BigScreen: Setting up socket event listeners');
+      this.setupSocketListeners();
+      this.listenersSet = true;
+    }
+  }
+
+  setupSocketListeners() {
     // Listen for real-time updates
     api.on('session_score_update', (data) => {
       console.log('BigScreen: Received session_score_update event:', data);
@@ -238,12 +262,24 @@ class BigScreenDisplay {
 
     api.on('show-qr', (data) => {
       console.log('BigScreen: Received show-qr event');
-      this.showQR();
+      const qrOverlay = document.getElementById('qr-overlay');
+      if (qrOverlay) {
+        qrOverlay.style.display = 'flex';
+      }
+      // Emit state
+      console.log('BigScreen: Emitting qr-state: true');
+      api.socket.emit('qr-state', true);
     });
 
-    api.on('toggle-qr', (data) => {
-      console.log('BigScreen: Received toggle-qr event');
-      this.toggleQR();
+    api.on('set-qr', (visible) => {
+      console.log('BigScreen: Received set-qr event:', visible);
+      const qrOverlay = document.getElementById('qr-overlay');
+      if (qrOverlay) {
+        qrOverlay.style.display = visible ? 'flex' : 'none';
+      }
+      // Emit current state
+      console.log('BigScreen: Emitting qr-state:', visible);
+      api.socket.emit('qr-state', visible);
     });
 
     api.on('connected', () => {
@@ -251,6 +287,12 @@ class BigScreenDisplay {
       this.showConnectionStatus('Connected', 'success');
       // Refresh data when connection is established
       this.loadInitialData();
+      // Emit current QR state
+      if (!this.initialQREmitted) {
+        console.log('BigScreen: Emitting qr-state on connect:', this.isQRVisible());
+        api.socket.emit('qr-state', this.isQRVisible());
+        this.initialQREmitted = true;
+      }
     });
 
     api.on('disconnected', () => {
@@ -263,6 +305,22 @@ class BigScreenDisplay {
     const qrOverlay = document.getElementById('qr-overlay');
     if (qrOverlay) {
       qrOverlay.style.display = 'flex';
+    }
+  }
+
+  hideQR() {
+    const qrOverlay = document.getElementById('qr-overlay');
+    if (qrOverlay) {
+      qrOverlay.style.display = 'none';
+    }
+  }
+
+  setQRVisibility(visible) {
+    console.log('BigScreen: Setting QR visibility to:', visible);
+    if (visible) {
+      this.showQR();
+    } else {
+      this.hideQR();
     }
   }
 
@@ -321,6 +379,18 @@ class BigScreenDisplay {
   }
 
   async loadPlayersForLeaderboard(sessionId, leaderboard) {
+    // Check if this is participant-based data (has player_name) or team-based
+    if (!leaderboard || leaderboard.length === 0) {
+      return;
+    }
+    
+    const isParticipantData = leaderboard[0].hasOwnProperty('player_name');
+    
+    // Participant-based leaderboards don't need player loading (they ARE the players)
+    if (isParticipantData) {
+      return;
+    }
+    
     // First, get all scores for the session to calculate player scores
     let allScores = [];
     try {
@@ -331,6 +401,13 @@ class BigScreenDisplay {
     }
 
     for (const team of leaderboard) {
+      // Skip if team_id is not present
+      if (!team.team_id) {
+        team.players = [];
+        team.playerScores = {};
+        continue;
+      }
+      
       try {
         const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
         team.players = resp && resp.players ? resp.players : [];
@@ -601,8 +678,8 @@ class BigScreenDisplay {
       leaderboard = leaderboard.filter((team) => !team.is_eliminated);
     }
 
-    // Sort leaderboard by score descending
-    leaderboard.sort((a, b) => b.score - a.score);
+    // Sort leaderboard by total_score descending (backend returns 'total_score', not 'score')
+    leaderboard.sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
 
     // Add class based on number of teams for layout
     this.teamsContainer.className = 'leaderboard-container';
@@ -802,42 +879,7 @@ function hideAdminLogin() {
   modal.classList.remove('show');
 }
 
-function loginAdmin() {
-  const password = document.getElementById('admin-password').value;
-  // Simple password check - in production, this should be more secure
-  const correctPassword = 'admin123'; // You should change this or make it configurable
-
-  if (password === correctPassword) {
-    // Redirect to admin page
-    window.location.href = 'admin.html';
-  } else {
-    alert('Incorrect password. Please try again.');
-    document.getElementById('admin-password').focus();
-  }
-}
-
-// Handle Enter key in password field
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  const passwordInput = document.getElementById('admin-password');
-  if (passwordInput) {
-    passwordInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        loginAdmin();
-      }
-    });
-  }
-});
-
-// Initialize the big screen display when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  const bigScreen = new BigScreenDisplay();
-
-  // Handle page visibility changes to optimize performance
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      bigScreen.stopAutoUpdate();
-    } else {
-      bigScreen.startAutoUpdate();
-    }
-  });
+  new BigScreenDisplay();
 });
