@@ -1046,7 +1046,19 @@ async def create_activity_score(activity_id: int, score: ActivityScoreCreate):
     )
     created_list = ActivityScoreRepository.get_scores_by_activity(activity_id)
     created = next((s for s in created_list if s['id'] == score_id), None)
-    return ActivityScoreResponse(**created) if created else ActivityScoreResponse(activity_id=activity_id, team_id=score.team_id, player_id=score.player_id, points=score.points, reason=score.reason, round_number=score.round_number, id=score_id, score_type='point', timestamp=datetime.now(CET))
+    response = ActivityScoreResponse(**created) if created else ActivityScoreResponse(activity_id=activity_id, team_id=score.team_id, player_id=score.player_id, points=score.points, reason=score.reason, round_number=score.round_number, id=score_id, score_type='point', timestamp=datetime.now(CET))
+    
+    # Broadcast score update to all connected clients (BigScreen, etc.)
+    await sio.emit('session_score_update', {
+        'session_id': score.activity_id,  # Use activity_id as identifier for activity scores
+        'team_id': score.team_id,
+        'player_id': score.player_id,
+        'points': score.points,
+        'reason': score.reason,
+        'timestamp': datetime.now(CET).isoformat()
+    })
+    
+    return response
 
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/leaderboard", tags=["Activities"], summary="Get activity leaderboard")
 async def get_activity_leaderboard(activity_id: int):
