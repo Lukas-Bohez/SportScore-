@@ -209,23 +209,17 @@ class Homepage {
 
     container.innerHTML = sessions.map(session => this.createHistorySessionCard(session)).join('');
     
-    // Add event listeners to expandable cards
+    // Add event listeners to open modal
     const self = this;
-    document.querySelectorAll('.history-session-header').forEach(header => {
-      header.addEventListener('click', function(e) {
-        const card = this.closest('.history-session-card');
-        const expanded = card.querySelector('.history-session-expanded');
-        
-        card.classList.toggle('expanded');
-        if (expanded.style.display === 'block') {
-          expanded.style.display = 'none';
-        } else {
-          expanded.style.display = 'block';
-          const sessionId = card.dataset.sessionId;
-          self.loadSessionScores(sessionId);
-        }
+    document.querySelectorAll('.history-session-card').forEach(card => {
+      card.addEventListener('click', function(e) {
+        const sessionId = this.dataset.sessionId;
+        self.openHistoryModal(sessionId);
       });
     });
+    
+    // Setup modal close handlers
+    this.setupModalHandlers();
   }
 
   createActiveSessionCard(session) {
@@ -273,27 +267,250 @@ class Homepage {
   }
 
   createHistorySessionCard(session) {
+    const sport = session.sport || 'Algemeen';
     return `
       <div class="history-session-card" data-session-id="${session.id}">
-        <div class="history-session-header" style="cursor: pointer;">
+        <div class="history-session-header">
           <div>
-            <span class="history-session-name">${this.escapeHtml(session.name)}</span>
-            <span class="history-session-date">${this.formatDate(session.created_at)}</span>
+            <div class="history-session-name">${this.escapeHtml(session.name)}</div>
+            <div class="history-session-date">${this.formatDate(session.created_at)}</div>
+            <div class="history-session-sport">📊 ${this.escapeHtml(sport)} • ${session.activities?.length || 0} activiteiten</div>
           </div>
-          <span class="expand-arrow">▼</span>
-        </div>
-        <div class="history-session-expanded" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color, #ddd);">
-          <div class="activity-selector-container">
-            <label for="history-activity-select-${session.id}">Selecteer activiteit om scores te bekijken:</label>
-            <select id="history-activity-select-${session.id}" onchange="window.homepage.displayActivityScores(${session.id}, this.value, true)">
-              <option value="">-- Kies een activiteit --</option>
-              ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
-            </select>
-          </div>
-          <div id="history-scores-${session.id}" class="scores-display" style="display: none;"></div>
         </div>
       </div>
     `;
+  }
+
+  setupModalHandlers() {
+    const modal = document.getElementById('history-modal');
+    const closeBtn = document.querySelector('.modal-close');
+    
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        if (modal) modal.classList.remove('show');
+      };
+    }
+    
+    if (modal) {
+      window.onclick = (event) => {
+        if (event.target === modal) {
+          modal.classList.remove('show');
+        }
+      };
+    }
+  }
+
+  openHistoryModal(sessionId) {
+    const session = this.historySessions.find(s => s.id == sessionId);
+    if (!session) {
+      console.error('Session not found:', sessionId);
+      return;
+    }
+
+    const modal = document.getElementById('history-modal');
+    const modalBody = document.getElementById('history-modal-body');
+    
+    if (!modal || !modalBody) {
+      console.error('Modal elements not found');
+      return;
+    }
+
+    // Create modal content using similar structure to active session
+    modalBody.innerHTML = `
+      <div class="active-session-card" style="border: none; box-shadow: none; padding: 0;">
+        <div class="session-header">
+          <div>
+            <h3 class="session-title">${this.escapeHtml(session.name)}</h3>
+            <p style="margin: 5px 0; color: var(--text-secondary);">${this.formatDate(session.created_at)}</p>
+          </div>
+          <span class="session-status completed">✓ Voltooid</span>
+        </div>
+        
+        <div class="session-details">
+          <div class="detail-box">
+            <label>Teams</label>
+            <value>${session.teams?.length || 0} teams</value>
+          </div>
+          <div class="detail-box">
+            <label>Activiteiten</label>
+            <value>${session.activities?.length || 0} activiteiten</value>
+          </div>
+          <div class="detail-box">
+            <label>Spelers</label>
+            <value>${session.players?.length || 0} spelers</value>
+          </div>
+        </div>
+
+        <div class="activity-selector-container">
+          <label for="modal-activity-select-${session.id}">Selecteer activiteit om scores te bekijken:</label>
+          <select id="modal-activity-select-${session.id}" onchange="window.homepage.displayModalActivityScores(${session.id}, this.value)">
+            <option value="">-- Kies een activiteit --</option>
+            ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div id="modal-scores-${session.id}" class="scores-display" style="display: none;"></div>
+
+        <div class="session-controls">
+          <button class="btn btn-secondary" onclick="document.getElementById('history-modal').classList.remove('show')">✕ Sluiten</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('show');
+  }
+
+  async displayModalActivityScores(sessionId, activityId) {
+    if (!activityId) {
+      const container = document.getElementById(`modal-scores-${sessionId}`);
+      if (container) container.style.display = 'none';
+      return;
+    }
+
+    // Reuse the existing display logic but with modal container
+    const session = this.historySessions.find(s => s.id == sessionId);
+    if (!session) return;
+
+    const activity = (session.activities || []).find(a => a.id == activityId);
+    if (!activity) return;
+
+    const scoringMode = activity.scoring_mode || 'team';
+    const teams = session.teams || [];
+    const players = session.players || [];
+
+    const scoresResponse = await this.api.getActivityScores(activityId);
+    const activityScores = this.api.extractArray(scoresResponse, 'scores');
+
+    const teamMap = {};
+    const playerMap = {};
+    teams.forEach(t => { teamMap[t.id] = t; });
+    players.forEach(p => { playerMap[p.id] = p; });
+
+    let aggregatedScores = {};
+
+    if (scoringMode === 'player') {
+      activityScores.forEach(score => {
+        const playerId = score.player_id;
+        const player = playerMap[playerId];
+        const playerName = player?.name || `Speler ${playerId}`;
+        if (!aggregatedScores[playerId]) {
+          aggregatedScores[playerId] = { 
+            id: playerId, 
+            name: playerName,
+            color: player?.color,
+            icon: player?.icon,
+            score: 0,
+            type: 'player'
+          };
+        }
+        aggregatedScores[playerId].score += (score.points || 0);
+      });
+    } else if (scoringMode === 'team_with_players') {
+      activityScores.forEach(score => {
+        const teamId = score.team_id;
+        const team = teamMap[teamId];
+        const teamName = team?.name || `Team ${teamId}`;
+        if (!aggregatedScores[teamId]) {
+          aggregatedScores[teamId] = { 
+            id: teamId, 
+            name: teamName,
+            color: team?.color,
+            icon: team?.icon,
+            score: 0,
+            players: {},
+            type: 'team'
+          };
+        }
+        aggregatedScores[teamId].score += (score.points || 0);
+
+        if (score.player_id && score.points) {
+          const playerId = score.player_id;
+          const player = playerMap[playerId];
+          const playerName = player?.name || `Speler ${playerId}`;
+          if (!aggregatedScores[teamId].players[playerId]) {
+            aggregatedScores[teamId].players[playerId] = { name: playerName, score: 0 };
+          }
+          aggregatedScores[teamId].players[playerId].score += (score.points || 0);
+        }
+      });
+    } else {
+      activityScores.forEach(score => {
+        const teamId = score.team_id;
+        const team = teamMap[teamId];
+        const teamName = team?.name || `Team ${teamId}`;
+        if (!aggregatedScores[teamId]) {
+          aggregatedScores[teamId] = { 
+            id: teamId, 
+            name: teamName,
+            color: team?.color,
+            icon: team?.icon,
+            score: 0,
+            type: 'team'
+          };
+        }
+        aggregatedScores[teamId].score += (score.points || 0);
+      });
+    }
+
+    const container = document.getElementById(`modal-scores-${sessionId}`);
+    if (!container) return;
+
+    let scoresList = Object.values(aggregatedScores);
+    scoresList.sort((a, b) => b.score - a.score);
+
+    if (scoresList.length === 0) {
+      container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Geen scores beschikbaar voor deze activiteit.</p>';
+    } else {
+      let html = '';
+
+      if (scoringMode === 'team_with_players') {
+        html = scoresList.map((team, index) => {
+          const iconEmoji = this.getIconEmoji(team.icon);
+          const colorStyle = team.color ? `background-color: ${team.color}22; border-left: 4px solid ${team.color};` : '';
+          const playersList = Object.values(team.players || {});
+          return `
+            <div class="score-card" style="background: var(--background-color); padding: 16px; border-radius: 8px; margin-bottom: 16px; ${colorStyle}">
+              <div style="font-weight: 600; color: var(--text-color); margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.3em; color: var(--primary-color);">${index + 1}.</span> 
+                <span style="font-size: 1.3em;">${iconEmoji}</span>
+                <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
+              </div>
+              <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${team.score} punten</div>
+              ${playersList.length > 0 ? `
+                <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
+                  ${playersList.map(p => `
+                    <div style="padding: 12px 14px; background: var(--card-bg, #fff); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                      <span style="font-size: 1.05em; font-weight: 500; color: var(--text-color);">${this.escapeHtml(p.name)}</span>
+                      <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${p.score}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } else {
+        html = scoresList.map((item, index) => {
+          const iconEmoji = this.getIconEmoji(item.icon);
+          const colorStyle = item.color ? `background-color: ${item.color}22; border-left: 4px solid ${item.color};` : '';
+          return `
+            <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
+              <div style="font-weight: 600; color: var(--text-color); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.1em; color: var(--primary-color);">${index + 1}.</span> 
+                <span>${iconEmoji}</span>
+                <span>${this.escapeHtml(item.name)}</span>
+              </div>
+              <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color);">${item.score} punten</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      container.innerHTML = html;
+    }
+
+    container.style.display = 'block';
   }
 
   useTemplate(templateId) {
@@ -488,21 +705,21 @@ class Homepage {
             const iconEmoji = this.getIconEmoji(team.icon);
             const colorStyle = team.color ? `background-color: ${team.color}22; border-left: 4px solid ${team.color};` : '';
             const playersList = Object.values(team.players || {});
-            return `
-              <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
-                <div style="font-weight: 600; color: var(--text-color); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 1.1em; color: var(--primary-color);">${index + 1}.</span> 
-                  <span>${iconEmoji}</span>
-                  <span>${this.escapeHtml(team.name)}</span>
+              return `
+                <div class="score-card" style="background: var(--background-color); padding: 16px; border-radius: 8px; margin-bottom: 16px; ${colorStyle}">
+                <div style="font-weight: 600; color: var(--text-color); margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 1.3em; color: var(--primary-color);">${index + 1}.</span> 
+                  <span style="font-size: 1.3em;">${iconEmoji}</span>
+                  <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
                 </div>
-                <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">${team.score} punten</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${team.score} punten</div>
                 ${playersList.length > 0 ? `
-                  <div style="font-size: 0.85em; color: var(--text-secondary); padding-top: 8px; border-top: 1px solid var(--border-color); margin-top: 8px;">
-                    <div style="font-weight: 500; margin-bottom: 6px; color: var(--text-color);">Spelers:</div>
+                  <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
                     ${playersList.map(player => `
-                      <div style="padding: 4px 0; display: flex; justify-content: space-between; gap: 8px;">
-                        <span>${this.escapeHtml(player.name)}</span>
-                        <span style="font-weight: 600; color: var(--primary-color);">${player.score}</span>
+                      <div style="padding: 12px 14px; background: var(--card-bg, #fff); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <span style="font-size: 1.05em; font-weight: 500; color: var(--text-color);">${this.escapeHtml(player.name)}</span>
+                        <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${player.score}</span>
                       </div>
                     `).join('')}
                   </div>

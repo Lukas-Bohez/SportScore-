@@ -758,6 +758,10 @@
             font-size: 0.85em;
             font-weight: 600;
         }
+        
+        .session-status.completed {
+            background: #6c757d;
+        }
 
         .session-details {
             display: grid;
@@ -862,7 +866,7 @@
             background: var(--card-bg);
             border: 1px solid var(--border-color, #ddd);
             border-radius: 10px;
-            padding: 16px;
+            padding: 20px;
             margin-bottom: 12px;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -871,17 +875,17 @@
         .history-session-card:hover {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             transform: translateY(-2px);
+            border-color: var(--primary-color, #007bff);
         }
 
         .history-session-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
         }
 
         .history-session-name {
-            font-size: 1.1em;
+            font-size: 1.2em;
             font-weight: 600;
             color: var(--text-color);
         }
@@ -890,21 +894,11 @@
             font-size: 0.9em;
             color: var(--text-secondary, #666);
         }
-
-        .history-session-expanded {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-color, #ddd);
-        }
-
-        .expand-arrow {
-            display: inline-block;
-            transition: transform 0.3s ease;
-            margin-left: 10px;
-        }
-
-        .history-session-card.expanded .expand-arrow {
-            transform: rotate(180deg);
+        
+        .history-session-sport {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: var(--text-secondary, #666);
         }
 
         .history-empty-state {
@@ -917,6 +911,75 @@
             text-align: center;
             padding: 40px 20px;
             color: var(--text-secondary, #666);
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: var(--background-color, #fff);
+            margin: 20px;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: modalSlideIn 0.3s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-close {
+            position: sticky;
+            top: 0;
+            right: 0;
+            float: right;
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--text-secondary, #666);
+            cursor: pointer;
+            padding: 10px 20px;
+            z-index: 1;
+            background: var(--background-color, #fff);
+            border-radius: 0 12px 0 0;
+        }
+        
+        .modal-close:hover,
+        .modal-close:focus {
+            color: var(--text-color, #000);
+        }
+        
+        #history-modal-body {
+            padding: 0 24px 24px 24px;
         }
     </style>
 </head>
@@ -1187,6 +1250,15 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- History Session Modal -->
+            <div id="history-modal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close">&times;</span>
+                    <div id="history-modal-body"></div>
+                </div>
+            </div>
+            
             <!-- Highscores Section (embedded) -->
             <div id="highscores-section" class="content-section">
                 <div class="highscores-container">
