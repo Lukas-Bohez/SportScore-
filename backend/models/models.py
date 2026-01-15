@@ -64,7 +64,7 @@ class ActivityBase(BaseModel):
     description: Optional[str] = None
 
 class ActivityCreate(ActivityBase):
-    session_id: int
+    session_id: Optional[int] = None
 
 class ActivityUpdate(BaseModel):
     name: Optional[str] = None
@@ -79,7 +79,7 @@ class ActivityUpdate(BaseModel):
 
 class ActivityResponse(ActivityBase):
     id: int
-    session_id: int
+    session_id: Optional[int] = None
     status: str = "setup"
     current_round: int = 1
     created_at: datetime

@@ -952,3 +952,34 @@ transform: translateY(20px);
         margin-top: 10px;
     }
 }
+
+/* Templates Grid Styles */
+.templates-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.template-card {
+    flex: 1 1 320px;
+    max-width: 380px;
+    min-width: 260px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@media (min-width: 700px) {
+    .templates-grid {
+        justify-content: center;
+    }
+
+    .template-card {
+        flex-basis: calc(50% - 20px);
+        max-width: 380px;
+    }
+}

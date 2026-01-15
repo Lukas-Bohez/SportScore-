@@ -1,9 +1,12 @@
 /* SportScore - Score Input Styles */
 
 :root {
-    --primary-color: #2c3e50; /* 60% - Dark blue-gray */
-    --secondary-color: #3498db; /* 30% - Bright blue */
-    --accent-color: #e74c3c; /* 10% - Red accent */
+    --primary-color: #2c3e50;
+    /* 60% - Dark blue-gray */
+    --secondary-color: #3498db;
+    /* 30% - Bright blue */
+    --accent-color: #e74c3c;
+    /* 10% - Red accent */
     --background-color: #f8f9fa;
     --card-background: #ffffff;
     --text-primary: #2c3e50;
@@ -300,28 +303,29 @@ h2::after {
         grid-template-columns: 1fr;
         gap: 20px;
     }
-    
+
     .score-form {
         padding: 20px;
     }
-    
-    .leaderboard, .recent-scores {
+
+    .leaderboard,
+    .recent-scores {
         padding: 20px;
     }
-    
+
     .leaderboard-item {
         padding: 15px;
     }
-    
+
     .score-item {
         padding: 12px;
     }
-    
+
     .header {
         padding: 20px;
         text-align: center;
     }
-    
+
     .session-info {
         flex-direction: column;
         gap: 10px;
@@ -332,19 +336,19 @@ h2::after {
     .container {
         padding: 10px;
     }
-    
+
     .header h1 {
         font-size: 1.8rem;
     }
-    
+
     .section-header h2 {
         font-size: 1.3rem;
     }
-    
+
     .leaderboard-item .team-name {
         font-size: 1rem;
     }
-    
+
     .leaderboard-item .score {
         font-size: 1.2rem;
     }
@@ -491,6 +495,67 @@ h2::after {
     transform: translateY(-2px);
 }
 
+/* Quick Scores Section */
+.quick-scores-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.quick-scores-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-color);
+    font-size: 1.1rem;
+}
+
+.sport-quick-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+/* Custom Quick Actions Section */
+.custom-quick-actions-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.custom-quick-actions-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-color);
+    font-size: 1.1rem;
+}
+
+.custom-quick-actions-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.custom-quick-actions-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--input-text);
+}
+
+.custom-quick-actions-form input[type="number"] {
+    flex: 0 0 80px;
+}
+
+.custom-quick-actions-form button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
 /* Custom Quick Actions */
 .custom-quick-actions {
     margin-top: 20px;
@@ -533,6 +598,31 @@ h2::after {
 
 .custom-action-btn.remove:hover {
     background: #c0392b;
+}
+
+.highest-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+.highest-player .player-icon {
+    font-size: 1.2em;
+}
+
+.highest-player .player-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.highest-player .player-score {
+    font-weight: bold;
+    color: var(--success-color);
+    margin-left: auto;
 }
 
 /* Create Quick Action */
@@ -596,6 +686,7 @@ h2::after {
     font-style: italic;
     padding: 10px;
 }
+
 .recent-scores {
     background: var(--card-background);
     border-radius: var(--border-radius);
@@ -763,9 +854,11 @@ h2::after {
         transform: scale(0.5);
         opacity: 0;
     }
+
     50% {
         transform: scale(1.2);
     }
+
     100% {
         transform: scale(1);
         opacity: 1;
@@ -790,7 +883,7 @@ h2::after {
     }
 
     .recent-scores-section {
-    grid-column: 1;
+        grid-column: 1;
         grid-row: 3;
     }
 

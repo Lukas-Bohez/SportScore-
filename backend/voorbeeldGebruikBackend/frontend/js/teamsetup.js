@@ -6,6 +6,7 @@ class TeamSetup {
     this.teams = [];
     this.availableTeams = []; // Alle beschikbare teams (niet in deze sessie)
     this.pendingTeams = new Map();
+    this.activities = [];
     this.init();
   }
 
@@ -17,6 +18,7 @@ class TeamSetup {
     this.loadTeams();
     this.loadAvailableTeams();
     this.loadPlayers();
+    this.loadActivities();
   }
 
   getSessionIdFromUrl() {
@@ -81,7 +83,16 @@ class TeamSetup {
     this.addPlayerGlobalBtn = document.getElementById('add-player-global-btn');
     // position input removed: positions are assigned alphabetically on creation
     this.playersListGlobal = document.getElementById('players-list-global');
+
+    // Activity manager elements
+    this.newActivityName = document.getElementById('new-activity-name');
+    this.activitySport = document.getElementById('activity-sport');
+    this.addActivityBtn = document.getElementById('add-activity-btn');
+    this.activitiesList = document.getElementById('activities-list');
     if (this.addPlayerGlobalBtn) this.addPlayerGlobalBtn.addEventListener('click', () => this.createPlayerGlobal());
+
+    // Activity manager event
+    if (this.addActivityBtn) this.addActivityBtn.addEventListener('click', () => this.addActivity());
 
     // Scoring mode change event
     if (this.scoringModeTeam) {
@@ -173,6 +184,26 @@ class TeamSetup {
       // Load players inline for each team card
       // Use a micro-task to allow the card to be in the DOM
       Promise.resolve().then(() => this.loadPlayersForTeam(team.id));
+    });
+  }
+
+  updateActivitiesDisplay() {
+    this.activitiesList.innerHTML = '';
+
+    if (this.activities.length === 0) {
+      this.activitiesList.innerHTML = '<p style="text-align: center; color: #666;">Nog geen activiteiten toegevoegd.</p>';
+      return;
+    }
+
+    this.activities.forEach((activity) => {
+      const activityItem = document.createElement('div');
+      activityItem.className = 'activity-item';
+      activityItem.innerHTML = `
+        <div class="activity-name">${activity.name}</div>
+        <div class="activity-sport">${activity.sport}</div>
+        <button class="delete-btn" onclick="teamSetup.deleteActivity(${activity.id})">Verwijderen</button>
+      `;
+      this.activitiesList.appendChild(activityItem);
     });
   }
 
@@ -422,6 +453,17 @@ class TeamSetup {
         console.warn('Fallback players load failed', err2);
         if (this.playersListGlobal) this.playersListGlobal.innerHTML = '<p style="color:#666">Kon spelers niet laden.</p>';
       }
+    }
+  }
+
+  async loadActivities() {
+    try {
+      const resp = await api.getSessionActivities(this.sessionId);
+      this.activities = resp.activities || [];
+      this.updateActivitiesDisplay();
+    } catch (err) {
+      console.warn('Could not load activities', err);
+      if (this.activitiesList) this.activitiesList.innerHTML = '<p style="color:#666">Kon activiteiten niet laden.</p>';
     }
   }
 
@@ -839,6 +881,37 @@ class TeamSetup {
     }
   }
 
+  async addActivity() {
+    const activityName = this.newActivityName.value.trim();
+    const sport = this.activitySport.value;
+    if (!activityName) {
+      alert('Voer een activiteit naam in.');
+      this.newActivityName.focus();
+      return;
+    }
+    if (!sport) {
+      alert('Kies een sport/stijl.');
+      this.activitySport.focus();
+      return;
+    }
+
+    try {
+      const activityData = {
+        name: activityName,
+        sport: sport,
+      };
+      await api.createSessionActivity(this.sessionId, activityData);
+      this.showSuccessMessage(`Activiteit "${activityName}" is toegevoegd!`);
+      this.newActivityName.value = '';
+      this.activitySport.value = '';
+      this.newActivityName.focus();
+      await this.loadActivities();
+    } catch (error) {
+      api.handleError(error, 'adding activity');
+      alert('Fout bij het toevoegen van de activiteit.');
+    }
+  }
+
   // Poll helper to check if a team with a given name appears server-side
   async waitForTeamPresence(teamName, timeoutMs = 5000, intervalMs = 500) {
     const end = Date.now() + timeoutMs;
@@ -940,6 +1013,21 @@ class TeamSetup {
     } catch (error) {
       api.handleError(error, 'removing team');
       alert('Fout bij het verwijderen van het team.');
+    }
+  }
+
+  async deleteActivity(activityId) {
+    if (!confirm('Weet je zeker dat je deze activiteit wilt verwijderen?')) {
+      return;
+    }
+
+    try {
+      await api.deleteActivity(activityId);
+      this.activities = this.activities.filter((a) => a.id !== activityId);
+      this.updateActivitiesDisplay();
+    } catch (error) {
+      api.handleError(error, 'deleting activity');
+      alert('Fout bij het verwijderen van de activiteit.');
     }
   }
 

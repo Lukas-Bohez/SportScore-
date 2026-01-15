@@ -1,1063 +1,1227 @@
+
 // homepage.js - Handles the homepage functionality
+
+import { HomepageManagement } from './homepageManagement.js';
 
 class Homepage {
   constructor() {
-    this.api = window.api;
+    this.api = window.scoreboardAPI;
+    this.sharedUtils = new SharedUtils(this.api);
     this.templatesGrid = document.getElementById('templates-grid');
     this.sessionsList = document.getElementById('sessions-list');
     this.currentView = 'simple'; // 'simple' or 'detailed'
+    this.management = new HomepageManagement(this.api, this.sharedUtils);
+    this.activeSessions = [];
+    this.historySessions = [];
     this.init();
   }
 
   async init() {
     this.setupNavigation();
-    this.setupViewToggle();
+    this.setupTabSwitching();
     const urlParams = new URLSearchParams(window.location.search);
-    const section = urlParams.get('section') || 'start';
+    const section = urlParams.get('section') || localStorage.getItem('lastSection') || 'start';
     this.showSection(section);
-    if (section === 'teams') {
-      this.startScreen = new StartScreen(this.api);
+    if (section === 'beheer') {
+      await this.management.loadBeheerData();
     }
     await this.loadTemplates();
-    // await this.loadSessions(); // Temporarily disabled
+    await this.loadActiveSessions();
+    await this.loadHistorySessions();
+  }
+
+  async loadTemplates() {
+    try {
+      const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
+      this.renderTemplates(templates);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      this.renderTemplates([]);
+    }
+  }
+
+  renderTemplates(templates) {
+    if (!this.templatesGrid) return;
+    
+    if (templates.length === 0) {
+      this.templatesGrid.innerHTML = '<p class="no-data">Geen templates beschikbaar. Maak een nieuwe sessie en sla deze op als template.</p>';
+      return;
+    }
+
+    this.templatesGrid.innerHTML = templates.map(template => `
+      <div class="template-card">
+        <h3>${this.escapeHtml(template.name)}</h3>
+        <p>${this.escapeHtml(template.description || 'Geen beschrijving')}</p>
+        <div class="template-stats">
+          <span>👥 ${template.teams?.length || 0} teams</span>
+          <span>🎯 ${template.activities?.length || 0} activiteiten</span>
+          <span>👤 ${template.players?.length || 0} spelers</span>
+        </div>
+        <div class="template-actions">
+          <button class="btn btn-primary" onclick="window.homepage.useTemplate('${template.id}')">Gebruik Template</button>
+          <button class="btn btn-danger" onclick="window.homepage.deleteTemplate('${template.id}')">Verwijder</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async loadSessions() {
+    try {
+      const response = await this.api.getSessions();
+      const sessions = this.api.extractArray(response, 'sessions');
+      this.renderSessions(sessions);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      this.renderSessions([]);
+    }
+  }
+
+  async loadActiveSessions() {
+    try {
+      const response = await this.api.getSessions();
+      const sessions = this.api.extractArray(response, 'sessions');
+      console.log('All sessions from API:', sessions);
+      
+      // Filter for ACTIVE sessions only (status must be 'active')
+      const activeSessions = sessions.filter(s => {
+        const isActive = s.status === 'active';
+        console.log(`Session ${s.id} (${s.name}): status=${s.status}, is_active=${isActive}`);
+        return isActive;
+      });
+      console.log('Filtered active sessions:', activeSessions);
+      
+      // Load activities, teams, and players for each active session
+      for (let session of activeSessions) {
+        try {
+          const [activitiesResponse, teamsResponse, playersResponse] = await Promise.all([
+            this.api.getSessionActivities(session.id),
+            this.api.getSessionTeams(session.id),
+            this.api.getPlayers()
+          ]);
+          session.activities = this.api.extractArray(activitiesResponse, 'activities');
+          session.teams = this.api.extractArray(teamsResponse, 'teams');
+          session.players = this.api.extractArray(playersResponse, 'players');
+          console.log(`Session ${session.id}:`, { activities: session.activities, teams: session.teams, players: session.players });
+        } catch (e) {
+          console.warn(`Could not load data for session ${session.id}:`, e);
+          session.activities = [];
+          session.teams = [];
+          session.players = [];
+        }
+      }
+      
+      this.activeSessions = activeSessions;
+      this.renderActiveSessions(activeSessions);
+    } catch (error) {
+      console.error('Error loading active sessions:', error);
+      this.activeSessions = [];
+      this.renderActiveSessions([]);
+    }
+  }
+
+  async loadHistorySessions() {
+    try {
+      const response = await this.api.getSessions();
+      const sessions = this.api.extractArray(response, 'sessions');
+      console.log('All sessions for history:', sessions);
+      
+      // Filter for CLOSED/HISTORY sessions (status must NOT be 'active')
+      const historySessions = sessions.filter(s => {
+        const isActive = s.status === 'active';
+        const isHistory = !isActive;
+        console.log(`History filter - Session ${s.id} (${s.name}): status=${s.status}, isHistory=${isHistory}`);
+        return isHistory;
+      });
+      console.log('Filtered history sessions:', historySessions);
+      
+      // Load activities, teams, and players for each history session
+      for (let session of historySessions) {
+        try {
+          const [activitiesResponse, teamsResponse, playersResponse] = await Promise.all([
+            this.api.getSessionActivities(session.id),
+            this.api.getSessionTeams(session.id),
+            this.api.getPlayers()
+          ]);
+          session.activities = this.api.extractArray(activitiesResponse, 'activities');
+          session.teams = this.api.extractArray(teamsResponse, 'teams');
+          session.players = this.api.extractArray(playersResponse, 'players');
+          console.log(`History session ${session.id}:`, { activities: session.activities, teams: session.teams, players: session.players });
+        } catch (e) {
+          console.warn(`Could not load data for history session ${session.id}:`, e);
+          session.activities = [];
+          session.teams = [];
+          session.players = [];
+        }
+      }
+      
+      this.historySessions = historySessions;
+      this.renderHistorySessions(historySessions);
+    } catch (error) {
+      console.error('Error loading history sessions:', error);
+      this.historySessions = [];
+      this.renderHistorySessions([]);
+    }
+  }
+
+  renderSessions(sessions) {
+    if (!this.sessionsList) return;
+    
+    if (sessions.length === 0) {
+      this.sessionsList.innerHTML = '<p class="no-data">Geen actieve sessies.</p>';
+      return;
+    }
+
+    this.sessionsList.innerHTML = sessions.map(session => `
+      <div class="session-card">
+        <h3>${this.escapeHtml(session.name)}</h3>
+        <p class="session-date">${this.formatDate(session.created_at)}</p>
+        <div class="session-stats">
+          <span>Status: ${session.is_active ? '🟢 Actief' : '⚪ Inactief'}</span>
+        </div>
+        <div class="session-actions">
+          <button class="btn btn-primary" onclick="window.homepage.openSession(${session.id})">Open</button>
+          <button class="btn btn-danger" onclick="window.homepage.deleteSession(${session.id})">Verwijder</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  renderActiveSessions(sessions) {
+    const container = document.getElementById('active-sessions-list');
+    if (!container) return;
+
+    if (sessions.length === 0) {
+      container.innerHTML = '<div class="active-empty-state"><p>📋 Geen actieve sessies op dit moment.</p><p>Start een nieuwe sessie via "Start" om aan de slag te gaan.</p></div>';
+      return;
+    }
+
+    container.innerHTML = sessions.map(session => this.createActiveSessionCard(session)).join('');
+  }
+
+  renderHistorySessions(sessions) {
+    const container = document.getElementById('history-sessions-list');
+    if (!container) return;
+
+    if (sessions.length === 0) {
+      container.innerHTML = '<div class="history-empty-state"><p>📚 Geen vorige sessies gevonden.</p></div>';
+      return;
+    }
+
+    container.innerHTML = sessions.map(session => this.createHistorySessionCard(session)).join('');
+    
+    // Add event listeners to expandable cards
+    const self = this;
+    document.querySelectorAll('.history-session-header').forEach(header => {
+      header.addEventListener('click', function(e) {
+        const card = this.closest('.history-session-card');
+        const expanded = card.querySelector('.history-session-expanded');
+        
+        card.classList.toggle('expanded');
+        if (expanded.style.display === 'block') {
+          expanded.style.display = 'none';
+        } else {
+          expanded.style.display = 'block';
+          const sessionId = card.dataset.sessionId;
+          self.loadSessionScores(sessionId);
+        }
+      });
+    });
+  }
+
+  createActiveSessionCard(session) {
+    return `
+      <div class="active-session-card">
+        <div class="session-header">
+          <div>
+            <h3 class="session-title">${this.escapeHtml(session.name)}</h3>
+            <p style="margin: 5px 0; color: var(--text-secondary);">${this.formatDate(session.created_at)}</p>
+          </div>
+          <span class="session-status">🟢 Actief</span>
+        </div>
+        
+        <div class="session-details">
+          <div class="detail-box">
+            <label>Teams</label>
+            <value>${session.teams?.length || 0} teams</value>
+          </div>
+          <div class="detail-box">
+            <label>Activiteiten</label>
+            <value>${session.activities?.length || 0} activiteiten</value>
+          </div>
+          <div class="detail-box">
+            <label>Spelers</label>
+            <value>${session.players?.length || 0} spelers</value>
+          </div>
+        </div>
+
+        <div class="activity-selector-container">
+          <label for="session-activity-select-${session.id}">Selecteer activiteit om scores te bekijken:</label>
+          <select id="session-activity-select-${session.id}" onchange="window.homepage.displayActivityScores(${session.id}, this.value)">
+            <option value="">-- Kies een activiteit --</option>
+            ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div id="scores-${session.id}" class="scores-display" style="display: none;"></div>
+
+        <div class="session-controls">
+          <button class="btn btn-primary" onclick="window.homepage.openSession(${session.id})">📖 Open Sessie</button>
+          <button class="btn btn-orange" onclick="window.homepage.endSession(${session.id})">⏹️ Beëindig Sessie</button>
+        </div>
+      </div>
+    `;
+  }
+
+  createHistorySessionCard(session) {
+    return `
+      <div class="history-session-card" data-session-id="${session.id}">
+        <div class="history-session-header" style="cursor: pointer;">
+          <div>
+            <span class="history-session-name">${this.escapeHtml(session.name)}</span>
+            <span class="history-session-date">${this.formatDate(session.created_at)}</span>
+          </div>
+          <span class="expand-arrow">▼</span>
+        </div>
+        <div class="history-session-expanded" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color, #ddd);">
+          <div class="activity-selector-container">
+            <label for="history-activity-select-${session.id}">Selecteer activiteit om scores te bekijken:</label>
+            <select id="history-activity-select-${session.id}" onchange="window.homepage.displayActivityScores(${session.id}, this.value, true)">
+              <option value="">-- Kies een activiteit --</option>
+              ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div id="history-scores-${session.id}" class="scores-display" style="display: none;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  useTemplate(templateId) {
+    const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      sessionStorage.setItem('templateData', JSON.stringify(template));
+      window.location.href = 'simple-setup.html';
+    }
+  }
+
+  deleteTemplate(templateId) {
+    if (!confirm('Weet je zeker dat je deze template wilt verwijderen?')) return;
+    
+    try {
+      const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
+      const filtered = templates.filter(t => t.id !== templateId);
+      localStorage.setItem('sessionTemplates', JSON.stringify(filtered));
+      this.loadTemplates();
+      this.showSuccessMessage('Template verwijderd!');
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      this.showErrorMessage('Fout bij verwijderen template');
+    }
+  }
+
+  async openSession(sessionId) {
+    window.location.href = `simple-scoreinput.html?session=${sessionId}`;
+  }
+
+  async deleteSession(sessionId) {
+    if (!confirm('Weet je zeker dat je deze sessie wilt verwijderen?')) return;
+    
+    try {
+      await this.api.deleteSession(sessionId);
+      this.showSuccessMessage('Sessie verwijderd!');
+      await this.loadActiveSessions();
+      await this.loadHistorySessions();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      this.showErrorMessage('Fout bij verwijderen sessie');
+    }
+  }
+
+  async endSession(sessionId) {
+    if (!confirm('Weet je zeker dat je deze sessie wilt beëindigen? Deze actie kan niet ongedaan gemaakt worden.')) return;
+    
+    try {
+      await this.api.updateSession(sessionId, { status: 'completed' });
+      this.showSuccessMessage('Sessie beëindigd!');
+      await this.loadActiveSessions();
+      await this.loadHistorySessions();
+    } catch (error) {
+      console.error('Error ending session:', error);
+      this.showErrorMessage('Fout bij beëindigen sessie');
+    }
+  }
+
+  async displayActivityScores(sessionId, activityId, isHistory = false) {
+    if (!activityId) {
+      const containerId = isHistory ? `history-scores-${sessionId}` : `scores-${sessionId}`;
+      const container = document.getElementById(containerId);
+      if (container) container.style.display = 'none';
+      return;
+    }
+
+    try {
+      // Get the session data from stored sessions
+      const sessionList = isHistory ? this.historySessions : this.activeSessions;
+      const session = sessionList.find(s => s.id == sessionId);
+      
+      if (!session) {
+        console.error(`Session ${sessionId} not found`);
+        return;
+      }
+
+      // Get the activity to check its scoring mode
+      const activity = (session.activities || []).find(a => a.id == activityId);
+      if (!activity) {
+        console.error(`Activity ${activityId} not found in session ${sessionId}`);
+        return;
+      }
+      
+      const scoringMode = activity.scoring_mode || 'team';
+      console.log(`Loading scores for activity ${activityId}, mode: ${scoringMode}`);
+      
+      // Use teams and players from session (already loaded)
+      const teams = session.teams || [];
+      const players = session.players || [];
+      
+      // Load activity scores
+      const scoresResponse = await this.api.getActivityScores(activityId);
+      const activityScores = this.api.extractArray(scoresResponse, 'scores');
+      
+      console.log(`Loaded scores:`, activityScores, `teams:`, teams, `players:`, players);
+      
+      // Create lookup maps for efficient enrichment
+      const teamMap = {};
+      const playerMap = {};
+      teams.forEach(t => { teamMap[t.id] = t; });
+      players.forEach(p => { playerMap[p.id] = p; });
+      
+      // Aggregate scores based on scoring mode
+      let aggregatedScores = {};
+      
+      if (scoringMode === 'player') {
+        // Group by player_id
+        activityScores.forEach(score => {
+          const playerId = score.player_id;
+          const player = playerMap[playerId];
+          const playerName = player?.name || `Speler ${playerId}`;
+          if (!aggregatedScores[playerId]) {
+            aggregatedScores[playerId] = { 
+              id: playerId, 
+              name: playerName,
+              color: player?.color,
+              icon: player?.icon,
+              score: 0,
+              type: 'player'
+            };
+          }
+          aggregatedScores[playerId].score += (score.points || 0);
+        });
+      } else if (scoringMode === 'team_with_players') {
+        // Group by team_id with player info
+        activityScores.forEach(score => {
+          const teamId = score.team_id;
+          const team = teamMap[teamId];
+          const teamName = team?.name || `Team ${teamId}`;
+          if (!aggregatedScores[teamId]) {
+            aggregatedScores[teamId] = { 
+              id: teamId, 
+              name: teamName,
+              color: team?.color,
+              icon: team?.icon,
+              score: 0,
+              players: {},
+              type: 'team'
+            };
+          }
+          // Add to team total
+          aggregatedScores[teamId].score += (score.points || 0);
+          
+          // Also track individual player scores (only if they have points)
+          if (score.player_id && score.points) {
+            const playerId = score.player_id;
+            const player = playerMap[playerId];
+            const playerName = player?.name || `Speler ${playerId}`;
+            if (!aggregatedScores[teamId].players[playerId]) {
+              aggregatedScores[teamId].players[playerId] = { name: playerName, score: 0 };
+            }
+            aggregatedScores[teamId].players[playerId].score += (score.points || 0);
+          }
+        });
+      } else {
+        // Default to team mode - group by team_id
+        activityScores.forEach(score => {
+          const teamId = score.team_id;
+          const team = teamMap[teamId];
+          const teamName = team?.name || `Team ${teamId}`;
+          if (!aggregatedScores[teamId]) {
+            aggregatedScores[teamId] = { 
+              id: teamId, 
+              name: teamName,
+              color: team?.color,
+              icon: team?.icon,
+              score: 0,
+              type: 'team'
+            };
+          }
+          aggregatedScores[teamId].score += (score.points || 0);
+        });
+      }
+      
+      const containerId = isHistory ? `history-scores-${sessionId}` : `scores-${sessionId}`;
+      const container = document.getElementById(containerId);
+      
+      if (!container) return;
+
+      // Convert to array and sort by score
+      let scoresList = Object.values(aggregatedScores);
+      scoresList.sort((a, b) => b.score - a.score);
+
+      if (scoresList.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Geen scores beschikbaar voor deze activiteit.</p>';
+      } else {
+        let html = '';
+        
+        if (scoringMode === 'team_with_players') {
+          // Show teams with their player breakdown
+          html = scoresList.map((team, index) => {
+            const iconEmoji = this.getIconEmoji(team.icon);
+            const colorStyle = team.color ? `background-color: ${team.color}22; border-left: 4px solid ${team.color};` : '';
+            const playersList = Object.values(team.players || {});
+            return `
+              <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
+                <div style="font-weight: 600; color: var(--text-color); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.1em; color: var(--primary-color);">${index + 1}.</span> 
+                  <span>${iconEmoji}</span>
+                  <span>${this.escapeHtml(team.name)}</span>
+                </div>
+                <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">${team.score} punten</div>
+                ${playersList.length > 0 ? `
+                  <div style="font-size: 0.85em; color: var(--text-secondary); padding-top: 8px; border-top: 1px solid var(--border-color); margin-top: 8px;">
+                    <div style="font-weight: 500; margin-bottom: 6px; color: var(--text-color);">Spelers:</div>
+                    ${playersList.map(player => `
+                      <div style="padding: 4px 0; display: flex; justify-content: space-between; gap: 8px;">
+                        <span>${this.escapeHtml(player.name)}</span>
+                        <span style="font-weight: 600; color: var(--primary-color);">${player.score}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+        } else if (scoringMode === 'player') {
+          // Show players with proper styling
+          html = scoresList.map((player, index) => {
+            const iconEmoji = this.getIconEmoji(player.icon);
+            const colorStyle = player.color ? `background-color: ${player.color}22; border-left: 4px solid ${player.color};` : '';
+            return `
+              <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <span style="font-weight: 700; color: var(--primary-color);">${index + 1}.</span>
+                    <span>${iconEmoji}</span>
+                    <span style="font-weight: 600; color: var(--text-color);">${this.escapeHtml(player.name)}</span>
+                  </div>
+                  <span style="font-size: 1.2em; font-weight: 700; color: var(--primary-color);">${player.score} punten</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          // Team mode - use same styling as team_with_players but without players section
+          html = scoresList.map((team, index) => {
+            const iconEmoji = this.getIconEmoji(team.icon);
+            const colorStyle = team.color ? `background-color: ${team.color}22; border-left: 4px solid ${team.color};` : '';
+            return `
+              <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
+                <div style="font-weight: 600; color: var(--text-color); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.1em; color: var(--primary-color);">${index + 1}.</span> 
+                  <span>${iconEmoji}</span>
+                  <span>${this.escapeHtml(team.name)}</span>
+                </div>
+                <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color);">${team.score} punten</div>
+              </div>
+            `;
+          }).join('');
+        }
+        
+        container.innerHTML = html;
+      }
+
+      container.style.display = 'block';
+    } catch (error) {
+      console.error('Error loading activity scores:', error);
+      const containerId = isHistory ? `history-scores-${sessionId}` : `scores-${sessionId}`;
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.innerHTML = '<p style="color: var(--text-secondary); padding: 20px;">Fout bij laden van scores.</p>';
+        container.style.display = 'block';
+      }
+    }
+  }
+
+  async loadSessionScores(sessionId) {
+    // This method can be expanded to preload scores when history card is expanded
+    // For now, scores are loaded on-demand when activity is selected
+  }
+
+  formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('nl-NL', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  showSuccessMessage(message) {
+    // Create a temporary success message element
+    const msgEl = document.createElement('div');
+    msgEl.className = 'success-message';
+    msgEl.textContent = message;
+    msgEl.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10000;';
+    document.body.appendChild(msgEl);
+    setTimeout(() => msgEl.remove(), 3000);
+  }
+
+  showErrorMessage(message) {
+    // Create a temporary error message element
+    const msgEl = document.createElement('div');
+    msgEl.className = 'error-message';
+    msgEl.textContent = message;
+    msgEl.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #f44336; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10000;';
+    document.body.appendChild(msgEl);
+    setTimeout(() => msgEl.remove(), 3000);
   }
 
   setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
-      if (item.id === 'qr-toggle') return; // Skip QR toggle, handled separately
       item.addEventListener('click', () => {
         const section = item.dataset.section;
+        if (!section) return;
         this.showSection(section);
-        if (section === 'active') {
-          this.loadActiveOverview();
+        if (section === 'beheer' && this.management && typeof this.management.loadBeheerData === 'function') {
+          this.management.loadBeheerData().catch((e) => console.error('Error loading beheer data:', e));
         }
       });
     });
   }
 
-  setupViewToggle() {
-    const simpleBtn = document.getElementById('simple-view');
-    const detailedBtn = document.getElementById('detailed-view');
+  setupTabSwitching() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.dataset.tab;
+        if (!tabName) return;
+        
+        // Remove active class from all buttons and panes
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        
+        // Add active class to clicked button and corresponding pane
+        btn.classList.add('active');
+        const pane = document.getElementById(`${tabName}-tab`);
+        if (pane) pane.classList.add('active');
 
-    if (simpleBtn && detailedBtn) {
-      simpleBtn.addEventListener('click', () => {
-        this.currentView = 'simple';
-        simpleBtn.classList.add('active');
-        detailedBtn.classList.remove('active');
-        this.loadSessions();
+        // Load highscores when highscores tab is clicked
+        if (tabName === 'highscores') {
+          this.loadActivitiesForHighscores();
+        }
       });
+    });
+  }
 
-      detailedBtn.addEventListener('click', () => {
-        this.currentView = 'detailed';
-        detailedBtn.classList.add('active');
-        simpleBtn.classList.remove('active');
-        this.loadSessions();
-      });
+  async loadActivitiesForHighscores() {
+    try {
+      const response = await this.api.getActivities();
+      const activities = this.api.extractArray(response, 'activities');
+      this.renderHighscores(activities);
+    } catch (error) {
+      console.error('Error loading highscores:', error);
+      const grid = document.getElementById('highscores-grid');
+      if (grid) grid.innerHTML = '<div class="empty-state">Fout bij het laden van activiteiten.</div>';
     }
+  }
+
+  renderHighscores(activities) {
+    const grid = document.getElementById('highscores-grid');
+    if (!grid) return;
+    
+    if (activities.length === 0) {
+      grid.innerHTML = '<div class="empty-state">Geen activiteiten beschikbaar.</div>';
+      return;
+    }
+
+    grid.innerHTML = activities.map(activity => `
+      <div class="highscores-card">
+        <h3>${this.escapeHtml(activity.name)}</h3>
+        <div class="highscores-meta">
+          <span>${this.escapeHtml(activity.sport_type)}</span>
+          <span>${this.escapeHtml(activity.game_type || 'custom')}</span>
+        </div>
+        <p>${this.escapeHtml(activity.description || 'Geen beschrijving')}</p>
+        <div class="highscores-stats">
+          <span>Rondes: ${activity.total_rounds || 1}</span>
+          ${activity.time_limit ? `<span>Tijd: ${activity.time_limit} min</span>` : ''}
+        </div>
+      </div>
+    `).join('');
   }
 
   showSection(sectionName) {
     // Hide all sections
-    document.querySelectorAll('.content-section').forEach(section => {
-      section.classList.remove('active');
-    });
+    document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+
+    // Special handling for highscores - it's a tab within sessions
+    if (sectionName === 'highscores') {
+      sectionName = 'sessions';
+      // Switch to highscores tab after showing section
+      setTimeout(() => {
+        const highscoresTab = document.querySelector('.tab-btn[data-tab="highscores"]');
+        if (highscoresTab) highscoresTab.click();
+      }, 50);
+    }
 
     // Show selected section
-    const targetSection = document.getElementById(sectionName + '-section');
-    if (targetSection) {
-      targetSection.classList.add('active');
-    }
+    const target = document.getElementById(`${sectionName}-section`);
+    if (target) target.classList.add('active');
 
     // Update nav active state
-    document.querySelectorAll('.nav-item').forEach(item => {
-      item.classList.remove('active');
-    });
-    const activeNav = document.querySelector(`[data-section="${sectionName}"]`);
-    if (activeNav) {
-      activeNav.classList.add('active');
-    }
-
-    // Initialize team management if teams section
-    if (sectionName === 'teams' && !this.startScreen) {
-      this.startScreen = new StartScreen(this.api);
-    }
-
-    // Load active overview for the Active tab
-    if (sectionName === 'active') {
-      this.loadActiveOverview();
-    }
-  }
-
-  async loadActiveOverview() {
-    const container = document.getElementById('active-overview');
-    const actionsDiv = document.querySelector('.session-actions');
-    const openBtn = document.getElementById('active-open-score');
-    const endBtn = document.getElementById('active-end');
-    if (!container || !actionsDiv || !openBtn || !endBtn) return;
-    try {
-      const activeSession = await this.api.getActiveSession();
-      if (!activeSession) {
-        container.innerHTML = '<p class="info-message">Geen actieve sessie.</p>';
-        actionsDiv.style.display = 'none';
-        return;
-      }
-      container.innerHTML = `
-        <div class="session-item">
-          <h4>${activeSession.name}</h4>
-          <div class="details">Status: ${this.getStatusText(activeSession.status)}</div>
-          <div class="details">Ronde: ${activeSession.current_round}/${activeSession.total_rounds}</div>
-        </div>`;
-      actionsDiv.style.display = 'flex';
-      openBtn.disabled = false;
-      endBtn.disabled = false;
-      openBtn.onclick = () => {
-        window.location.href = `simple-scoreinput.html?session=${activeSession.id}`;
-      };
-      endBtn.onclick = async () => {
-        if (!confirm('Weet je zeker dat je deze sessie wilt beëindigen?')) return;
-        try {
-          await this.api.updateSession(activeSession.id, { status: 'completed' });
-          this.loadActiveOverview();
-        } catch (e) {
-          this.api.handleError(e, 'ending active session');
-          alert('Fout bij beëindigen sessie.');
-        }
-      };
-    } catch (e) {
-      this.api.handleError(e, 'loading active overview');
-      container.innerHTML = '<p class="error-message">Fout bij laden actieve sessie.</p>';
-    }
-  }
-
-  async loadTemplates() {
-    if (!this.templatesGrid) return;
-
-    try {
-      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
-
-      if (templates.length === 0) {
-        this.templatesGrid.innerHTML = '<p style="text-align: center; grid-column: 1 / -1;">Geen templates gevonden. Maak eerst een sessie aan en sla deze op als template.</p>';
-        return;
-      }
-
-      const templatesHtml = templates
-        .map(
-          (template) => `
-            <div class="template-card">
-              <h3>${template.name}</h3>
-              <p>${template.description || 'Geen beschrijving'}</p>
-              <div class="template-actions">
-                <button class="btn" onclick="homepage.loadTemplate(${template.id})">Gebruiken</button>
-                <button class="delete-team-btn" onclick="homepage.deleteTemplate(${template.id})">Verwijderen</button>
-              </div>
-            </div>
-          `
-        )
-        .join('');
-
-      this.templatesGrid.innerHTML = templatesHtml;
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      if (this.templatesGrid) {
-        this.templatesGrid.innerHTML = '<p>Fout bij laden templates.</p>';
-      }
-    }
-  }
-
-  async loadSessions() {
-    if (!this.sessionsList) return;
-
-    try {
-      const response = await this.api.getSessions();
-      const sessions = response.sessions || [];
-
-      // Filter completed sessions
-      const completedSessions = sessions.filter((s) => s.status === 'completed');
-
-      if (completedSessions.length === 0) {
-        this.sessionsList.innerHTML = '<p style="text-align: center; grid-column: 1 / -1;">Geen gespeelde sessies gevonden.</p>';
-        return;
-      }
-
-      // Load winners for each session
-      const sessionsWithWinners = await Promise.all(
-        completedSessions.map(async (session) => {
-          const winnerInfo = await this.getSessionWinner(session);
-          // Load per-activity winners
-          let activityWinners = [];
-          try {
-            const actsResp = await this.api.getSessionActivities(session.id);
-            const activities = actsResp.activities || [];
-            activityWinners = await Promise.all(
-              activities.map(async (a) => {
-                try {
-                  const lb = await this.api.getActivityLeaderboard(a.id);
-                  const top = (lb.leaderboard || [])[0];
-                  return top
-                    ? {
-                        activity: a.name,
-                        team_name: top.team_name,
-                        total_score: top.total_score || top.score || 0,
-                      }
-                    : { activity: a.name, team_name: '-', total_score: 0 };
-                } catch (_) {
-                  return { activity: a.name, team_name: '-', total_score: 0 };
-                }
-              })
-            );
-          } catch (_) {}
-          return { ...session, winner: winnerInfo, activityWinners };
-        })
-      );
-
-      const sessionsHtml = sessionsWithWinners
-        .map((session) => {
-          const date = new Date(session.created_at).toLocaleDateString('nl-NL');
-          const winnerText = session.winner ? `${session.winner.name}${session.winner.points ? ` (${session.winner.points} punten)` : ''}` : 'Onbekend';
-
-          let extraDetails = '';
-          if (this.currentView === 'detailed' && session.winner && session.winner.players) {
-            extraDetails = '<div class="players">' + session.winner.players.map((p) => `<div>${p.name}: ${p.score} punten</div>`).join('') + '</div>';
-          }
-
-          const activitiesHtml = (session.activityWinners || [])
-            .map(
-              (aw) => `
-              <div class="details">Activiteit: ${this.escapeHtml(aw.activity)} — Top: ${this.escapeHtml(aw.team_name)} (${aw.total_score})</div>
-            `
-            )
-            .join('');
-
-          return `
-            <div class="session-item">
-              <h4>${session.name}</h4>
-              <div class="details">Winnaar: ${winnerText}</div>
-              <div class="details">Datum: ${date}</div>
-              ${activitiesHtml}
-              ${extraDetails}
-              <button class="btn" onclick="window.location.href='leaderboard.html?session=${session.id}'">Bekijken</button>
-            </div>
-          `;
-        })
-        .join('');
-
-      this.sessionsList.innerHTML = sessionsHtml;
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-      if (this.sessionsList) {
-        this.sessionsList.innerHTML = '<p>Fout bij laden sessies.</p>';
-      }
-    }
-  }
-
-  async getSessionWinner(session) {
-    try {
-      const scoresResponse = await this.api.getSessionScores(session.id);
-      const scores = scoresResponse.scores || [];
-
-      if (session.scoring_mode === 'player') {
-        // For player mode, winner is the player with highest score
-        const [playersResponse, teamsResponse] = await Promise.all([this.api.getPlayers(), this.api.getSessionTeams(session.id)]);
-        const players = playersResponse.players || [];
-        const teams = teamsResponse.teams || [];
-        const playerMap = {};
-        const teamMap = {};
-        players.forEach((p) => {
-          playerMap[p.id] = { name: p.name, team_id: p.team_id };
-        });
-        teams.forEach((t) => (teamMap[t.id] = t.name));
-
-        const playerScores = {};
-        scores.forEach((score) => {
-          if (score.player_id) {
-            if (!playerScores[score.player_id]) playerScores[score.player_id] = 0;
-            playerScores[score.player_id] += score.points;
-          }
-        });
-
-        const sortedPlayers = Object.entries(playerScores)
-          .map(([id, score]) => ({
-            id,
-            name: playerMap[id]?.name || 'Onbekend',
-            team: teamMap[playerMap[id]?.team_id] || 'Onbekend',
-            score,
-          }))
-          .sort((a, b) => b.score - a.score);
-
-        if (sortedPlayers.length === 0) return null;
-
-        const winner = sortedPlayers[0];
-        return {
-          name: winner.name,
-          points: winner.score,
-          players: this.currentView === 'detailed' ? sortedPlayers.slice(0, 5) : null // Top 5 for detailed view
-        };
-      } else if (session.scoring_mode === 'team_with_players') {
-        // For team_with_players, winner is the team, show players of winning team
-        const teamsResponse = await this.api.getSessionTeams(session.id);
-        const teams = teamsResponse.teams || [];
-        const teamMap = {};
-        teams.forEach((t) => (teamMap[t.id] = t.name));
-
-        const teamScores = {};
-        scores.forEach((score) => {
-          if (score.team_id) {
-            if (!teamScores[score.team_id]) teamScores[score.team_id] = 0;
-            teamScores[score.team_id] += score.points;
-          }
-        });
-
-        const sortedTeams = Object.entries(teamScores)
-          .map(([id, score]) => ({ id, name: teamMap[id] || 'Onbekend', score }))
-          .sort((a, b) => b.score - a.score);
-
-        if (sortedTeams.length === 0) return null;
-
-        const winner = sortedTeams[0];
-
-        // Get players for the winning team
-        const playersResponse = await this.api.request(`/api/v1/sessions/${session.id}/teams/${winner.id}/players`);
-        const teamPlayers = playersResponse.players || [];
-
-        const playerScores = {};
-        teamPlayers.forEach((p) => (playerScores[p.id] = { name: p.name || p.player_name, score: 0 }));
-        scores.forEach((score) => {
-          if (score.player_id && playerScores[score.player_id]) {
-            playerScores[score.player_id].score += score.points;
-          }
-        });
-
-        const sortedTeamPlayers = Object.values(playerScores).sort((a, b) => b.score - a.score);
-
-        return {
-          name: winner.name,
-          points: winner.score,
-          players: this.currentView === 'detailed' ? sortedTeamPlayers : null
-        };
-      } else {
-        // For team mode, winner is the team with highest score
-        const teamsResponse = await this.api.getSessionTeams(session.id);
-        const teams = teamsResponse.teams || [];
-        const teamMap = {};
-        teams.forEach((t) => (teamMap[t.id] = t.name));
-
-        const teamScores = {};
-        scores.forEach((score) => {
-          if (score.team_id) {
-            if (!teamScores[score.team_id]) teamScores[score.team_id] = 0;
-            teamScores[score.team_id] += score.points;
-          }
-        });
-
-        const sortedTeams = Object.entries(teamScores)
-          .map(([id, score]) => ({
-            id,
-            name: teamMap[id] || 'Onbekend',
-            score,
-          }))
-          .sort((a, b) => b.score - a.score);
-
-        if (sortedTeams.length === 0) return null;
-
-        const winner = sortedTeams[0];
-        return {
-          name: winner.name,
-          points: winner.score,
-          players: this.currentView === 'detailed' ? sortedTeams.slice(0, 3) : null // Top 3 teams for detailed view
-        };
-      }
-    } catch (error) {
-      console.error('Error getting session winner:', error);
-      return null;
-    }
-  }
-
-  async loadTemplate(templateId) {
-    try {
-      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
-      const template = templates.find((t) => t.id == templateId);
-      if (!template) {
-        alert('Template niet gevonden.');
-        return;
-      }
-
-      // Store template data in sessionStorage and redirect to simple-setup
-      sessionStorage.setItem('templateData', JSON.stringify(template.template_data));
-      window.location.href = 'simple-setup.html';
-    } catch (error) {
-      console.error('Error loading template:', error);
-      alert('Fout bij laden template.');
-    }
-  }
-
-  deleteTemplate(templateId) {
-    if (confirm('Weet je zeker dat je deze template wilt verwijderen?')) {
-      try {
-        const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
-        const updated = templates.filter((t) => t.id != templateId);
-        localStorage.setItem('sportScoreTemplates', JSON.stringify(updated));
-        this.loadTemplates(); // Refresh the list
-      } catch (error) {
-        console.error('Error deleting template:', error);
-        alert('Fout bij verwijderen template.');
-      }
-    }
-  }
-}
-
-// Start Screen JavaScript integrated
-class StartScreen {
-  constructor(api) {
-    this.api = api;
-    this.editingTeamId = null;
-    this.init();
-  }
-
-  init() {
-    this.bindElements();
-    this.setupEventListeners();
-    this.loadTeams();
-  }
-
-  bindElements() {
-    this.sessionForm = document.getElementById('session-form');
-
-    // Team management elements
-    this.addTeamBtn = document.getElementById('add-team-btn');
-    this.teamFormContainer = document.getElementById('team-form-container');
-    this.teamForm = document.getElementById('team-form');
-    this.cancelTeamBtn = document.getElementById('cancel-team-btn');
-    this.teamsList = document.getElementById('teams-list');
-    // Player manager elements
-    this.showPlayersCheckbox = document.getElementById('show-players');
-    this.showPlayerManagerBtn = document.getElementById('show-player-manager');
-    this.playerManagerDiv = document.getElementById('player-manager');
-    this.pmPlayerName = document.getElementById('pm-player-name');
-    // position input removed: positions are assigned alphabetically on creation
-    this.pmPlayerDefaultTeam = document.getElementById('pm-player-default-team');
-    this.pmAddPlayerBtn = document.getElementById('pm-add-player');
-    this.pmPlayersList = document.getElementById('pm-players-list');
-
-    // Log missing elements for debugging
-    if (!this.sessionForm) console.warn('session-form element not found');
-    if (!this.activeSessionDiv) console.warn('active-session element not found');
-    if (!this.activeSessionInfo) console.warn('active-session-info element not found');
-    if (!this.continueBtn) console.warn('continue-session element not found');
-    if (!this.endBtn) console.warn('end-session element not found');
-    if (!this.viewAllSessionsBtn) console.warn('view-all-sessions-btn element not found');
-  }
-
-  setupEventListeners() {
-    if (this.sessionForm) {
-      this.sessionForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        this.createNewSession();
-      });
-    }
-
-    // Player manager events
-    if (this.showPlayerManagerBtn) this.showPlayerManagerBtn.addEventListener('click', () => this.togglePlayerManager());
-    if (this.pmAddPlayerBtn) this.pmAddPlayerBtn.addEventListener('click', () => this.createPlayerFromManager());
-
-    // Team management event listeners
-    if (this.addTeamBtn) {
-      this.addTeamBtn.addEventListener('click', () => {
-        this.showTeamForm();
-      });
-    }
-
-    if (this.cancelTeamBtn) {
-      this.cancelTeamBtn.addEventListener('click', () => {
-        this.hideTeamForm();
-      });
-    }
-
-    if (this.teamForm) {
-      this.teamForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        this.createTeam();
-      });
-    }
-
-    // Color preview event listener
-    const teamColorInput = document.getElementById('team-color');
-    if (teamColorInput) {
-      teamColorInput.addEventListener('input', this.handleColorChange.bind(this));
-    }
-
-    // Color preview click to open color picker
-    const colorPreview = document.getElementById('color-preview');
-    if (colorPreview) {
-      colorPreview.addEventListener('click', () => {
-        if (teamColorInput) {
-          teamColorInput.click();
-        }
-      });
-    }
-  }
-
-  async createNewSession() {
-    const formData = new FormData(this.sessionForm);
-    const sessionData = {
-      name: document.getElementById('session-name').value,
-      sport_type: document.getElementById('sport-type') ? document.getElementById('sport-type').value : 'custom',
-      game_type: document.getElementById('game-type').value,
-      scoring_mode: document.getElementById('scoring-mode').value,
-      show_players: this.showPlayersCheckbox ? Boolean(this.showPlayersCheckbox.checked) : true,
-      total_rounds: parseInt(document.getElementById('total-rounds').value),
-      time_limit: document.getElementById('time-limit').value ? parseInt(document.getElementById('time-limit').value) * 60 : null, // Convert to seconds
-    };
-
-    // Force show_players for team_with_players mode
-    if (sessionData.scoring_mode === 'team_with_players') {
-      sessionData.show_players = true;
-    }
-
-    try {
-      const response = await this.api.post('/api/v1/sessions', sessionData);
-      if (response) {
-        this.showSuccessMessage('Sessie aangemaakt!');
-        // Redirect to team setup page
-        setTimeout(() => {
-          window.location.href = `teamsetup.html?session=${response.id}`;
-        }, 500);
-      }
-    } catch (error) {
-      this.api.handleError(error, 'creating session');
-
-      // Show user-friendly error message
-      const errorMsg = error.message && error.message.includes('fetch') ? 'Kan geen verbinding maken met de backend server. Zorg dat de server draait op http://localhost:8000' : 'Fout bij het aanmaken van de sessie. Probeer opnieuw.';
-
-      this.showErrorMessage(errorMsg);
-    }
-  }
-
-  async loadActiveSession() {
-    try {
-      const activeSession = await this.api.get('/api/v1/sessions/active');
-      if (activeSession) {
-        this.showActiveSession(activeSession);
-      }
-    } catch (error) {
-      // Distinguish between no active session and backend not reachable
-      if (error instanceof TypeError || (error.message && error.message.includes('fetch'))) {
-        // Network error likely means backend is down - show prominent warning
-        this.showBackendConnectionError();
-      } else {
-        console.log('No active session found');
-      }
-    }
-  }
-
-  showBackendConnectionError() {
-    // Create prominent error banner at the top of the page
-    const banner = document.createElement('div');
-    banner.id = 'backend-error-banner';
-    banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #dc3545; color: white; padding: 15px 20px; text-align: center; z-index: 10000; box-shadow: 0 2px 8px rgba(0,0,0,0.2);';
-    banner.innerHTML = `
-      <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">⚠️ Backend Server Niet Bereikbaar</div>
-      <div style="font-size: 0.95em;">Kan geen verbinding maken met de backend op http://localhost:8000</div>
-      <div style="font-size: 0.9em; margin-top: 5px;">Start de backend server en <a href="#" onclick="location.reload()" style="color: #fff; text-decoration: underline;">vernieuw deze pagina</a></div>
-    `;
-
-    // Remove existing banner if present
-    const existing = document.getElementById('backend-error-banner');
-    if (existing) existing.remove();
-
-    document.body.prepend(banner);
-
-    // Also show in the UI where active session would be
-    if (this.activeSessionDiv) {
-      this.activeSessionDiv.style.display = 'block';
-      this.activeSessionDiv.innerHTML = `
-        <div style="background: #f8d7da; border: 2px solid #dc3545; padding: 15px; border-radius: 8px;">
-          <h3 style="color: #721c24; margin-top: 0;">⚠️ Verbindingsfout</h3>
-          <p style="color: #721c24;">De applicatie kan geen verbinding maken met de backend server.</p>
-          <p style="color: #721c24; margin-bottom: 0;"><strong>Oplossing:</strong> Start de backend server met <code>python app.py</code> en vernieuw deze pagina.</p>
-        </div>
-      `;
-    }
-  }
-
-  showActiveSession(session) {
-    this.activeSessionDiv.classList.remove('hidden');
-
-    const gameTypeNames = {
-      custom: 'Aangepast',
-      quiz: 'Quiz Modus',
-      sport_challenge: 'Sport Challenge',
-      random_bonus: 'Random Bonus',
-      elimination: 'Elimination Mode',
-      team_vs_time: 'Team vs Time',
-    };
-
-    this.activeSessionInfo.innerHTML = `
-            <strong>${session.name}</strong><br>
-            Type: ${gameTypeNames[session.game_type] || session.game_type}<br>
-            Status: ${this.getStatusText(session.status)}<br>
-            Ronde: ${session.current_round}/${session.total_rounds}
-        `;
-  }
-
-  async continueSession() {
-    try {
-      const activeSession = await this.api.get('/api/v1/sessions/active');
-      if (activeSession) {
-        window.location.href = `simple-scoreinput.html?session=${activeSession.id}`;
-      }
-    } catch (error) {
-      this.api.handleError(error, 'continuing session');
-    }
-  }
-
-  async endSession() {
-    if (!confirm('Weet je zeker dat je deze sessie wilt beëindigen?')) {
-      return;
-    }
-
-    try {
-      const activeSession = await this.api.get('/api/v1/sessions/active');
-      if (activeSession) {
-        await this.api.put(`/api/v1/sessions/${activeSession.id}`, { status: 'completed' });
-        alert('Sessie beëindigd!');
-        window.location.reload();
-      }
-    } catch (error) {
-      this.api.handleError(error, 'ending session');
-    }
-  }
-
-  async loadAllSessions() {
-    try {
-      const response = await this.api.get('/api/v1/sessions');
-      // Handle both response formats: {sessions: [...]} or [...] directly
-      const sessions = Array.isArray(response) ? response : response.sessions || [];
-      // Always render the section, even if empty, to replace the "Laden..." placeholder
-      this.displayRecentSessions(sessions.slice(0, 5)); // Show up to 5 recent sessions
-    } catch (error) {
-      this.api.handleError(error, 'loading recent sessions');
-      this.sessionsList.innerHTML = 'Fout bij het laden van sessies.';
-    }
-  }
-
-  getStatusText(status) {
-    const statusMap = {
-      setup: 'Setup',
-      active: 'Actief',
-      paused: 'Gepauzeerd',
-      completed: 'Voltooid',
-    };
-    return statusMap[status] || status;
-  }
-
-  // Team Management Methods
-  showTeamForm() {
-    this.teamFormContainer.classList.remove('hidden');
-    this.teamForm.reset();
-    this.editingTeamId = null;
-    // Initialize color preview
-    this.handleColorChange({ target: { value: '#3B82F6' } });
-  }
-
-  hideTeamForm() {
-    this.teamFormContainer.classList.add('hidden');
-    this.teamForm.reset();
-    this.editingTeamId = null;
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const activeNav = document.querySelector(`.nav-item[data-section="${sectionName}"]`);
+    if (activeNav) activeNav.classList.add('active');
+
+    // Persist last section
+    try { localStorage.setItem('lastSection', sectionName); } catch (_) {}
   }
 
   async editTeam(teamId) {
+    if (this.management && typeof this.management.editTeam === 'function') {
+      return this.management.editTeam(teamId);
+    }
+    // Fallback - find team and show form
+    const team = this.management?.teams?.find(t => t.id === teamId);
+    if (team && this.management && typeof this.management.showTeamForm === 'function') {
+      this.management.showTeamForm(team);
+    }
+  }
+
+  async deletePlayer(playerId) {
+    if (this.management && typeof this.management.deletePlayer === 'function') {
+      return this.management.deletePlayer(playerId);
+    }
+  }
+
+  async editActivity(activityId) {
+    if (this.management && typeof this.management.activities === 'object') {
+      const activity = this.management.activities.find(a => a.id === activityId);
+      if (activity && typeof this.management.showActivityForm === 'function') {
+        this.management.showActivityForm(activity);
+      }
+    }
+  }
+
+  async deleteActivity(activityId) {
+    if (this.management && typeof this.management.deleteActivity === 'function') {
+      return this.management.deleteActivity(activityId);
+    }
+  }
+
+  async assignPlayerToTeamFromSelect(playerId, teamId) {
+    if (!teamId) return;
     try {
-      const response = await this.api.getStandaloneTeam(teamId);
-      if (response && response.team) {
-        const team = response.team;
-        this.editingTeamId = teamId;
-
-        // Populate form with team data
-        document.getElementById('team-name').value = team.name || '';
-        document.getElementById('team-color').value = team.color || '#3B82F6';
-        document.getElementById('team-icon').value = team.icon || 'team';
-        document.getElementById('team-description').value = team.description || '';
-
-        // Update color preview
-        this.handleColorChange({ target: { value: team.color || '#3B82F6' } });
-
-        // Show form
-        this.teamFormContainer.classList.remove('hidden');
-
-        // Focus on name field
-        document.getElementById('team-name').focus();
+      await this.api.updatePlayer(playerId, { team_id: parseInt(teamId) });
+      this.showSuccessMessage('Speler toegewezen aan team!');
+      if (this.management && typeof this.management.loadPlayers === 'function') {
+        await this.management.loadPlayers();
       }
     } catch (error) {
-      this.api.handleError(error, 'loading team for editing');
-      alert('Fout bij het laden van team gegevens.');
+      console.error('Error assigning player to team:', error);
+      this.showErrorMessage('Fout bij toewijzen speler aan team');
     }
   }
 
-  handleColorChange(e) {
-    const color = e.target.value;
-    const preview = document.getElementById('color-preview');
-    if (preview) {
-      preview.style.backgroundColor = color;
-      preview.textContent = color.toUpperCase();
-    }
-  }
-
-  async loadTeams() {
+  async unassignPlayerFromTeam(playerId) {
     try {
-      const response = await this.api.getAllStandaloneTeams();
-      const teams = response.teams || [];
-      this.displayTeams(teams);
+      await this.api.updatePlayer(playerId, { team_id: null });
+      this.showSuccessMessage('Speler verwijderd uit team!');
+      if (this.management && typeof this.management.loadPlayers === 'function') {
+        await this.management.loadPlayers();
+      }
     } catch (error) {
-      this.api.handleError(error, 'loading teams');
-      this.teamsList.innerHTML = 'Fout bij het laden van teams.';
-    }
-    // populate player manager default team select if present
-    if (this.pmPlayerDefaultTeam) {
-      try {
-        const response = await this.api.getAllStandaloneTeams();
-        const teams = response.teams || [];
-        this.pmPlayerDefaultTeam.innerHTML = '<option value="">-- Standaard team (opt) --</option>';
-        teams.forEach((t) => {
-          const opt = document.createElement('option');
-          opt.value = t.id;
-          opt.textContent = t.name;
-          this.pmPlayerDefaultTeam.appendChild(opt);
-        });
-      } catch (e) {
-        // ignore
-      }
-    }
-  }
-
-  togglePlayerManager() {
-    if (!this.playerManagerDiv) return;
-    if (this.playerManagerDiv.style.display === 'none' || !this.playerManagerDiv.style.display) {
-      this.playerManagerDiv.style.display = 'block';
-      this.loadPlayersForManager();
-    } else {
-      this.playerManagerDiv.style.display = 'none';
-    }
-  }
-
-  async loadPlayersForManager() {
-    if (!this.pmPlayersList) return;
-    this.pmPlayersList.innerHTML = 'Laden spelers…';
-    try {
-      const resp = await this.api.get('/api/v1/players');
-      const players = resp && resp.players ? resp.players : [];
-      // Sort players alphabetically by name
-      players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      if (players.length === 0) {
-        this.pmPlayersList.innerHTML = '<p class="info-message">Nog geen spelers.</p>';
-        return;
-      }
-      this.pmPlayersList.innerHTML = '';
-      players.forEach((p) => {
-        const row = document.createElement('div');
-        row.className = 'player-item';
-        row.innerHTML = `<div class="player-item-name">${this.escapeHtml(p.name)} ${p.position ? '<span class="player-item-position">(' + this.escapeHtml(p.position) + ')</span>' : ''}</div>`;
-        const actions = document.createElement('div');
-        actions.className = 'player-item-actions';
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-team-btn';
-        deleteBtn.textContent = 'Verwijderen';
-        deleteBtn.onclick = async () => {
-          if (!confirm('Weet je zeker dat je deze speler wilt verwijderen?')) return;
-          try {
-            await this.api.delete(`/api/v1/players/${p.id}`);
-            await this.loadPlayersForManager();
-          } catch (err) {
-            this.api.handleError(err, 'deleting player');
-            alert('Fout bij het verwijderen van speler.');
-          }
-        };
-        actions.appendChild(deleteBtn);
-        row.appendChild(actions);
-        this.pmPlayersList.appendChild(row);
-      });
-    } catch (err) {
-      this.api.handleError(err, 'loading players for manager');
-      this.pmPlayersList.innerHTML = '<p class="info-message">Kan spelers niet laden.</p>';
-    }
-  }
-
-  async createPlayerFromManager() {
-    const name = ((this.pmPlayerName && this.pmPlayerName.value) || '').trim();
-    if (!name) {
-      alert('Voer een spelersnaam in.');
-      return;
-    }
-    try {
-      const payload = { name };
-      await this.api.post('/api/v1/players', payload);
-      if (this.pmPlayerName) this.pmPlayerName.value = '';
-      // Reindex positions alphabetically after creating a new player
-      await this.reindexPlayersAlphabetically();
-      await this.loadPlayersForManager();
-    } catch (err) {
-      this.api.handleError(err, 'creating player from manager');
-      alert('Fout bij het aanmaken van speler.');
-    }
-  }
-
-  async reindexPlayersAlphabetically() {
-    try {
-      const resp = await this.api.get('/api/v1/players');
-      const players = resp && resp.players ? resp.players.slice() : [];
-      players.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
-      for (let i = 0; i < players.length; i++) {
-        const p = players[i];
-        try {
-          await this.api.put(`/api/v1/players/${p.id}`, { position: String(i + 1) });
-        } catch (e) {
-          console.warn('Failed to update player position during reindex', p.id, e);
-        }
-      }
-      await this.loadPlayersForManager();
-    } catch (e) {
-      console.warn('Reindexing players failed', e);
-    }
-  }
-
-  escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
-  showSuccessMessage(message) {
-    const existing = document.querySelector('.success-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.className = 'success-toast';
-    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
-    toast.innerHTML = `<span style="font-size: 1.2em;">✓</span> ${this.escapeHtml(message)}`;
-    document.body.appendChild(toast);
-
-    setTimeout(() => toast.remove(), 3000);
-  }
-
-  showErrorMessage(message) {
-    const existing = document.querySelector('.error-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.className = 'error-toast';
-    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
-    toast.innerHTML = `<span style="font-size: 1.2em;">⚠️</span> ${this.escapeHtml(message)}`;
-    document.body.appendChild(toast);
-
-    setTimeout(() => toast.remove(), 5000);
-  }
-
-  displayTeams(teams) {
-    if (teams.length === 0) {
-      this.teamsList.innerHTML = '<p class="info-message" style="text-align: center;">Nog geen teams aangemaakt.</p>';
-      return;
-    }
-
-    const iconMap = {
-      team: '👥',
-      star: '⭐',
-      trophy: '🏆',
-      fire: '🔥',
-      rocket: '🚀',
-      crown: '👑',
-      lightning: '⚡',
-      heart: '❤️',
-    };
-
-    const teamsHtml = teams
-      .map(
-        (team) => `
-      <div class="team-card" data-team-id="${team.id}">
-        <div class="team-card-header">
-          <span class="team-icon">${iconMap[team.icon] || iconMap['team']}</span>
-          <div class="team-color-badge" style="background-color: ${team.color} !important;"></div>
-          <span class="team-name">${team.name}</span>
-        </div>
-        ${team.description ? `<p class="team-description">${team.description}</p>` : ''}
-        <div class="team-actions">
-          <button class="edit-team-btn" onclick="homepage.startScreen.editTeam(${team.id})">
-            ✏️ Bewerken
-          </button>
-          <button class="delete-team-btn" onclick="homepage.startScreen.deleteTeam(${team.id}, '${team.name}')">
-            🗑️ Verwijderen
-          </button>
-          <button class="save-team-btn compact" onclick="homepage.startScreen.toggleUnassignedPlayers(${team.id})">Speler toewijzen</button>
-        </div>
-        <div class="players-section" id="players-for-${team.id}">
-          <div class="players-list" id="players-list-${team.id}">Laden spelers…</div>
-          <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none;">
-            <div class="unassigned-dropdown-header">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
-            <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
-          </div>
-        </div>
-      </div>
-    `
-      )
-      .join('');
-
-    this.teamsList.innerHTML = teamsHtml;
-    // Load assigned players for each team and prepare unassigned lists
-    teams.forEach((t) => {
-      this.loadAssignedPlayersForTeam(t.id);
-    });
-  }
-
-  async loadAssignedPlayersForTeam(teamId) {
-    const listEl = document.getElementById(`players-list-${teamId}`);
-    if (!listEl) return;
-    try {
-      listEl.innerHTML = '<p style="color:#666">Laden…</p>';
-      const resp = await this.api.get('/api/v1/players');
-      const players = resp && resp.players ? resp.players : [];
-      const assigned = players.filter((p) => p.team_id && String(p.team_id) === String(teamId));
-      // Sort assigned players alphabetically by name
-      assigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      if (!assigned || assigned.length === 0) {
-        listEl.innerHTML = '<p class="info-message">Nog geen spelers toegewezen.</p>';
-        return;
-      }
-      listEl.innerHTML = '';
-      assigned.forEach((p) => {
-        const row = document.createElement('div');
-        row.className = 'player-row';
-        row.innerHTML = `<div class="player-left"><strong>${this.escapeHtml(p.name)}</strong></div>`;
-        const actions = document.createElement('div');
-        actions.className = 'player-actions';
-        const unassignBtn = document.createElement('button');
-        unassignBtn.className = 'delete-team-btn';
-        unassignBtn.textContent = 'Verwijderen';
-        unassignBtn.onclick = async () => {
-          if (!confirm('Weet je zeker dat je deze speler van het team wilt halen?')) return;
-          try {
-            await this.api.put(`/api/v1/players/${p.id}`, { team_id: null });
-            await this.loadAssignedPlayersForTeam(teamId);
-            await this.loadPlayersForManager();
-          } catch (err) {
-            this.api.handleError(err, 'unassigning player');
-            alert('Fout bij het verwijderen van speler uit team.');
-          }
-        };
-        actions.appendChild(unassignBtn);
-        row.appendChild(actions);
-        listEl.appendChild(row);
-      });
-    } catch (err) {
-      this.api.handleError(err, 'loading assigned players');
-      listEl.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
-    }
-  }
-
-  toggleUnassignedPlayers(teamId) {
-    const el = document.getElementById(`unassigned-players-${teamId}`);
-    if (!el) return;
-    if (el.style.display === 'none' || el.style.display === '') {
-      el.style.display = 'block';
-      this.loadUnassignedForTeam(teamId);
-    } else {
-      el.style.display = 'none';
-    }
-  }
-
-  async loadUnassignedForTeam(teamId) {
-    const container = document.getElementById(`unassigned-list-${teamId}`);
-    if (!container) return;
-    try {
-      const resp = await this.api.get('/api/v1/players');
-      const players = resp && resp.players ? resp.players : [];
-      // Only show players that are not assigned to any team
-      const unassigned = players.filter((p) => !p.team_id);
-      // Sort unassigned players alphabetically by name
-      unassigned.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      if (!unassigned || unassigned.length === 0) {
-        container.innerHTML = '<p class="info-message">Geen beschikbare spelers om toe te wijzen.</p>';
-        return;
-      }
-      container.innerHTML = '';
-      unassigned.forEach((p) => {
-        const row = document.createElement('div');
-        row.className = 'unassigned-player-item';
-        const left = document.createElement('div');
-        left.className = 'unassigned-player-name';
-        left.textContent = this.escapeHtml(p.name);
-        const btn = document.createElement('button');
-        btn.className = 'save-team-btn compact';
-        btn.textContent = 'Toewijzen';
-        btn.onclick = async () => {
-          await this.assignPlayerToTeam(teamId, p.id);
-        };
-        row.appendChild(left);
-        row.appendChild(btn);
-        container.appendChild(row);
-      });
-    } catch (err) {
-      this.api.handleError(err, 'loading unassigned players');
-      container.innerHTML = '<p class="info-message">Kon spelers niet laden.</p>';
+      console.error('Error unassigning player from team:', error);
+      this.showErrorMessage('Fout bij verwijderen speler uit team');
     }
   }
 
   async assignPlayerToTeam(teamId, playerId) {
+    if (this.management && typeof this.management.assignPlayerToTeam === 'function') {
+      return this.management.assignPlayerToTeam(teamId, playerId);
+    }
+    // Fallback: store locally
     try {
-      await this.api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) });
-      // refresh lists
-      await this.loadAssignedPlayersForTeam(teamId);
-      await this.loadPlayersForManager();
-      const ul = document.getElementById(`unassigned-players-${teamId}`);
-      if (ul) ul.style.display = 'none';
-    } catch (err) {
-      this.api.handleError(err, 'assigning player to team');
-      alert('Fout bij het toewijzen van speler aan team.');
+      const assignments = JSON.parse(localStorage.getItem('playerTeamAssignments') || '{}');
+      assignments[playerId] = teamId;
+      localStorage.setItem('playerTeamAssignments', JSON.stringify(assignments));
+      this.updatePlayerManagerDisplay();
+      this.showSuccessMessage('Speler toegewezen aan team!');
+    } catch (error) {
+      console.error('Error assigning player to team:', error);
+      alert('Fout bij toewijzen speler aan team');
     }
   }
 
-  async createTeam() {
+  assignPlayerToTeamFromSelect(playerId, teamId) {
+    if (!teamId) return;
+    this.assignPlayerToTeam(teamId, playerId);
+  }
+
+  async removePlayerFromTeam(playerId) {
+    try {
+      const assignments = JSON.parse(localStorage.getItem('playerTeamAssignments') || '{}');
+      delete assignments[playerId];
+      localStorage.setItem('playerTeamAssignments', JSON.stringify(assignments));
+
+      this.updatePlayerManagerDisplay();
+      this.showSuccessMessage('Speler verwijderd uit team!');
+    } catch (error) {
+      console.error('Error removing player from team:', error);
+      alert('Fout bij verwijderen speler uit team');
+    }
+  }
+
+  promptEditPlayer(playerId) {
+    if (this.management && typeof this.management.promptEditPlayer === 'function') {
+      return this.management.promptEditPlayer(playerId);
+    }
+  }
+
+  async editPlayer(playerId, newName) {
+    if (this.management && typeof this.management.editPlayer === 'function') return this.management.editPlayer(playerId, newName);
+  }
+
+  populateTeamSelectForPlayers() {
+    if (this.management && typeof this.management.updateTeamSelect === 'function') return this.management.updateTeamSelect();
+  }
+
+  populateExistingTeamSelect() {
+    if (this.management && typeof this.management.updateExistingTeamSelect === 'function') return this.management.updateExistingTeamSelect();
+  }
+
+  addExistingTeam() {
+    if (this.management && typeof this.management.addExistingTeam === 'function') return this.management.addExistingTeam();
+  }
+
+  editTeam(team) {
+    if (this.management && typeof this.management.showTeamForm === 'function') return this.management.showTeamForm(team);
+    // fallback
+    this.showTeamForm(team);
+  }
+
+  async addPlayerToTeam() {
+    if (this.management && typeof this.management.addPlayerToTeam === 'function') return this.management.addPlayerToTeam();
+  }
+
+  async loadBeheerData() {
+    // Delegate to management module
+    if (this.management && typeof this.management.loadBeheerData === 'function') {
+      await this.management.loadBeheerData();
+    }
+  }
+
+  setupBeheerEventListeners() {
+    // Delegate to management module
+    if (this.management && typeof this.management.setupBeheerEventListeners === 'function') {
+      this.management.setupBeheerEventListeners();
+    }
+  }
+
+  showTeamForm(team = null) {
+    // Delegate to management module that handles team form UI
+    if (this.management && typeof this.management.showTeamForm === 'function') {
+      this.management.showTeamForm(team);
+      return;
+    }
+
+    // Fallback: simple DOM handling
+    const container = document.getElementById('team-form-container');
+    if (!container) return;
+    container.classList.remove('hidden');
+    const form = container.querySelector('form');
+    if (!form) return;
+    if (team) {
+      this.editingTeamId = team.id;
+      form['team-name'].value = team.name || '';
+      form['team-color'].value = team.color || '#3B82F6';
+      form['team-icon'].value = team.icon || 'team';
+      form['team-description'].value = team.description || '';
+    } else {
+      this.editingTeamId = null;
+      try { form.reset(); } catch (_) {}
+      try { form['team-name'].focus(); } catch (_) {}
+    }
+  }
+
+  hideTeamForm() {
+    if (this.management && typeof this.management.hideTeamForm === 'function') {
+      this.management.hideTeamForm();
+      return;
+    }
+
+    const container = document.getElementById('team-form-container');
+    if (container) container.classList.add('hidden');
+    this.editingTeamId = null;
+  }
+
+  showActivityForm(activity = null) {
+    // Prefer management implementation
+    if (this.management && typeof this.management.showActivityForm === 'function') {
+      this.management.showActivityForm(activity);
+      return;
+    }
+
+    // Fallback: local DOM handling
+    const container = document.getElementById('activity-form-container');
+    if (!container) return;
+    const form = container.querySelector('form');
+
+    container.classList.remove('hidden');
+
+    if (activity) {
+      this.editingActivityId = activity.id;
+      if (form) {
+        try { form.reset(); } catch (_) {}
+        form['activity-name'].value = activity.name || '';
+        form['activity-sport'].value = activity.sport_type || 'custom';
+        form['activity-game-type'].value = activity.game_type || 'custom';
+        form['activity-scoring'].value = activity.scoring_mode || 'team';
+        form['activity-rounds'].value = activity.total_rounds || 1;
+        form['activity-time'].value = activity.time_limit || '';
+        form['activity-desc'].value = activity.description || '';
+      }
+      if (form) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Bijwerken';
+        try { form['activity-name'].focus(); } catch (_) {}
+      }
+    } else {
+      this.editingActivityId = null;
+      if (form) {
+        try { form.reset(); } catch (_) {}
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Activiteit Opslaan';
+        try { form['activity-name'].focus(); } catch (_) {}
+      }
+    }
+  }
+
+  hideActivityForm() {
+    if (this.management && typeof this.management.hideActivityForm === 'function') {
+      this.management.hideActivityForm();
+      return;
+    }
+    const container = document.getElementById('activity-form-container');
+    if (!container) return;
+    const form = container.querySelector('form');
+    container.classList.add('hidden');
+    this.editingActivityId = null;
+    if (form) {
+      try { form.reset(); } catch (_) {}
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Activiteit Opslaan';
+    }
+  }
+
+  togglePlayerManager() {
+    const manager = document.getElementById('player-manager');
+    if (manager) {
+      manager.style.display = manager.style.display === 'none' ? 'block' : 'none';
+    }
+  }
+
+  async handleTeamSubmit(e) {
+    if (this.management && typeof this.management.handleTeamSubmit === 'function') {
+      return this.management.handleTeamSubmit(e);
+    }
+    // fallback: prevent default and do nothing
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  }
+
+  async handleActivitySubmit(e) {
+    if (this.management && typeof this.management.handleActivitySubmit === 'function') {
+      return this.management.handleActivitySubmit(e);
+    }
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  }
+
+  async loadTeams() {
+    if (this.management && typeof this.management.loadTeams === 'function') return this.management.loadTeams();
+  }
+
+  async loadActivities() {
+    if (this.management && typeof this.management.loadActivities === 'function') return this.management.loadActivities();
+  }
+
+  renderTeams(teams) {
+    if (this.management && typeof this.management.renderTeams === 'function') return this.management.renderTeams(teams);
+  }
+
+  renderActivities(activities) {
+    if (this.management && typeof this.management.renderActivities === 'function') return this.management.renderActivities(activities);
+  }
+
+  async deleteTeam(teamId) {
+    if (this.management && typeof this.management.deleteTeam === 'function') {
+      return this.management.deleteTeam(teamId);
+    }
+    // Fallback
+    if (!confirm('Weet je zeker dat je dit team wilt verwijderen?')) return;
+    try {
+      await this.api.deleteTeam(teamId);
+      this.showSuccessMessage('Team verwijderd!');
+      if (this.management && typeof this.management.loadTeams === 'function') {
+        await this.management.loadTeams();
+      }
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      this.showErrorMessage('Fout bij het verwijderen van het team.');
+    }
+  }
+
+  async editTeam(teamId) {
+    if (this.management && typeof this.management.editTeam === 'function') {
+      return this.management.editTeam(teamId);
+    }
+    // Fallback - find team and show form
+    const team = this.management?.teams?.find(t => t.id === teamId);
+    if (team && this.management && typeof this.management.showTeamForm === 'function') {
+      this.management.showTeamForm(team);
+    }
+  }
+
+  async deleteActivity(activityId) {
+    if (this.management && typeof this.management.deleteActivity === 'function') return this.management.deleteActivity(activityId);
+  }
+
+  getIconEmoji(icon) {
+    const icons = {
+      team: '👥',
+      star: '⭐',
+      fire: '🔥',
+      rocket: '🚀',
+      trophy: '🏆',
+      lightning: '⚡',
+      heart: '❤️',
+      diamond: '💎',
+      crown: '👑',
+      superhero: '🦸'
+    };
+    return icons[icon] || '👥';
+  }
+
+  loadActivitiesFromLocalStorage() {
+    if (this.management && typeof this.management.loadActivitiesFromLocalStorage === 'function') return this.management.loadActivitiesFromLocalStorage();
+    try {
+      const stored = localStorage.getItem('sportscore_activities');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error loading activities from localStorage:', error);
+      return [];
+    }
+  }
+
+  saveActivitiesToLocalStorage(activities) {
+    if (this.management && typeof this.management.saveActivitiesToLocalStorage === 'function') return this.management.saveActivitiesToLocalStorage(activities);
+    try {
+      localStorage.setItem('sportscore_activities', JSON.stringify(activities));
+    } catch (error) {
+      console.error('Error saving activities to localStorage:', error);
+    }
+  }
+
+
+  updatePlayerManagerDisplay() {
+    if (this.management && typeof this.management.updatePlayerManagerDisplay === 'function') {
+      return this.management.updatePlayerManagerDisplay();
+    }
+  }
+
+
+  getAssignedTeamForPlayer(playerId) {
+    // This would need to be implemented based on your data structure
+    // For now, return null - you'll need to track player-team assignments
+    return null;
+  }
+
+
+
+  async removePlayerFromTeam(playerId) {
+    if (this.management && typeof this.management.removePlayerFromTeam === 'function') return this.management.removePlayerFromTeam(playerId);
+  }
+
+  promptEditPlayer(player) {
+    // Accept either player object or id
+    const id = player && typeof player === 'object' ? player.id : player;
+    if (this.management && typeof this.management.promptEditPlayer === 'function') return this.management.promptEditPlayer(id);
+  }
+
+  async editPlayer(playerId, newName) {
+    if (this.management && typeof this.management.editPlayer === 'function') return this.management.editPlayer(playerId, newName);
+  }
+
+  async deletePlayer(playerId) {
+    if (this.management && typeof this.management.deletePlayer === 'function') return this.management.deletePlayer(playerId);
+  }
+
+  promptEditTeam(teamId) {
+    const team = this.teams.find(t => t.id == teamId);
+    if (team) {
+      this.editTeam(team);
+    } else {
+      alert('Team niet gevonden');
+    }
+  }
+
+  async createPlayerGlobal() {
+    if (this.processingPlayer) return;
+    if (!this.newPlayerNameInput) return;
+    const name = this.newPlayerNameInput.value.trim();
+    if (!name) {
+      this.showErrorMessage('Voer een spelersnaam in.');
+      try { this.newPlayerNameInput.focus(); } catch (_) {}
+      return;
+    }
+
+    this.processingPlayer = true;
+    const btn = document.getElementById('add-player-global-btn');
+    if (btn) btn.disabled = true;
+
+    try {
+      if (this.management && typeof this.management.createPlayerGlobal === 'function') {
+        await this.management.createPlayerGlobal(name);
+      } else {
+        await this.api.request('/api/v1/players', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        await this.loadPlayers();
+      }
+      this.showSuccessMessage(`Speler "${name}" toegevoegd!`);
+      this.newPlayerNameInput.value = '';
+    } catch (error) {
+      console.error('Error creating player:', error);
+      if (this.api && typeof this.api.handleError === 'function') this.api.handleError(error, 'creating player');
+      this.showErrorMessage('Fout bij het toevoegen van de speler.');
+    } finally {
+      this.processingPlayer = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async createActivity() {
+    if (!this.newActivityNameInput || !this.activitySportSelect || !this.activityGameTypeSelect) return;
+    const name = this.newActivityNameInput.value.trim();
+    const sport = this.activitySportSelect.value;
+    const gameType = this.activityGameTypeSelect.value;
+    const description = this.activityDescriptionInput ? this.activityDescriptionInput.value.trim() : '';
+
+    if (!name || !sport) {
+      this.showErrorMessage('Voer een naam en sport in.');
+      return;
+    }
+
+    const activityData = {
+      name,
+      sport_type: sport,
+      game_type: gameType,
+      scoring_mode: 'team',
+      total_rounds: 1,
+      description
+    };
+
+    if (this.management && typeof this.management.createActivity === 'function') {
+      return this.management.createActivity(activityData);
+    }
+
+    try {
+      await this.api.createActivity(activityData);
+      this.showSuccessMessage(`Activiteit "${name}" toegevoegd!`);
+      this.newActivityNameInput.value = '';
+      if (this.activityDescriptionInput) this.activityDescriptionInput.value = '';
+      await this.loadActivities();
+    } catch (error) {
+      console.error('Error creating activity:', error);
+      if (this.api && typeof this.api.handleError === 'function') this.api.handleError(error, 'creating activity');
+      this.showErrorMessage('Fout bij het toevoegen van activiteit.');
+    }
+  }
+
+  // Submit team form (supports create and update) - used by 'Nieuw Team' form on homepage
+  async submitTeamFromForm() {
+    // Prefer management implementation
+    if (this.management && typeof this.management.submitTeamFromForm === 'function') {
+      return this.management.submitTeamFromForm();
+    }
+
+    // Fallback: existing behavior
+    // Prevent duplicate submissions
+    if (this.processingTeam) return;
+    this.processingTeam = true;
+    const submitBtn = document.getElementById('team-submit-btn');
+    if (submitBtn) submitBtn.disabled = true;
+
+    const form = document.getElementById('team-form');
+    if (!form) {
+      this.processingTeam = false;
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+
+    const formData = new FormData(form);
     const teamData = {
-      name: document.getElementById('team-name').value,
-      color: document.getElementById('team-color').value,
-      icon: document.getElementById('team-icon').value,
-      description: document.getElementById('team-description').value || null,
+      name: formData.get('team-name'),
+      color: formData.get('team-color'),
+      icon: formData.get('team-icon'),
+      description: formData.get('team-description') || null
     };
 
     try {
       let response;
       if (this.editingTeamId) {
-        // Update existing team
         response = await this.api.updateStandaloneTeam(this.editingTeamId, teamData);
         this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
       } else {
-        // Create new team
         response = await this.api.createStandaloneTeam(teamData);
-        this.showSuccessMessage(`Team "${teamData.name}" succesvol aangemaakt!`);
+        this.showSuccessMessage(`Team "${teamData.name}" toegevoegd!`);
       }
 
       if (response) {
-        this.hideTeamForm();
-        this.loadTeams();
+        if (typeof this.hideTeamFormProper === 'function') this.hideTeamFormProper();
+        try { form.reset(); } catch (_){ }
+        this.editingTeamId = null;
+        await this.loadTeams();
       }
     } catch (error) {
-      this.api.handleError(error, 'creating/updating team');
-      if (error.message && error.message.includes('already exists')) {
-        alert('Er bestaat al een team met deze naam. Kies een andere naam.');
-      } else {
-        alert('Fout bij het aanmaken/bijwerken van het team. Probeer opnieuw.');
-      }
-    }
-  }
-
-  async deleteTeam(teamId, teamName) {
-    if (!confirm(`Weet je zeker dat je team "${teamName}" wilt verwijderen? Dit verwijdert het team uit alle sessies.`)) {
-      return;
-    }
-
-    try {
-      await this.api.deleteStandaloneTeam(teamId);
-      this.loadTeams();
-      alert(`Team "${teamName}" succesvol verwijderd!`);
-    } catch (error) {
-      this.api.handleError(error, 'deleting team');
-      alert('Fout bij het verwijderen van het team. Probeer opnieuw.');
+      const operation = this.editingTeamId ? 'updating team' : 'creating team';
+      const errorMessage = this.api && typeof this.api.getErrorMessage === 'function' ? this.api.getErrorMessage(error, operation, { name: teamData.name }) : 'Fout bij het opslaan van team.';
+      this.showErrorMessage(errorMessage);
+      if (this.api && typeof this.api.handleError === 'function') this.api.handleError(error, operation);
+    } finally {
+      this.processingTeam = false;
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 

@@ -63,7 +63,7 @@ END;
 -- ===========================================
 CREATE TABLE IF NOT EXISTS activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER NOT NULL,
+    session_id INTEGER NULL,
     name VARCHAR(200) NOT NULL,
     sport_type VARCHAR(50) DEFAULT 'custom',
     game_type TEXT CHECK(game_type IN ('custom', 'quiz', 'sport_challenge', 'elimination', 'team_vs_time', 'golf')) DEFAULT 'custom',

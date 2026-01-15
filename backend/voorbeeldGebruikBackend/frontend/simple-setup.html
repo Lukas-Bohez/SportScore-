@@ -312,6 +312,19 @@
             flex: 1;
         }
 
+        /* Color-group: keep color preview inline with inputs and labels */
+        .team-form .form-group.color-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .team-form .form-group.color-group label {
+            margin-bottom: 0;
+            min-width: 80px;
+            /* keep label readable */
+        }
+
         .team-form .form-group label {
             display: block;
             margin-bottom: 5px;
@@ -412,14 +425,31 @@
             display: flex;
             gap: 10px;
             margin-bottom: 12px;
+            flex-wrap: wrap;
         }
 
         .team-actions button {
             flex: 1;
+            min-width: 100px;
+            white-space: nowrap;
         }
 
-        .players-section {
-            border-top: 1px solid var(--border-color, #e1e5e9);
+        .btn-sm {
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            min-height: 32px !important;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
+            color: white !important;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2) !important;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3) !important;
             padding-top: 12px;
         }
 
@@ -510,16 +540,26 @@
         }
 
         .color-preview {
-            margin-top: 8px;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 10px 20px;
+            min-width: 180px;
+            /* increased width for better visibility */
+            border-radius: 6px;
             color: white;
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 13px;
+            font-weight: 700;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
             border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.2s ease;
+            transition: all 0.12s ease;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            /* avoid wrapping */
+            margin-top: 0;
+            vertical-align: middle;
+            background-color: #3B82F6;
+            text-align: center;
         }
 
         .color-preview:hover {
@@ -539,13 +579,11 @@
 <body>
     <div class="container">
         <header class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <a href="index.html" class="control-btn" style="text-decoration: none;">← Terug naar Home</a>
-                <div>
-                    <h1>SportScore - Eenvoudige Setup</h1>
-                    <p>Stap-voor-stap sessie aanmaken</p>
-                </div>
-                <button id="qr-toggle" onclick="toggleQR()" class="control-btn">📱 QR</button>
+            <a href="index.html" class="control-btn"
+                style="text-decoration: none; position: absolute; left: 10px; top: 10px;">← Terug naar Home</a>
+            <div style="text-align: center;">
+                <h1>SportScore - Eenvoudige Setup</h1>
+                <p>Stap-voor-stap sessie aanmaken</p>
             </div>
         </header>
 
@@ -555,7 +593,8 @@
 
                 <div class="form-group">
                     <label for="session-name">Sessie Naam:</label>
-                    <input type="text" id="session-name" placeholder="bijv. Team Building Dag 2025" required>
+                    <input type="text" id="session-name" name="session-name" placeholder="bijv. Team Building Dag 2025"
+                        required>
                 </div>
 
                 <div id="step-1-error" class="error-message"></div>
@@ -573,20 +612,31 @@
                             Activiteit</button>
                     </div>
 
+                    <!-- Existing activities selection -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="existing-activity-select">Of selecteer een bestaande activiteit:</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="existing-activity-select" style="flex: 3;">
+                                <option value="">-- Selecteer een bestaande activiteit --</option>
+                            </select>
+                            <button id="add-existing-activity-btn" class="add-team-btn btn-sm"
+                                style="padding: 8px 16px; flex: 1;">Toevoegen</button>
+                        </div>
+                    </div>
+
                     <div id="activity-form-container" class="team-form-container hidden">
                         <form id="activity-form" class="team-form">
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="activity-name">Activiteit Naam:</label>
-                                    <input type="text" id="activity-name" placeholder="bijv. Basketbal 3-Punters"
-                                        required>
+                                    <input type="text" id="activity-name" name="activity-name"
+                                        placeholder="bijv. Basketbal 3-Punters" required>
                                 </div>
                                 <div class="form-group">
                                     <label for="activity-sport">Stijl (sport type):</label>
-                                    <select id="activity-sport">
-                                        <option value="custom">🎯 Aangepast</option>
+                                    <select id="activity-sport" name="activity-sport">
                                         <option value="quiz">🧠 Quiz</option>
-                                        <option value="voetbal">⚽ Voetbal</option>
+                                        <option value="voetbal" selected>⚽ Voetbal</option>
                                         <option value="basketbal">🏀 Basketbal</option>
                                         <option value="volleybal">🏐 Volleybal</option>
                                         <option value="hockey">🏑 Hockey</option>
@@ -603,7 +653,7 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="activity-scoring">Scoring Mode:</label>
-                                    <select id="activity-scoring">
+                                    <select id="activity-scoring" name="activity-scoring">
                                         <option value="team">👥 Team Scores</option>
                                         <option value="team_with_players">👥👤 Team met Spelers</option>
                                         <option value="player">👤 Speler Scores</option>
@@ -611,10 +661,9 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="activity-game-type">Game Type (modus):</label>
-                                    <select id="activity-game-type">
-                                        <option value="custom">🎯 Aangepast</option>
+                                    <select id="activity-game-type" name="activity-game-type">
                                         <option value="quiz">🧠 Quiz Modus</option>
-                                        <option value="sport_challenge">🏃 Sport Challenge</option>
+                                        <option value="sport_challenge" selected>🏃 Sport Challenge</option>
                                         <option value="elimination">❌ Eliminatie Modus</option>
                                         <option value="team_vs_time">⏱️ Team vs Tijd</option>
                                         <option value="golf">⛳ Golf Scoring</option>
@@ -624,16 +673,19 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="activity-rounds">Aantal Rondes:</label>
-                                    <input type="number" id="activity-rounds" value="1" min="1" max="10">
+                                    <input type="number" id="activity-rounds" name="activity-rounds" value="1" min="1"
+                                        max="10">
                                 </div>
                                 <div class="form-group">
                                     <label for="activity-time">Tijdslimiet (min):</label>
-                                    <input type="number" id="activity-time" placeholder="Optioneel" min="1">
+                                    <input type="number" id="activity-time" name="activity-time" placeholder="Optioneel"
+                                        min="1">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label for="activity-desc">Beschrijving (optioneel):</label>
-                                <input type="text" id="activity-desc" placeholder="bijv. Snelle 3-punters ronde">
+                                <input type="text" id="activity-desc" name="activity-desc"
+                                    placeholder="bijv. Snelle 3-punters ronde">
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="save-team-btn">Activiteit Opslaan</button>
@@ -665,11 +717,11 @@
                     <div class="form-group" style="margin-bottom: 20px;">
                         <label for="existing-team-select">Of selecteer een bestaand team:</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <select id="existing-team-select" style="flex: 1;">
+                            <select id="existing-team-select" style="flex: 3;">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
                             <button id="add-existing-team-btn" class="add-team-btn btn-sm"
-                                style="padding: 8px 16px; flex-shrink: 0;">Toevoegen</button>
+                                style="padding: 8px 16px; flex: 1;">Toevoegen</button>
                         </div>
                     </div>
 
@@ -678,11 +730,12 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="team-name">Team Naam:</label>
-                                    <input type="text" id="team-name" placeholder="bijv. Team Blauw" required="">
+                                    <input type="text" id="team-name" name="team-name" placeholder="bijv. Team Blauw"
+                                        required="">
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group color-group">
                                     <label for="team-color">Kleur:</label>
-                                    <input type="color" id="team-color" value="#3B82F6"
+                                    <input type="color" id="team-color" name="team-color" value="#3B82F6"
                                         style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
                                     <div id="color-preview" class="color-preview">#3B82F6</div>
                                 </div>
@@ -691,7 +744,7 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="team-icon">Icoon:</label>
-                                    <select id="team-icon">
+                                    <select id="team-icon" name="team-icon">
                                         <option value="team">👥 Team</option>
                                         <option value="star">⭐ Ster</option>
                                         <option value="trophy">🏆 Trofee</option>
@@ -704,7 +757,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="team-description">Beschrijving (optioneel):</label>
-                                    <input type="text" id="team-description" placeholder="bijv. De beste spelers">
+                                    <input type="text" id="team-description" name="team-description"
+                                        placeholder="bijv. De beste spelers">
                                 </div>
                             </div>
 
@@ -736,11 +790,11 @@
                     <div id="player-form-section">
                         <div class="form-group" id="team-select-group">
                             <label for="team-for-player">Team:</label>
-                            <select id="team-for-player"></select>
+                            <select id="team-for-player" name="team-for-player"></select>
                         </div>
                         <div class="form-group">
                             <label for="player-name">Speler Naam:</label>
-                            <input type="text" id="player-name" placeholder="bijv. Jan">
+                            <input type="text" id="player-name" name="player-name" placeholder="bijv. Jan">
                             <button id="add-player" class="add-team-btn" style="flex-shrink: 0;">Speler
                                 Toevoegen</button>
                         </div>
@@ -784,18 +838,8 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/shared-utils.js"></script>
     <script src="js/simple-setup.js"></script>
-    <script>
-        // Function to toggle QR visibility
-        function toggleQR() {
-            if (api && api.socket) {
-                api.toggleQR();
-            }
-        }
-    </script>
 </body>
 
 </html>
-</content>
-<parameter name="filePath">c:\Users\lukas\OneDrive - Hogeschool
-    West-Vlaanderen\Documents\security\SportScore-\backend\voorbeeldGebruikBackend\frontend\simple-setup.html

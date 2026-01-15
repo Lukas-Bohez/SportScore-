@@ -132,6 +132,125 @@
             }
         }
 
+        .score-input-section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .form-group select,
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            font-size: 14px;
+        }
+
+        .points-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .points-controls button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .points-controls button:hover {
+            background: var(--theme-secondary);
+        }
+
+        .points-controls input {
+            flex: 1;
+            text-align: center;
+        }
+
+        .activity-selection-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--light-color);
+            border-radius: 8px;
+        }
+
+        .activity-selection-header h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-color);
+        }
+
+        .selected-activity {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .no-selection {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .station-card.selected {
+            border: 3px solid var(--primary-color);
+            background: rgba(0, 123, 255, 0.1);
+        }
+
+        .station-card.active {
+            border: 3px solid var(--success-color);
+            background: rgba(40, 167, 69, 0.1);
+        }
+
+        .activity-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .activity-actions .btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        .btn.select-activity {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+
+        .btn.set-active {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+        }
+
+        .btn.active-btn {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+
         .participant-info {
             background: var(--card-bg);
             padding: 15px;
@@ -145,12 +264,9 @@
 <body>
     <div class="container">
         <a href="index.html" class="control-btn"
-            style="text-decoration: none; margin-bottom: 10px; display: inline-block;" id="back-btn">← Terug</a>
-        <a href="index.html" class="control-btn"
             style="text-decoration: none; margin-bottom: 10px; display: inline-block;">← Terug naar Home</a>
         <header class="header">
             <h1>SportScore - Score Invoer</h1>
-            <button id="qr-toggle" onclick="toggleQR()" class="control-btn" style="float: right;">📱 QR</button>
             <div class="session-info">
                 <span id="session-name">Sessie laden...</span>
                 <span id="round-info">Ronde 1/1</span>
@@ -160,17 +276,70 @@
 
         <main class="main-content">
             <div class="leaderboard-section">
-                <h2>Scorebord</h2>
+                <h2 id="leaderboard-title">Scorebord</h2>
                 <div class="leaderboard" id="leaderboard">
                     <!-- Leaderboard will be populated by JavaScript -->
                 </div>
             </div>
 
             <div class="score-input-section">
-                <h2>Stations - Score Ingeven</h2>
-                <div class="participant-info">
-                    <strong>Deelnemer:</strong> <span id="participant-name">Laden...</span>
+                <h2>Score Ingeven</h2>
+
+                <!-- Team/Player Selection -->
+                <div class="form-group">
+                    <label for="team-select">Team:</label>
+                    <select id="team-select" required>
+                        <option value="">Kies een team...</option>
+                    </select>
                 </div>
+
+                <div class="form-group" id="player-select-group" style="display: none;">
+                    <label for="player-select">Speler:</label>
+                    <select id="player-select">
+                        <option value="">Alle spelers</option>
+                    </select>
+                </div>
+
+                <!-- Points Input -->
+                <div class="form-group">
+                    <label for="points-input">Punten:</label>
+                    <div class="points-controls">
+                        <button id="subtract-btn" type="button">-</button>
+                        <input type="number" id="points-input" value="1" min="-100" max="100" required>
+                        <button id="add-btn" type="button">+</button>
+                    </div>
+                </div>
+
+                <!-- Reason Input -->
+                <div class="form-group">
+                    <label for="reason-input">Reden:</label>
+                    <input type="text" id="reason-input" placeholder="Bijv. Doelpunt, Bonus, etc." required>
+                </div>
+
+                <!-- Submit Button -->
+                <button id="submit-score-btn" class="control-btn" type="button">Score Opslaan</button>
+
+                <!-- Sport Quick Buttons -->
+                <div class="quick-scores-section">
+                    <h3>Snelle Scores</h3>
+                    <div id="sport-quick-buttons" class="sport-quick-buttons">
+                        <!-- Sport-specific quick buttons will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Custom Quick Actions -->
+                <div class="custom-quick-actions-section">
+                    <h3>Aangepaste Snelle Acties</h3>
+                    <div class="custom-quick-actions-form">
+                        <input type="text" id="custom-reason" placeholder="Reden (bijv. Bonus)">
+                        <input type="number" id="custom-points" placeholder="Punten" min="-100" max="100">
+                        <button id="add-custom-action" class="control-btn">Toevoegen</button>
+                    </div>
+                    <div id="custom-quick-actions" class="custom-quick-actions">
+                        <!-- Custom quick actions will be loaded here -->
+                    </div>
+                </div>
+
                 <div id="activities-container" class="activities-container">
                     <!-- Activities will be loaded here -->
                 </div>
@@ -205,14 +374,6 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/simple-scoreinput.js"></script>
-    <script>
-        // Function to toggle QR visibility
-        function toggleQR() {
-            if (api && api.socket) {
-                api.toggleQR();
-            }
-        }
-    </script>
 </body>
 
 </html>
