@@ -179,6 +179,12 @@ async def qr_state(sid, data=None):
     print(f"QR state update: {data}")
     await sio.emit('qr-state', data)
 
+@sio.on('set_active_activity')
+async def set_active_activity(sid, data=None):
+    print(f"Admin set active activity: {data}")
+    # Broadcast to all connected clients (including BigScreen)
+    await sio.emit('set_active_activity', data)
+
 # ----------------------------------------------------
 # API Routes
 # ----------------------------------------------------
@@ -231,7 +237,7 @@ async def get_teams(sport_id: Optional[int] = Query(None)):
 @app.post(f"{ENDPOINT}/teams", response_model=TeamResponse)
 async def create_team(team: TeamCreate):
     try:
-        team_id = TeamRepository.create_team(team.name, team.sport_id)
+        team_id = TeamRepository.create_team(team.name, team.color, team.icon, team.description)
         if not team_id:
             raise HTTPException(status_code=400, detail="Failed to create team")
         created_team = TeamRepository.get_team_by_id(team_id)
@@ -252,7 +258,8 @@ async def get_team(team_id: int):
 
 @app.put(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
 async def update_team(team_id: int, team_update: TeamUpdate):
-    success = TeamRepository.update_team(team_id, team_update.name, team_update.sport_id)
+    # Pass the expected fields (name, color, icon, description) to the repository
+    success = TeamRepository.update_team(team_id, team_update.name, team_update.color, team_update.icon, team_update.description)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update team")
     updated_team = TeamRepository.get_team_by_id(team_id)
@@ -264,6 +271,26 @@ async def delete_team(team_id: int):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete team")
     return {"message": "Team deleted successfully"}
+
+@app.put(f"{ENDPOINT}/teams/{{team_id}}/players/{{player_id}}", response_model=PlayerResponse)
+async def assign_player_to_team(team_id: int, player_id: int):
+    # Check if team exists
+    team = TeamRepository.get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if player exists
+    player = PlayerRepository.get_player_by_id(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    # Update player's team_id
+    success = PlayerRepository.update_player(player_id, None, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to assign player to team")
+    
+    updated_player = PlayerRepository.get_player_by_id(player_id)
+    return PlayerResponse(**updated_player)
 
 # Players endpoints
 @app.get(f"{ENDPOINT}/players", response_model=PlayerListResponse)
@@ -304,6 +331,43 @@ async def delete_player(player_id: int):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete player")
     return {"message": "Player deleted successfully"}
+
+
+# Teams endpoints
+@app.get(f"{ENDPOINT}/teams", response_model=TeamListResponse)
+async def get_teams():
+    teams = TeamRepository.get_all_teams()
+    return {"teams": [TeamResponse(**team) for team in teams]}
+
+@app.post(f"{ENDPOINT}/teams", response_model=TeamResponse)
+async def create_team(team: TeamCreate):
+    team_id = TeamRepository.create_team(team.name, team.color, team.icon, team.description)
+    if not team_id:
+        raise HTTPException(status_code=400, detail="Failed to create team")
+    created_team = TeamRepository.get_team_by_id(team_id)
+    return TeamResponse(**created_team)
+
+@app.get(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
+async def get_team(team_id: int):
+    team = TeamRepository.get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return TeamResponse(**team)
+
+@app.put(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
+async def update_team(team_id: int, team_update: TeamUpdate):
+    success = TeamRepository.update_team(team_id, team_update.name, team_update.color, team_update.icon, team_update.description)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update team")
+    updated_team = TeamRepository.get_team_by_id(team_id)
+    return TeamResponse(**updated_team)
+
+@app.delete(f"{ENDPOINT}/teams/{{team_id}}")
+async def delete_team(team_id: int):
+    success = TeamRepository.delete_team(team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete team")
+    return {"message": "Team deleted successfully"}
 
 
 # Session player assignments endpoints
@@ -810,6 +874,38 @@ async def delete_session_team(session_id: int, team_id: int):
 
 # Activities Endpoints
 @app.get(
+    f"{ENDPOINT}/activities",
+    response_model=ActivityListResponse,
+    tags=["Activities"],
+    summary="List global activities"
+)
+async def get_global_activities():
+    activities = ActivityRepository.get_activities_by_session(None)
+    return ActivityListResponse(activities=[ActivityResponse(**a) for a in activities])
+
+@app.post(
+    f"{ENDPOINT}/activities",
+    response_model=ActivityResponse,
+    tags=["Activities"],
+    summary="Create global activity"
+)
+async def create_global_activity(activity: ActivityCreate):
+    if activity.session_id is not None:
+        raise HTTPException(status_code=400, detail="Use session-specific endpoint for session activities")
+    activity_id = ActivityRepository.create_activity(
+        session_id=None,
+        name=activity.name,
+        sport_type=activity.sport_type,
+        game_type=activity.game_type,
+        scoring_mode=activity.scoring_mode,
+        total_rounds=activity.total_rounds,
+        time_limit=activity.time_limit,
+        description=activity.description
+    )
+    created = ActivityRepository.get_activity_by_id(activity_id)
+    return ActivityResponse(**created)
+
+@app.get(
     f"{ENDPOINT}/sessions/{{session_id}}/activities",
     response_model=ActivityListResponse,
     tags=["Activities"],
@@ -955,7 +1051,12 @@ async def create_activity_score(activity_id: int, score: ActivityScoreCreate):
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/leaderboard", tags=["Activities"], summary="Get activity leaderboard")
 async def get_activity_leaderboard(activity_id: int):
     leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
-    return {"leaderboard": leaderboard}
+    # Get activity to find session_id
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    session = None
+    if activity and activity.get('session_id'):
+        session = SessionRepository.get_session_by_id(activity['session_id'])
+    return {"leaderboard": leaderboard, "session": session}
 
 # Session Scores Endpoints
 @app.get(

@@ -17,14 +17,12 @@
                 <span id="session-name">Sessie laden...</span>
                 <span id="session-status">Status: Setup</span>
             </div>
-            <button id="qr-toggle" onclick="toggleQR()"
-                style="background: none; border: none; font-size: 1.5em; cursor: pointer; margin-left: 20px;">📱</button>
         </header>
 
         <main class="main-content">
             <div class="left-column">
                 <div class="teams-section">
-                    <h2>Teams Beheren</h2>
+                    <h2>Beheer</h2>
 
                     <!-- Bestaande teams selecteren -->
                     <div class="existing-teams-section">
@@ -88,6 +86,35 @@
 
                     <div id="players-list-global">
                         <p>Laden van spelers…</p>
+                    </div>
+                </div>
+
+                <!-- Activities Manager -->
+                <div class="activities-section">
+                    <h2>Activiteiten Beheren</h2>
+                    <div class="activity-create">
+                        <input class="input" type="text" id="new-activity-name" placeholder="Nieuwe activiteit naam"
+                            maxlength="100">
+                        <select id="activity-sport">
+                            <option value="">Kies sport/stijl</option>
+                            <option value="quiz">Quiz</option>
+                            <option value="voetbal">Voetbal</option>
+                            <option value="basketbal">Basketbal</option>
+                            <option value="volleybal">Volleybal</option>
+                            <option value="hockey">Hockey</option>
+                            <option value="tennis">Tennis</option>
+                            <option value="atletiek">Atletiek</option>
+                            <option value="zwemmen">Zwemmen</option>
+                            <option value="fietsen">Wielrennen</option>
+                            <option value="hardlopen">Hardlopen</option>
+                            <option value="esports">E-Sports</option>
+                            <option value="boardgame">Bordspel</option>
+                        </select>
+                        <button id="add-activity-btn" class="save-team-btn">Activiteit Toevoegen</button>
+                    </div>
+
+                    <div id="activities-list">
+                        <p>Laden van activiteiten…</p>
                     </div>
                 </div>
             </div>
@@ -200,14 +227,6 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/teamsetup.js"></script>
-    <script>
-        // Function to toggle QR visibility
-        function toggleQR() {
-            if (api && api.socket) {
-                api.toggleQR();
-            }
-        }
-    </script>
 </body>
 
 </html>

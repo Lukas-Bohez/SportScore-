@@ -8,10 +8,12 @@ class SimpleSetup {
     this.players = [];
     this.allPlayers = []; // All players from API
     this.apiTeams = []; // Teams from API
+    this.apiActivities = []; // Activities from API
     this.assignedMap = new Map(); // Track player assignments
     this.editingTeamIndex = null;
     this.playersLoaded = false;
     this.api = window.api || new ScoreboardAPI();
+    this.sharedUtils = new SharedUtils(this.api);
     this.loadTemplateData();
     this.init();
     window.simpleSetup = this;
@@ -77,7 +79,7 @@ class SimpleSetup {
           this.showStep();
         }
         this.setupEventListeners();
-        this.loadTeamsFromAPI();
+        this.loadTeamsFromAPI().then(() => this.loadAllPlayers()).then(() => this.loadActivitiesFromAPI());
       });
     } else {
       this.bindElements();
@@ -88,7 +90,7 @@ class SimpleSetup {
         this.showStep();
       }
       this.setupEventListeners();
-      this.loadTeamsFromAPI().then(() => this.loadAllPlayers());
+      this.loadTeamsFromAPI().then(() => this.loadAllPlayers()).then(() => this.loadActivitiesFromAPI());
     }
   }
 
@@ -116,6 +118,8 @@ class SimpleSetup {
     this.activityDescInput = document.getElementById('activity-desc');
     this.cancelActivityBtn = document.getElementById('cancel-activity-btn');
     this.activitiesList = document.getElementById('activities-list');
+    this.existingActivitySelect = document.getElementById('existing-activity-select');
+    this.addExistingActivityBtn = document.getElementById('add-existing-activity-btn');
 
     // Team management elements
     this.addTeamBtn = document.getElementById('add-team-btn');
@@ -203,22 +207,21 @@ class SimpleSetup {
       this.cancelTeamBtn.addEventListener('click', this.handleCancelTeam.bind(this));
     }
     if (this.teamColorInput) {
-      this.teamColorInput.addEventListener('input', this.handleColorChange.bind(this));
-    }
-
-    // Color preview click to open color picker
-    const colorPreview = document.getElementById('color-preview');
-    if (colorPreview) {
-      colorPreview.addEventListener('click', () => {
-        if (this.teamColorInput) {
-          this.teamColorInput.click();
-        }
-      });
+      // Use shared util for consistent color preview behaviour
+      const preview = document.getElementById('color-preview');
+      if (preview) {
+        this._colorPreviewCtrl = this.sharedUtils.attachColorPreview(this.teamColorInput, preview);
+      }
     }
 
     // Existing teams selection
     if (this.addExistingTeamBtn) {
       this.addExistingTeamBtn.addEventListener('click', this.handleAddExistingTeam.bind(this));
+    }
+
+    // Existing activities selection
+    if (this.addExistingActivityBtn) {
+      this.addExistingActivityBtn.addEventListener('click', this.handleAddExistingActivity.bind(this));
     }
 
     // Add player
@@ -287,14 +290,12 @@ class SimpleSetup {
     this.addExistingTeam();
   }
 
-  handleColorChange(e) {
-    const color = e.target.value;
-    const preview = document.getElementById('color-preview');
-    if (preview) {
-      preview.style.backgroundColor = color;
-      preview.textContent = color.toUpperCase();
-    }
+  handleAddExistingActivity(e) {
+    e.preventDefault();
+    this.addExistingActivity();
   }
+
+
 
   handleScoringModeChange(e) {
     // Store the selected scoring mode in session data
@@ -334,6 +335,7 @@ class SimpleSetup {
       this.updateActivitiesList();
     }
     if (this.currentStep === 3) {
+      this.playersSection.style.display = 'none'; // Hide players section in step 3
       this.updateTeamsList(); // Refresh teams list to show/hide player management based on scoring mode
     }
     if (this.currentStep === 4) {
@@ -345,8 +347,11 @@ class SimpleSetup {
       } else {
         this.updatePlayersList();
       }
+      // Ensure team select is populated
+      this.updateTeamSelect();
     }
     if (this.currentStep === 5) {
+      this.playersSection.style.display = 'none'; // Hide players section in step 5
       this.populateReview();
     }
   }
@@ -465,7 +470,7 @@ class SimpleSetup {
     this.editingActivityIndex = null;
   }
 
-  addActivity() {
+  async addActivity() {
     const name = this.activityNameInput.value.trim();
     const sport = this.activitySportSelect.value;
     const scoring = this.activityScoringSelect.value;
@@ -486,13 +491,70 @@ class SimpleSetup {
       time_limit: time,
       description: desc || null,
     };
-    if (this.editingActivityIndex != null) {
-      this.activities[this.editingActivityIndex] = act;
-    } else {
-      this.activities.push(act);
+
+    try {
+      let apiResult;
+      if (this.editingActivityIndex != null) {
+        // Update existing activity
+        const existingActivity = this.activities[this.editingActivityIndex];
+        if (existingActivity.id) {
+          // Update via API if it has an id
+          apiResult = await this.api.updateActivity(existingActivity.id, act);
+        } else {
+          // Create new activity if it doesn't have an id
+          apiResult = await this.api.createActivity(act);
+        }
+      } else {
+        // Create new activity
+        apiResult = await this.api.createActivity(act);
+      }
+
+      const activityData = {
+        id: apiResult.id,
+        name,
+        sport_type: sport,
+        scoring_mode: scoring,
+        game_type: gameType,
+        total_rounds: rounds,
+        time_limit: time,
+        description: desc || null,
+      };
+
+      if (this.editingActivityIndex != null) {
+        // Update existing activity
+        this.activities[this.editingActivityIndex] = activityData;
+      } else {
+        // Add new activity
+        this.activities.push(activityData);
+      }
+    } catch (error) {
+      const errorMessage = this.api.getErrorMessage(error, 'creating activity', { name: act.name });
+      alert(errorMessage);
+      console.error('Error saving activity:', error);
+      // Continue with local storage
+      const activityData = {
+        id: Date.now(), // Temporary ID
+        name,
+        sport_type: sport,
+        scoring_mode: scoring,
+        game_type: gameType,
+        total_rounds: rounds,
+        time_limit: time,
+        description: desc || null,
+      };
+
+      if (this.editingActivityIndex != null) {
+        this.activities[this.editingActivityIndex] = activityData;
+      } else {
+        this.activities.push(activityData);
+      }
+      // Add to apiActivities for visibility
+      this.apiActivities.push(activityData);
+      this.saveActivitiesToLocalStorage();
     }
     this.hideActivityForm();
     this.updateActivitiesList();
+    this.updateExistingActivitiesSelect();
   }
 
   editActivity(index) {
@@ -500,9 +562,19 @@ class SimpleSetup {
     if (act) this.showActivityForm(act);
   }
 
-  deleteActivity(index) {
-    if (!confirm(`Activiteit "${this.activities[index].name}" verwijderen?`)) return;
+  async deleteActivity(index) {
+    const activity = this.activities[index];
+    if (!confirm(`Activiteit "${activity.name}" verwijderen?`)) return;
+
+    try {
+      await this.api.deleteActivity(activity.id);
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      // Continue with local removal
+    }
     this.activities.splice(index, 1);
+    // Update localStorage after deletion
+    this.saveActivitiesToLocalStorage();
     this.updateActivitiesList();
   }
 
@@ -521,11 +593,11 @@ class SimpleSetup {
               <span class="team-icon">🎯</span>
               <div class="team-name-wrap">
                 <span class="team-name">${this.escapeHtml(act.name)}</span>
-                <span class="team-color-hex">${this.escapeHtml(act.sport_type)} • ${this.escapeHtml(act.scoring_mode)} • ${this.escapeHtml(act.game_type)}</span>
+                <span class="team-color-hex">${this.escapeHtml(act.sport_type || act.sport || '')} • ${this.escapeHtml(act.scoring_mode)} • ${this.escapeHtml(act.game_type || '')}</span>
               </div>
             </div>
           </div>
-          <p class="team-description">${this.escapeHtml(act.description || '')} Rondes: ${act.total_rounds}${act.time_limit ? ' • Tijd: ' + act.time_limit + 'min' : ''}</p>
+          <p class="team-description">${this.escapeHtml(act.description || '')} Rondes: ${act.total_rounds || act.rounds || 1}${act.time_limit ? ' • Tijd: ' + act.time_limit + 'min' : ''}</p>
           <div class="team-actions">
             <button class="delete-team-btn" onclick="simpleSetup.deleteActivity(${index})">Verwijderen</button>
             <button class="save-team-btn compact" onclick="simpleSetup.editActivity(${index})">Bewerken</button>
@@ -543,7 +615,12 @@ class SimpleSetup {
       this.teamColorInput.value = team.color || '#3B82F6';
       this.teamIconSelect.value = team.icon || 'team';
       this.teamDescriptionInput.value = team.description || '';
-      this.editingTeamIndex = this.teams.indexOf(team);
+      // Support editing when the passed team object is not the same reference - match by id if needed
+      let idx = this.teams.indexOf(team);
+      if (idx === -1 && team && team.id != null) {
+        idx = this.teams.findIndex(t => String(t.id) === String(team.id));
+      }
+      this.editingTeamIndex = idx !== -1 ? idx : null;
     } else {
       // Add mode
       this.teamNameInput.value = '';
@@ -552,8 +629,13 @@ class SimpleSetup {
       this.teamDescriptionInput.value = '';
       this.editingTeamIndex = null;
     }
-    // Update color preview
-    this.handleColorChange({ target: { value: this.teamColorInput.value } });
+    // Update color preview via shared utility controller if available
+    if (this._colorPreviewCtrl) {
+      this._colorPreviewCtrl.setColor(this.teamColorInput.value || '#3B82F6');
+    } else {
+      const preview = document.getElementById('color-preview');
+      if (preview && this.teamColorInput) this.sharedUtils.attachColorPreview(this.teamColorInput, preview);
+    }
     this.teamNameInput.focus();
   }
 
@@ -579,25 +661,30 @@ class SimpleSetup {
         };
 
         let apiResult;
-        if (this.editingTeamIndex !== null) {
+        let existingTeam = null;
+        if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
           // Update existing team
-          const existingTeam = this.teams[this.editingTeamIndex];
+          existingTeam = this.teams[this.editingTeamIndex];
           apiResult = await this.api.updateStandaloneTeam(existingTeam.id, apiTeamData);
         } else {
           // Create new team
           apiResult = await this.api.createStandaloneTeam(apiTeamData);
         }
 
+        // Support different API response shapes (some endpoints return { team: {...} }, others return the team object directly)
+        const apiTeam = apiResult && (apiResult.team || apiResult) ? (apiResult.team || apiResult) : null;
+        const teamId = (apiTeam && apiTeam.id) ? apiTeam.id : (existingTeam ? existingTeam.id : Date.now());
+
         const teamData = {
-          id: apiResult.team.id,
+          id: teamId,
           name: name,
           color: color,
-          icon: this.getIconEmoji(icon),
+          icon: icon, // store icon key; render emoji via getIconEmoji()
           description: description || `${name} team.`,
-          players: [],
+          players: existingTeam && existingTeam.players ? [...existingTeam.players] : [],
         };
 
-        if (this.editingTeamIndex !== null) {
+        if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
           // Update existing team
           this.teams[this.editingTeamIndex] = teamData;
         } else {
@@ -637,7 +724,7 @@ class SimpleSetup {
       return;
     }
 
-    const showPlayers = this.currentStep === 3 && this.sessionData.scoringMode !== 'team';
+    const showPlayers = this.currentStep >= 4 && this.sessionData.scoringMode !== 'team';
 
     this.teamsList.innerHTML = this.teams
       .map((team, index) => {
@@ -647,7 +734,7 @@ class SimpleSetup {
         <div class="team-card-header">
           <div class="team-color-badge" style="background-color: ${teamColor} !important;"></div>
           <div class="team-title">
-            <span class="team-icon">${team.icon}</span>
+            <span class="team-icon">${this.getIconEmoji(team.icon)}</span>
             <div class="team-name-wrap">
               <span class="team-name">${team.name}</span>
               <span class="team-color-hex">${teamColor.toUpperCase()}</span>
@@ -656,11 +743,11 @@ class SimpleSetup {
         </div>
         <p class="team-description">${team.description}</p>
         <div class="team-actions">
-          <button class="delete-team-btn" onclick="simpleSetup.deleteTeam(${index})">
-            Verwijderen
-          </button>
-          <button class="save-team-btn compact" onclick="simpleSetup.editTeam(${index})">
+          <button class="btn btn-sm btn-secondary" onclick="simpleSetup.editTeam(${index})" style="flex: 1;">
             Bewerken
+          </button>
+          <button class="btn btn-sm" style="background: #dc3545; color: white; flex: 1;" onclick="simpleSetup.deleteTeam(${index})">
+            Verwijderen
           </button>
           ${
             showPlayers && this.sessionData.scoringMode === 'team_with_players'
@@ -700,7 +787,7 @@ class SimpleSetup {
 
   updateTeamSelect() {
     if (this.teamForPlayerSelect) {
-      this.teamForPlayerSelect.innerHTML = '<option value="">Selecteer team</option>' + this.teams.map((team) => `<option value="${team.id}">${team.icon} ${team.name}</option>`).join('');
+      this.teamForPlayerSelect.innerHTML = '<option value="">Selecteer team</option>' + this.teams.map((team) => `<option value="${team.id}">${this.getIconEmoji(team.icon)} ${team.name}</option>`).join('');
     }
   }
 
@@ -736,14 +823,6 @@ class SimpleSetup {
         <button class="delete-team-btn" onclick="simpleSetup.deleteTeam(${team.id}, '${team.name}')">
           🗑️ Verwijderen
         </button>
-        <button class="save-team-btn compact" onclick="simpleSetup.toggleUnassignedPlayers(${team.id})">Speler toewijzen</button>
-      </div>
-      <div class="players-section" id="players-for-${team.id}">
-        <div class="players-list" id="players-list-${team.id}">Laden spelers…</div>
-        <div class="unassigned-players-dropdown" id="unassigned-players-${team.id}" style="display:none;">
-          <div class="unassigned-dropdown-header">Selecteer speler om toe te voegen aan <strong>${team.name}</strong>:</div>
-          <div class="unassigned-list" id="unassigned-list-${team.id}">Laden…</div>
-        </div>
       </div>
     </div>
   `
@@ -751,10 +830,6 @@ class SimpleSetup {
       .join('');
 
     this.teamsListStep3.innerHTML = teamsHtml;
-    // Load assigned players for each team and prepare unassigned lists
-    teams.forEach((t) => {
-      this.loadAssignedPlayersForTeam(t.id);
-    });
   }
 
   async loadAssignedPlayersForTeam(teamId) {
@@ -882,17 +957,14 @@ class SimpleSetup {
   async loadAllPlayers() {
     try {
       const resp = await this.api.get('/api/v1/players');
-      if (Array.isArray(resp)) {
-        this.allPlayers = resp;
-      } else {
-        this.allPlayers = resp.players || [];
-      }
+      this.allPlayers = this.api.extractArray(resp, 'players');
       this.playersLoaded = true;
       this.assignedMap.clear();
       this.players.forEach((p) => {
         if (p.id) this.assignedMap.set(p.id, true);
       });
-      if (this.currentStep === 3) {
+      // Only update players list if we're in step 4 (players section is visible)
+      if (this.currentStep === 4) {
         this.updatePlayersList();
       }
     } catch (error) {
@@ -903,8 +975,13 @@ class SimpleSetup {
   }
 
   updatePlayersList(searchTerm = '') {
+    if (!this.playersList) {
+      console.warn('Players list element not found');
+      return;
+    }
+
     if (!this.allPlayers || this.allPlayers.length === 0) {
-      this.playersList.innerHTML = '<p class="info-message">Geen spelers gevonden.</p>';
+      this.playersList.innerHTML = '<div class="empty-state">Nog geen spelers. Voeg een nieuwe speler toe of zoek naar bestaande spelers.</div>';
       return;
     }
 
@@ -1000,8 +1077,32 @@ class SimpleSetup {
 
   async assignPlayerToTeamFromList(playerId, teamId) {
     try {
-      await this.api.put(`/api/v1/players/${playerId}`, { team_id: teamId });
-      await this.loadAllPlayers(); // Refresh all players
+      // Find the player in our local players array
+      const playerIndex = this.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) {
+        console.error('Player not found in local players array');
+        return;
+      }
+
+      // Update the player's team assignment locally
+      const teamIndex = teamId ? this.teams.findIndex(t => String(t.id) === String(teamId)) : null;
+      this.players[playerIndex].teamIndex = teamIndex;
+
+      // Update assigned map
+      if (teamId) {
+        this.assignedMap.set(playerId, true);
+      } else {
+        this.assignedMap.delete(playerId);
+      }
+
+      // Refresh the players list
+      this.updatePlayersList();
+
+      // If we're in step 3, also update the teams list
+      if (this.currentStep === 3) {
+        this.updateTeamsList();
+      }
+
     } catch (error) {
       console.error('Error assigning player:', error);
       alert('Fout bij het toewijzen van speler.');
@@ -1076,7 +1177,7 @@ class SimpleSetup {
   async loadTeamsFromAPI() {
     try {
       const response = await this.api.getAllStandaloneTeams();
-      const teams = response.teams || response || [];
+      const teams = this.api.extractArray(response, 'teams');
 
       // Map API teams to internal format
       this.apiTeams = teams.map((team) => ({
@@ -1104,6 +1205,30 @@ class SimpleSetup {
       // Continue without API teams
       this.apiTeams = [];
     }
+  }
+
+  async loadActivitiesFromAPI() {
+    try {
+      const response = await this.api.getActivities();
+      const activities = this.api.extractArray(response, 'activities');
+
+      // Map API activities to internal format (use our internal keys)
+      this.apiActivities = activities.map((activity) => ({
+        id: activity.id,
+        name: activity.name,
+        sport_type: activity.sport_type || 'custom',
+        scoring_mode: activity.scoring_mode || 'team',
+        game_type: activity.game_type || 'custom',
+        total_rounds: activity.total_rounds || 1,
+        time_limit: activity.time_limit || null,
+        description: activity.description || '',
+      }));
+    } catch (error) {
+      console.error('Error loading activities:', error);
+      // Load from localStorage
+      this.apiActivities = this.loadActivitiesFromLocalStorage();
+    }
+    this.updateExistingActivitiesSelect();
   }
 
   displayAvailableTeams() {
@@ -1152,6 +1277,47 @@ class SimpleSetup {
     }
   }
 
+  updateExistingActivitiesSelect() {
+    if (!this.existingActivitySelect) return;
+
+    // Clear and rebuild options
+    this.existingActivitySelect.innerHTML = '<option value="">-- Selecteer een bestaande activiteit --</option>';
+
+    // Filter out activities already in session
+    const currentActivityIds = this.activities.map((a) => String(a.id));
+    const available = this.apiActivities.filter((a) => !currentActivityIds.includes(String(a.id)));
+
+    available.forEach((activity) => {
+      const option = document.createElement('option');
+      option.value = activity.id;
+      option.textContent = activity.name;
+      this.existingActivitySelect.appendChild(option);
+    });
+
+    // Disable button if no activities available
+    if (this.addExistingActivityBtn) {
+      this.addExistingActivityBtn.disabled = available.length === 0;
+    }
+  }
+
+  loadActivitiesFromLocalStorage() {
+    try {
+      const stored = localStorage.getItem('sportscore_activities');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error loading activities from localStorage:', error);
+      return [];
+    }
+  }
+
+  saveActivitiesToLocalStorage() {
+    try {
+      localStorage.setItem('sportscore_activities', JSON.stringify(this.apiActivities));
+    } catch (error) {
+      console.error('Error saving activities to localStorage:', error);
+    }
+  }
+
   addTeamFromAPI(apiTeam) {
     if (typeof apiTeam === 'string') {
       apiTeam = this.apiTeams.find((t) => String(t.id) === String(apiTeam));
@@ -1172,11 +1338,10 @@ class SimpleSetup {
       id: apiTeam.id,
       name: apiTeam.name,
       color: (apiTeam.color || '').trim() || '#3B82F6',
-      icon: this.getIconEmoji(apiTeam.icon),
+      icon: apiTeam.icon || 'team',
       description: apiTeam.description || '',
       players: apiTeam.players ? [...apiTeam.players] : [],
     };
-
     this.teams.push(team);
 
     // Add existing players to the players list
@@ -1216,27 +1381,46 @@ class SimpleSetup {
     this.existingTeamSelect.value = ''; // Reset selection
   }
 
+  addExistingActivity() {
+    const activityId = this.existingActivitySelect.value;
+    if (!activityId) {
+      alert('Selecteer eerst een activiteit om toe te voegen.');
+      return;
+    }
+
+    const apiActivity = this.apiActivities.find((a) => String(a.id) === String(activityId));
+    if (!apiActivity) {
+      alert('Geselecteerde activiteit niet gevonden.');
+      return;
+    }
+
+    // Add the activity to the session activities (normalize keys & preserve id)
+    this.activities.push({
+      id: apiActivity.id,
+      name: apiActivity.name,
+      sport_type: apiActivity.sport_type || apiActivity.sport || 'custom',
+      scoring_mode: apiActivity.scoring_mode || 'team',
+      game_type: apiActivity.game_type || 'custom',
+      total_rounds: apiActivity.total_rounds || apiActivity.rounds || 1,
+      time_limit: apiActivity.time_limit || null,
+      description: apiActivity.description || null,
+    });
+
+    this.updateActivitiesList();
+    this.existingActivitySelect.value = ''; // Reset selection
+  }
+
   updateTeamSelect() {
-    this.teamForPlayerSelect.innerHTML = this.teams.map((team, index) => `<option value="${index}">${team.icon} ${team.name}</option>`).join('');
+    this.teamForPlayerSelect.innerHTML = this.teams.map((team, index) => `<option value="${index}">${this.getIconEmoji(team.icon)} ${team.name}</option>`).join('');
   }
 
   async addPlayer() {
     const name = this.playerNameInput.value.trim();
-    const teamIndex = this.teamForPlayerSelect.value;
     if (!name) return;
 
     try {
-      // Create player via API
+      // Create player via API without team assignment initially
       const playerData = { name };
-      if (this.sessionData.scoringMode !== 'player' && teamIndex !== '') {
-        // For team modes, assign to team if selected
-        const team = this.teams.find((t) => String(t.id) === String(teamIndex));
-        if (!team) {
-          alert('Geselecteerd team niet gevonden.');
-          return;
-        }
-        playerData.team_id = team.id;
-      }
 
       const response = await this.api.createPlayer(playerData);
       const newPlayer = response.player || response;
@@ -1244,18 +1428,16 @@ class SimpleSetup {
       // Add to allPlayers
       this.allPlayers.push(newPlayer);
 
-      // Add to session players
+      // Add to session players without team assignment initially
       const playerForSession = {
         id: newPlayer.id,
         name: newPlayer.name,
-        teamIndex: this.sessionData.scoringMode === 'player' ? null : teamIndex !== '' ? parseInt(teamIndex) : null,
+        teamIndex: null, // No team assignment initially
       };
       this.players.push(playerForSession);
 
-      // Mark as assigned if has team
-      if (newPlayer.team_id) {
-        this.assignedMap.set(newPlayer.id, true);
-      }
+      // Don't mark as assigned since no team assignment
+      // Players can be assigned to teams manually later
 
       this.updatePlayersList();
       this.playerNameInput.value = '';
@@ -1416,13 +1598,10 @@ class SimpleSetup {
     } else {
       if (teamModeMessage) teamModeMessage.style.display = 'none';
       if (playerFormSection) playerFormSection.style.display = 'block';
-      // Hide team select for player mode - but since per activity, perhaps show always or check
+      // Hide team select for player creation - assignment happens manually later
       const teamSelectGroup = document.getElementById('team-select-group');
       if (teamSelectGroup) {
-        // For simplicity, show team select if any activity is team_with_players
-        const hasTeamWithPlayers = this.activities.some(act => act.scoring_mode === 'team_with_players');
-        const hasPlayerOnly = this.activities.some(act => act.scoring_mode === 'player');
-        teamSelectGroup.style.display = hasPlayerOnly ? 'none' : 'block';
+        teamSelectGroup.style.display = 'none'; // Always hide team select during creation
       }
     }
   }

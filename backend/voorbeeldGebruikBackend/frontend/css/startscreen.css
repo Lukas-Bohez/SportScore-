@@ -218,7 +218,8 @@ body {
 .active-session h2 {
     text-align: center;
     margin-bottom: 20px;
-    color: var(--text-color); /* Dark grey text */
+    color: var(--text-color);
+    /* Dark grey text */
     font-size: 1.5rem;
 }
 
@@ -255,21 +256,26 @@ body {
 }
 
 .continue-btn {
-    background: var(--gold-color); /* Dark goldenrod - 10% primary color */
+    background: var(--gold-color);
+    /* Dark goldenrod - 10% primary color */
     color: #ffffff;
 }
 
 .continue-btn:hover {
-    background: var(--gold-hover); /* Darker goldenrod on hover */
+    background: var(--gold-hover);
+    /* Darker goldenrod on hover */
 }
 
 .end-btn {
-    background: var(--light-color); /* Light grey background */
-    color: var(--text-color); /* Dark grey text */
+    background: var(--light-color);
+    /* Light grey background */
+    color: var(--text-color);
+    /* Dark grey text */
 }
 
 .end-btn:hover {
-    background: var(--border-color); /* Medium grey on hover */
+    background: var(--border-color);
+    /* Medium grey on hover */
 }
 
 /* Recent Sessions */
@@ -358,7 +364,8 @@ body {
     justify-content: center;
     min-height: 60px;
     width: 100%;
-    max-width: 800px; /* Match teams-list width */
+    max-width: 800px;
+    /* Match teams-list width */
 }
 
 .add-team-btn:hover {
@@ -427,7 +434,8 @@ body {
     gap: 15px;
     margin-top: 20px;
     width: 100%;
-    max-width: 800px; /* Consistent width */
+    max-width: 800px;
+    /* Consistent width */
 }
 
 .team-card {
@@ -440,11 +448,13 @@ body {
     gap: 10px;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px var(--shadow-color);
-    min-height: 200px; /* Ensure consistent height */
+    min-height: 200px;
+    /* Ensure consistent height */
 }
 
 .add-team-card {
-    grid-column: span 2; /* Spans full width */
+    grid-column: span 2;
+    /* Spans full width */
     cursor: pointer;
     border: 2px dashed var(--border-color);
     display: flex;
@@ -535,6 +545,128 @@ body {
     box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
 }
 
+.edit-player-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+    margin-right: 8px;
+}
+
+.edit-player-btn:hover {
+    background: linear-gradient(135deg, #e0a800 0%, #d39e00 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(255, 193, 7, 0.3);
+}
+
+.delete-player-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+}
+
+.delete-player-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
+}
+
+/* Team and Activity item styles for homepage management */
+.team-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin: 8px 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.team-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.team-info .team-icon {
+    font-size: 1.5em;
+}
+
+.team-info>div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.team-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.team-color {
+    width: 20px;
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--primary-color);
+}
+
+.activity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin: 8px 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.activity-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+.activity-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.activity-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.activity-sport {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
 #sessions-list {
     display: flex;
     flex-direction: column;
@@ -577,21 +709,26 @@ body {
 }
 
 .btn-primary {
-    background: #b8860b; /* Dark goldenrod - 10% primary color */
+    background: #b8860b;
+    /* Dark goldenrod - 10% primary color */
     color: #ffffff;
 }
 
 .btn-primary:hover {
-    background: #a0780a; /* Darker goldenrod on hover */
+    background: #a0780a;
+    /* Darker goldenrod on hover */
 }
 
 .btn-secondary {
-    background: #cccccc; /* Light grey background */
-    color: #333333; /* Dark grey text */
+    background: #cccccc;
+    /* Light grey background */
+    color: #333333;
+    /* Dark grey text */
 }
 
 .btn-secondary:hover {
-    background: #aaaaaa; /* Medium grey on hover */
+    background: #aaaaaa;
+    /* Medium grey on hover */
 }
 
 /* Footer */
@@ -599,7 +736,8 @@ body {
     text-align: center;
     margin-top: 40px;
     padding: 20px;
-    color: #666666; /* Medium grey text */
+    color: #666666;
+    /* Medium grey text */
 }
 
 /* Warning banner for connectivity issues */
@@ -621,7 +759,7 @@ body {
     .form-row {
         flex-direction: column;
     }
-    
+
     .form-row .form-group {
         flex: 1 1 100%;
     }
@@ -653,11 +791,11 @@ body {
         align-self: stretch;
         justify-content: space-between;
     }
-    
+
     .form-actions {
         flex-direction: column;
     }
-    
+
     .form-actions button {
         width: 100%;
     }
@@ -668,20 +806,20 @@ body {
     .container {
         padding: 10px;
     }
-    
+
     .header {
         padding: 20px 15px;
         margin-bottom: 20px;
     }
-    
+
     .header h1 {
         font-size: 1.5rem;
     }
-    
+
     .main-content {
         gap: 15px;
     }
-    
+
     .session-setup,
     .active-session,
     .team-management,
@@ -689,43 +827,43 @@ body {
     .recent-sessions {
         padding: 15px;
     }
-    
+
     .team-card {
         padding: 15px;
     }
-    
+
     .team-actions {
         flex-direction: column;
     }
-    
+
     .delete-team-btn,
     .save-team-btn {
         width: 100%;
         padding: 10px;
         font-size: 0.9rem;
     }
-    
+
     .player-item,
     .unassigned-players-dropdown {
         padding: 10px;
     }
-    
+
     .player-item-actions {
         flex-direction: column;
         width: 100%;
     }
-    
+
     .player-item-actions button {
         width: 100%;
         padding: 8px;
         font-size: 0.85rem;
     }
-    
+
     .player-item {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .player-item-name {
         margin-bottom: 8px;
     }
@@ -778,7 +916,7 @@ body {
     margin-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     max-height: 400px;
     overflow-y: auto;
 }
@@ -804,6 +942,7 @@ body {
     border-radius: 6px;
     border: 2px solid var(--border-color);
     gap: 10px;
+    margin-bottom: 10px;
 }
 
 .player-info {
@@ -868,6 +1007,112 @@ body {
 }
 
 .unassigned-dropdown-header {
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.unassigned-players-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.team-players-group {
+    margin-bottom: 16px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.team-players-group h4 {
+    background: var(--primary-color);
+    color: white;
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.team-players-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    gap: 10px;
+}
+
+.player-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.player-name {
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.team-assign-select {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    min-width: 140px;
+}
+
+.btn-compact {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--button-bg);
+    color: var(--button-text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-compact:hover {
+    background: var(--button-hover);
+}
+
+.btn-compact.edit-btn {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-compact.delete-btn {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-compact.delete-btn:hover {
+    background: #c0392b;
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
+}
+
+.unassigned-dropdown-header {
     margin-bottom: 8px;
     color: var(--text-color);
 }
@@ -915,19 +1160,25 @@ body {
 }
 
 .color-preview {
-    margin-top: 8px;
-    padding: 8px 12px;
-    border-radius: 4px;
+    padding: 8px 16px;
+    min-width: 120px;
+    border-radius: 6px;
     color: white;
-    font-size: 12px;
-    font-weight: bold;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    border: 2px solid rgba(255,255,255,0.3);
-    transition: all 0.2s ease;
+    font-size: 13px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.12s ease;
+    cursor: pointer;
+    background-color: #3B82F6;
+    display: inline-block;
+    margin-top: 0;
+    vertical-align: top;
+    text-align: center;
 }
 
 .color-preview:hover {
-    border-color: rgba(255,255,255,0.8);
+    border-color: rgba(255, 255, 255, 0.8);
     transform: scale(1.05);
 }
 
@@ -943,8 +1194,152 @@ body {
     font-weight: 600;
 }
 
+.players-section h5 {
+    color: var(--text-color);
+    margin-bottom: 8px;
+    margin-top: 20px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
 .players-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 12px;
+}
+
+/* New comprehensive management styles */
+.add-team-form,
+.player-create,
+.activity-create {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.add-team-form input,
+.add-team-form select,
+.player-create input,
+.activity-create input,
+.activity-create select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg, #fff);
+    color: var(--text-color);
+}
+
+.add-team-form button,
+.player-create button,
+.activity-create button {
+    padding: 8px 16px;
+    background: var(--primary-color, #4CAF50);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.add-team-form button:hover,
+.player-create button:hover,
+.activity-create button:hover {
+    background: var(--primary-hover, #45a049);
+}
+
+.team-card,
+.player-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.team-card h3,
+.player-card strong {
+    margin: 0 0 10px 0;
+    color: var(--text-color);
+}
+
+.assigned-label {
+    color: var(--success-color, #4CAF50);
+    font-weight: 500;
+}
+
+.team-assign-select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg, #fff);
+}
+
+.edit-btn {
+    background: var(--warning-color, #ff9800);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.edit-btn:hover {
+    background: var(--warning-hover, #e68900);
+}
+
+.delete-btn {
+    background: var(--danger-color, #f44336);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.delete-btn:hover {
+    background: var(--danger-hover, #d32f2f);
+}
+
+.save-team-btn {
+    background: var(--success-color, #4CAF50);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.save-team-btn:hover {
+    background: var(--success-hover, #45a049);
+}
+
+.cancel-team-btn {
+    background: var(--secondary-color, #6c757d);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.cancel-team-btn:hover {
+    background: var(--secondary-hover, #5a6268);
+}
+
+.no-players {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
 }

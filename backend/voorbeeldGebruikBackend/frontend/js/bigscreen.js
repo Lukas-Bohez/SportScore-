@@ -8,6 +8,7 @@ class BigScreenDisplay {
     this.listenersSet = false;
     this.isToggling = false;
     this.initialQREmitted = false;
+    this.activeActivityId = null; // Track active activity for big screen display
     this.init();
   }
 
@@ -184,6 +185,17 @@ class BigScreenDisplay {
   init() {
     this.bindElements();
     this.setupEventListeners();
+    // Try to restore last active activity from localStorage (same device)
+    try {
+      const storedActivityId = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('activeActivityId') : null;
+      if (storedActivityId) {
+        const parsed = parseInt(storedActivityId, 10);
+        if (!Number.isNaN(parsed)) {
+          this.activeActivityId = parsed;
+        }
+      }
+    } catch (_) {}
+
     this.startAutoUpdate();
     this.loadInitialData();
     // Show QR code initially
@@ -251,8 +263,26 @@ class BigScreenDisplay {
       this.loadInitialData();
     });
 
+    // Listen for active activity changes
+    api.on('set_active_activity', (data) => {
+      console.log('BigScreen: Received set_active_activity event:', data);
+      // Update the display to show the active activity's leaderboard
+      this.activeActivityId = data.activityId;
+      this.loadInitialData();
+    });
+
     api.on('welcome', (data) => {
       console.log('BigScreen: Received welcome event:', data);
+      try {
+        // If server shares the current active activity in welcome, adopt it
+        if (data && (data.active_activity_id || (data.activity && data.activity.id))) {
+          const incomingId = data.active_activity_id || (data.activity && data.activity.id);
+          if (incomingId && incomingId !== this.activeActivityId) {
+            this.activeActivityId = incomingId;
+            this.loadInitialData();
+          }
+        }
+      } catch (_) {}
     });
 
     api.on('test_event', (data) => {
@@ -334,14 +364,61 @@ class BigScreenDisplay {
 
   async loadInitialData() {
     try {
-      const liveData = await api.getLiveLeaderboard();
+      let liveData;
+      if (this.activeActivityId) {
+        // Load activity-specific leaderboard
+        liveData = await api.getActivityLeaderboard(this.activeActivityId);
+        // Load active activity details for header/context
+        try {
+          this.activeActivity = await api.getActivity(this.activeActivityId);
+        } catch (e) {
+          console.warn('BigScreen: Unable to load active activity details:', e);
+          this.activeActivity = null;
+        }
+      } else {
+        // Load general live leaderboard
+        liveData = await api.getLiveLeaderboard();
+        this.activeActivity = null;
+      }
+
       if (liveData && liveData.session) {
+        // Heuristic: try to pick up active activity from session payload if present
+        try {
+          if (!this.activeActivityId && liveData.session.activities && Array.isArray(liveData.session.activities)) {
+            const activeFromSession = liveData.session.activities.find(a => a.is_active || a.active || a.status === 'active');
+            if (activeFromSession && activeFromSession.id) {
+              this.activeActivityId = activeFromSession.id;
+            }
+          }
+        } catch (_) {}
+
         // Apply theme based on sport_type
         this.applyTheme(liveData.session.sport_type || 'custom');
 
-        // Load players for teams in the leaderboard
+        // If backend returned participant leaderboard, convert to team leaderboard
+        const lb = liveData.leaderboard || [];
+        const isParticipantData = lb.length > 0 && Object.prototype.hasOwnProperty.call(lb[0], 'player_name');
+        if (isParticipantData) {
+          try {
+            const teamsResp = await api.getSessionTeams(liveData.session.id);
+            const teams = (teamsResp && teamsResp.teams) || [];
+            liveData.leaderboard = teams.map(t => ({
+              team_id: t.id,
+              team_name: t.name,
+              team_icon: t.icon,
+              team_color: t.color,
+              total_score: t.total_score || t.score || 0,
+              is_eliminated: Boolean(t.is_eliminated)
+            }));
+          } catch (e) {
+            console.warn('BigScreen: Fallback to team leaderboard failed, using empty list:', e);
+            liveData.leaderboard = [];
+          }
+        }
+
+        // Load players for teams in the (team-based) leaderboard (activity-aware)
         if (liveData.leaderboard && liveData.leaderboard.length > 0) {
-          await this.loadPlayersForLeaderboard(liveData.session.id, liveData.leaderboard);
+          await this.loadPlayersForLeaderboard(liveData.session.id, liveData.leaderboard, this.activeActivityId || null);
         }
         this.updateDisplay(liveData);
       } else {
@@ -378,7 +455,7 @@ class BigScreenDisplay {
     document.title = `${icon} SportScore - Live Scorebord`;
   }
 
-  async loadPlayersForLeaderboard(sessionId, leaderboard) {
+  async loadPlayersForLeaderboard(sessionId, leaderboard, activityId = null) {
     // Check if this is participant-based data (has player_name) or team-based
     if (!leaderboard || leaderboard.length === 0) {
       return;
@@ -391,13 +468,27 @@ class BigScreenDisplay {
       return;
     }
     
-    // First, get all scores for the session to calculate player scores
+    // First, get all scores for the current context to calculate player scores
     let allScores = [];
     try {
-      const scoresResponse = await api.get(`/api/v1/sessions/${sessionId}/scores`);
+      let scoresResponse;
+      if (activityId) {
+        scoresResponse = await api.getActivityScores(activityId);
+      } else {
+        scoresResponse = await api.get(`/api/v1/sessions/${sessionId}/scores`);
+      }
       allScores = scoresResponse.scores || [];
     } catch (err) {
       console.warn('Could not load scores for player stats:', err);
+    }
+
+    // Compute team totals from allScores to ensure correct totals
+    const teamTotals = {};
+    for (const s of allScores) {
+      const tid = s.team_id;
+      const pts = Number(s.points) || 0;
+      if (!tid) continue;
+      teamTotals[tid] = (teamTotals[tid] || 0) + pts;
     }
 
     for (const team of leaderboard) {
@@ -406,6 +497,11 @@ class BigScreenDisplay {
         team.players = [];
         team.playerScores = {};
         continue;
+      }
+
+      // Override team total score when computed
+      if (Object.prototype.hasOwnProperty.call(teamTotals, team.team_id)) {
+        team.total_score = teamTotals[team.team_id];
       }
       
       try {
@@ -418,8 +514,10 @@ class BigScreenDisplay {
         team.playerScores = {};
         if (team.players && team.players.length > 0) {
           team.players.forEach((player) => {
-            // Sum up all scores for this player
-            const playerPoints = allScores.filter((score) => score.player_id === player.id).reduce((sum, score) => sum + score.points, 0);
+            // Sum up all scores for this player; restrict to this team when team_id present
+            const playerPoints = allScores
+              .filter((score) => score.player_id === player.id && (!team.team_id || score.team_id === team.team_id))
+              .reduce((sum, score) => sum + score.points, 0);
             team.playerScores[player.id] = playerPoints;
           });
         }
@@ -468,12 +566,13 @@ class BigScreenDisplay {
       return;
     }
 
-    // Check if this is player mode - if so, need full refresh for player scores
+    // Check modes that need full refresh when player scores change
     const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
+    const isTeamWithPlayers = this.currentSession && this.currentSession.scoring_mode === 'team_with_players';
 
-    if (isPlayerMode && data.player_id) {
-      // Player score update - need to refresh to recalculate all player scores
-      console.log('Player score update, refreshing to recalculate player scores');
+    if ((isPlayerMode || isTeamWithPlayers) && data.player_id) {
+      // Player-related update - refresh to recalculate top players
+      console.log('Player-related score update, refreshing to recalculate player scores');
       this.loadInitialData();
       return;
     }
@@ -615,7 +714,19 @@ class BigScreenDisplay {
     if (this.sessionTitle) {
       // Add subtle icon for scoring mode
       const scoringModeIcon = session.scoring_mode === 'player' ? '👤' : '👥';
-      this.sessionTitle.textContent = session.name || 'SportScore Session';
+      let titleText = session.name || 'SportScore Session';
+
+      // Prefer active activity name (fetched separately) in header
+      if (this.activeActivity && this.activeActivity.name) {
+        titleText += ` - ${this.activeActivity.name}`;
+      } else if (this.activeActivityId && session.activities) {
+        const activeActivity = session.activities.find(a => a.id == this.activeActivityId);
+        if (activeActivity) {
+          titleText += ` - ${activeActivity.name}`;
+        }
+      }
+
+      this.sessionTitle.textContent = titleText;
 
       // Add icon as separate element for better styling control
       const existingIcon = this.sessionTitle.querySelector('.scoring-mode-icon');
@@ -704,38 +815,52 @@ class BigScreenDisplay {
       teamDiv.setAttribute('data-team-id', team.team_id);
     }
 
-    // Check scoring mode
-    const scoringMode = this.currentSession ? this.currentSession.scoring_mode : 'team';
+    // Check scoring mode (activity has priority over session, like in ScoreInput)
+    const scoringMode = (this.activeActivity && this.activeActivity.scoring_mode) || (this.currentSession && this.currentSession.scoring_mode) || 'team';
     const isPlayerMode = scoringMode === 'player';
     const isTeamWithPlayers = scoringMode === 'team_with_players';
-    const showPlayers = this.currentSession && typeof this.currentSession.show_players !== 'undefined' ? Boolean(this.currentSession.show_players) : true;
+    const showPlayers = !this.currentSession || this.currentSession.show_players !== false; // default to true unless explicitly false
 
     const players = team.players || [];
     const playerScores = team.playerScores || {};
 
+    // Player rendering: varies by mode
     let playersHtml = '';
-    if (players.length > 0 && showPlayers) {
+    if (players.length > 0 && showPlayers && (isPlayerMode || isTeamWithPlayers)) {
+      const entries = players.map((p) => ({ p, s: playerScores[p.id] || 0 }));
+      
       if (isPlayerMode) {
-        // Player mode: show player names with their individual scores
-        playersHtml = `<div class="team-players-bigscreen player-mode">
-          ${players
-            .map((p) => {
-              const score = playerScores[p.id] || 0;
-              const scoreClass = score > 0 ? 'positive' : score < 0 ? 'negative' : '';
-              return `<span class="player-badge-bigscreen with-score ${scoreClass}">
-              <span class="player-name-part">${p.position ? `${p.name} (${p.position})` : p.name}</span>
-              <span class="player-score-part">${score > 0 ? '+' : ''}${score}</span>
-            </span>`;
+        // In player mode: show all players, sorted by score descending
+        entries.sort((a, b) => b.s - a.s);
+        playersHtml = `<div class="team-players-bigscreen all-players">
+          ${entries
+            .map(({ p, s }) => {
+              const name = p.position ? `${p.name} (${p.position})` : p.name;
+              return `<span class="player-badge-bigscreen ${s > 0 ? 'with-score positive' : 'no-score'}">
+                <span class="player-name-part">${this.escapeHtml(name)}</span>
+                ${s > 0 ? `<span class="player-score-part">${s}</span>` : ''}
+              </span>`;
             })
             .join('')}
         </div>`;
       } else if (isTeamWithPlayers) {
-        // Team with players mode: show player names without individual scores
-        playersHtml = `<div class="team-players-bigscreen team-with-players-mode">
-          ${players.map((p) => `<span class="player-badge-bigscreen">${p.position ? `${p.name} (${p.position})` : p.name}</span>`).join('')}
-        </div>`;
+        // In team_with_players mode: show only top player(s) if score > 0
+        const maxScore = entries.reduce((m, e) => (e.s > m ? e.s : m), 0);
+        if (maxScore > 0) {
+          const top = entries.filter((e) => e.s === maxScore);
+          playersHtml = `<div class="team-players-bigscreen top-players">
+            ${top
+              .map(({ p, s }) => {
+                const name = p.position ? `${p.name} (${p.position})` : p.name;
+                return `<span class="player-badge-bigscreen with-score positive">
+                  <span class="player-name-part">${this.escapeHtml(name)}</span>
+                  <span class="player-score-part">+${s}</span>
+                </span>`;
+              })
+              .join('')}
+          </div>`;
+        }
       }
-      // else: pure team mode - don't show players at all
     }
 
     teamDiv.innerHTML = `
@@ -879,7 +1004,4 @@ function hideAdminLogin() {
   modal.classList.remove('show');
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  new BigScreenDisplay();
-});
+// Note: Avoid duplicate initialization

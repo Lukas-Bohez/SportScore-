@@ -58,25 +58,24 @@ class TeamRepository:
     """
 
     @staticmethod
-    def create_team(name: str, sport_id: Optional[int] = None) -> int:
-        if sport_id:
-            sql = "INSERT INTO teams (name, sport_id) VALUES (?, ?)"
-            params = [name, sport_id]
-        else:
-            sql = "INSERT INTO teams (name) VALUES (?)"
-            params = [name]
+    def create_team(name: str, color: str = "#3B82F6", icon: str = "team", description: Optional[str] = None) -> int:
+        sql = """
+        INSERT INTO teams (name, color, icon, description)
+        VALUES (?, ?, ?, ?)
+        """
+        params = [name, color or "#3B82F6", icon or "team", description]
         return Database.execute_sql(sql, params)
 
     @staticmethod
     def get_all_teams() -> List[Dict[str, Any]]:
         # Geef alle teams terug (uit alle games) - LEGACY, gebruik SessionTeamRepository.get_all_teams()
-        sql = """SELECT t.id, t.name, t.created_at, t.updated_at
+        sql = """SELECT t.id, t.name, t.color, t.icon, t.description, t.created_at, t.updated_at
                  FROM teams t ORDER BY t.id ASC"""
         return Database.get_rows(sql)
 
     @staticmethod
     def get_team_by_id(team_id: int) -> Optional[Dict[str, Any]]:
-        sql = """SELECT t.id, t.name, t.created_at, t.updated_at
+        sql = """SELECT t.id, t.name, t.color, t.icon, t.description, t.created_at, t.updated_at
                  FROM teams t WHERE t.id = ?"""
         return Database.get_one_row(sql, [team_id])
 
@@ -91,12 +90,27 @@ class TeamRepository:
         return Database.get_rows(sql, [sport_id])
 
     @staticmethod
-    def update_team(team_id: int, name: Optional[str] = None, sport_id: Optional[int] = None) -> bool:
-        # In nieuwe structuur kunnen we alleen naam updaten
-        if name is None:
+    def update_team(team_id: int, name: Optional[str] = None, color: Optional[str] = None, icon: Optional[str] = None, description: Optional[str] = None) -> bool:
+        sql = "UPDATE teams SET "
+        params = []
+        updates = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if color is not None:
+            updates.append("color = ?")
+            params.append(color)
+        if icon is not None:
+            updates.append("icon = ?")
+            params.append(icon)
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if not updates:
             return False
-        sql = "UPDATE teams SET name = ? WHERE id = ?"
-        return Database.execute_sql(sql, [name, team_id]) is not None
+        sql += ", ".join(updates) + " WHERE id = ?"
+        params.append(team_id)
+        return Database.execute_sql(sql, params) is not None
 
     @staticmethod
     def delete_team(team_id: int) -> bool:
@@ -955,7 +969,7 @@ class ActivityRepository:
     """
 
     @staticmethod
-    def create_activity(session_id: int, name: str, sport_type: str = 'custom', game_type: str = 'custom',
+    def create_activity(session_id: Optional[int], name: str, sport_type: str = 'custom', game_type: str = 'custom',
                         scoring_mode: str = 'team', total_rounds: int = 1, time_limit: Optional[int] = None,
                         description: Optional[str] = None) -> int:
         sql = """
@@ -965,15 +979,25 @@ class ActivityRepository:
         return Database.execute_sql(sql, [session_id, name, sport_type, game_type, scoring_mode, total_rounds, time_limit, description])
 
     @staticmethod
-    def get_activities_by_session(session_id: int) -> List[Dict[str, Any]]:
-        sql = """
-        SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
-               created_at, updated_at
-        FROM activities
-        WHERE session_id = ?
-        ORDER BY created_at ASC
-        """
-        return Database.get_rows(sql, [session_id])
+    def get_activities_by_session(session_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        if session_id is None:
+            sql = """
+            SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+                   created_at, updated_at
+            FROM activities
+            WHERE session_id IS NULL
+            ORDER BY created_at ASC
+            """
+            return Database.get_rows(sql)
+        else:
+            sql = """
+            SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+                   created_at, updated_at
+            FROM activities
+            WHERE session_id = ?
+            ORDER BY created_at ASC
+            """
+            return Database.get_rows(sql, [session_id])
 
     @staticmethod
     def get_activity_by_id(activity_id: int) -> Optional[Dict[str, Any]]:

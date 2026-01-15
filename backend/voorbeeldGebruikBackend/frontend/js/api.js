@@ -19,7 +19,7 @@ class ScoreboardAPI {
     // Initialize socket immediately for pages that need it
     if (typeof window !== 'undefined') {
       const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-      const pagesNeedingSocket = ['index.html', 'simple-scoreinput.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'index.html', 'SportScoreBigScreen.html'];
+      const pagesNeedingSocket = ['index.html', 'simple-scoreinput.html', 'scoreinput.html', 'teamsetup.html', 'leaderboard.html', 'admin.html', 'simple-setup.html', 'index.html', 'SportScoreBigScreen.html'];
       if (pagesNeedingSocket.includes(currentPage)) {
         this.initSocket();
       }
@@ -277,6 +277,23 @@ class ScoreboardAPI {
     this.socket.on('toggle-qr', (data) => {
       console.log('API: Received toggle-qr event:', data);
       this.emit('toggle-qr', data);
+    });
+
+    // Activity selection updates (propagate to pages like BigScreen)
+    this.socket.on('set_active_activity', (data) => {
+      console.log('API: Received set_active_activity event:', data);
+      try {
+        // Persist for same-origin tabs (e.g., BigScreen on same device)
+        if (typeof window !== 'undefined' && window.localStorage) {
+          if (data && typeof data.activityId !== 'undefined') {
+            window.localStorage.setItem('activeActivityId', String(data.activityId));
+          }
+          if (data && typeof data.sessionId !== 'undefined') {
+            window.localStorage.setItem('activeSessionId', String(data.sessionId));
+          }
+        }
+      } catch (_) {}
+      this.emit('set_active_activity', data);
     });
   }
   on(event, callback) {
@@ -751,29 +768,96 @@ class ScoreboardAPI {
 
   // Standalone Teams Management
   async getAllStandaloneTeams() {
-    return this.request('/api/v1/standalone-teams');
+    return this.request('/api/v1/teams');
   }
 
   async getStandaloneTeam(teamId) {
-    return this.request(`/api/v1/standalone-teams/${teamId}`);
+    return this.request(`/api/v1/teams/${teamId}`);
   }
 
   async createStandaloneTeam(data) {
-    return this.request('/api/v1/standalone-teams', {
+    return this.request('/api/v1/teams', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateStandaloneTeam(teamId, data) {
-    return this.request(`/api/v1/standalone-teams/${teamId}`, {
+    return this.request(`/api/v1/teams/${teamId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteStandaloneTeam(teamId) {
-    return this.request(`/api/v1/standalone-teams/${teamId}`, {
+    return this.request(`/api/v1/teams/${teamId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Teams Management (alias for standalone)
+  async getTeams() {
+    return this.getAllStandaloneTeams();
+  }
+
+  async createTeam(data) {
+    return this.createStandaloneTeam(data);
+  }
+
+  async updateTeam(id, data) {
+    return this.updateStandaloneTeam(id, data);
+  }
+
+  async deleteTeam(id) {
+    return this.deleteStandaloneTeam(id);
+  }
+
+  // Players Management
+  async getPlayers() {
+    return this.request('/api/v1/players');
+  }
+
+  async createPlayer(data) {
+    return this.request('/api/v1/players', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePlayer(id, data) {
+    return this.request(`/api/v1/players/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePlayer(id) {
+    return this.request(`/api/v1/players/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Activities Management
+  async getActivities() {
+    return this.request('/api/v1/activities');
+  }
+
+  async createActivity(data) {
+    return this.request('/api/v1/activities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateActivity(id, data) {
+    return this.request(`/api/v1/activities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteActivity(id) {
+    return this.request(`/api/v1/activities/${id}`, {
       method: 'DELETE',
     });
   }
@@ -817,11 +901,159 @@ class ScoreboardAPI {
     }
   }
 
+  // Global Activities
+  async getActivities() {
+    return this.request('/api/v1/activities');
+  }
+
+  async createActivity(data) {
+    return this.request('/api/v1/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteActivity(activityId) {
+    return this.request(`/api/v1/activities/${activityId}`, {
+      method: 'DELETE'
+    });
+  }
+
   // Error handling
   handleError(error, context = '') {
     console.error(`API Error${context ? ` (${context})` : ''}:`, error);
     // You can implement custom error handling here
     // e.g., show user notifications, retry logic, etc.
+  }
+
+  // Utility methods for consistent data handling across components
+
+  /**
+   * Safely extract array from API response
+   * @param {Object} response - API response object
+   * @param {string} key - The key containing the array (e.g., 'teams', 'activities', 'players')
+   * @returns {Array} The array or empty array if not found
+   */
+  extractArray(response, key) {
+    return (response && response[key]) || [];
+  }
+
+  /**
+   * Find item by ID in API response array
+   * @param {Object} response - API response object
+   * @param {string} key - The key containing the array
+   * @param {number|string} id - The ID to find
+   * @returns {Object|null} The found item or null
+   */
+  findById(response, key, id) {
+    const array = this.extractArray(response, key);
+    return array.find(item => item.id == id) || null;
+  }
+
+  /**
+   * Standardized error handling with user-friendly messages
+   * @param {Error} error - The error object
+   * @param {string} operation - What operation was being performed
+   * @param {Object} data - Additional data for error messages (e.g., {name: 'Team Name'})
+   * @returns {string} User-friendly error message
+   */
+  getErrorMessage(error, operation, data = {}) {
+    if (error.message.includes('409')) {
+      if (operation.includes('team')) {
+        return `Team met naam "${data.name || 'deze naam'}" bestaat al. Kies een andere naam.`;
+      }
+      if (operation.includes('activity')) {
+        return `Activiteit met naam "${data.name || 'deze naam'}" bestaat al. Kies een andere naam.`;
+      }
+      if (operation.includes('player')) {
+        return `Speler met naam "${data.name || 'deze naam'}" bestaat al. Kies een andere naam.`;
+      }
+    }
+    if (error.message.includes('422')) {
+      if (operation.includes('activity')) {
+        return 'Activiteit kon niet worden aangemaakt. Controleer of alle velden correct zijn ingevuld.';
+      }
+      return 'Gegevens zijn ongeldig. Controleer alle velden.';
+    }
+    if (error.message.includes('404')) {
+      return 'Item niet gevonden.';
+    }
+    if (error.message.includes('500')) {
+      return 'Serverfout. Probeer het later opnieuw.';
+    }
+    return `Fout bij ${operation}.`;
+  }
+
+  /**
+   * Extract form data with proper type conversion
+   * @param {FormData} formData - The FormData object
+   * @param {Object} fieldConfig - Configuration for each field {fieldName: {type: 'string'|'number'|'boolean', required: true|false}}
+   * @returns {Object} Processed form data
+   */
+  extractFormData(formData, fieldConfig = {}) {
+    const result = {};
+
+    for (const [key, value] of formData.entries()) {
+      if (fieldConfig[key]) {
+        const config = fieldConfig[key];
+        switch (config.type) {
+          case 'number':
+            result[key] = value ? parseInt(value, 10) : (config.required ? 0 : null);
+            break;
+          case 'boolean':
+            result[key] = value === 'true' || value === '1';
+            break;
+          default:
+            result[key] = value || null;
+        }
+      } else {
+        result[key] = value || null;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate required fields
+   * @param {Object} data - Data object to validate
+   * @param {Array} requiredFields - Array of required field names
+   * @returns {Array} Array of missing field names, empty if all present
+   */
+  validateRequired(data, requiredFields) {
+    return requiredFields.filter(field => !data[field] || data[field] === '');
+  }
+
+  /**
+   * Safely extract array from API response object
+   * @param {Object} response - API response object
+   * @param {string} arrayKey - Key for the array (e.g., 'teams', 'activities', 'players')
+   * @returns {Array} The array or empty array if not found
+   */
+  extractArray(response, arrayKey) {
+    if (!response || typeof response !== 'object') {
+      console.warn(`API response is not an object:`, response);
+      return [];
+    }
+    const array = response[arrayKey];
+    if (!Array.isArray(array)) {
+      console.warn(`Expected array for key '${arrayKey}', got:`, array);
+      return [];
+    }
+    return array;
+  }
+
+  /**
+   * Find item by ID in API response array
+   * @param {Object} response - API response object
+   * @param {string} arrayKey - Key for the array (e.g., 'teams', 'activities', 'players')
+   * @param {number|string} id - ID to search for
+   * @returns {Object|null} Found item or null
+   */
+  findById(response, arrayKey, id) {
+    const array = this.extractArray(response, arrayKey);
+    return array.find(item => item.id === id) || null;
   }
 }
 

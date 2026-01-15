@@ -21,6 +21,10 @@ class ScoreInput {
     this.customQuickActions = [];
     this.isSubmitting = false;
 
+    // Activity selection properties
+    this.selectedActivityId = null;
+    this.activeActivityId = null; // For big screen display
+
     if (!this.sessionId) {
       alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
       window.location.href = 'index.html';
@@ -35,19 +39,9 @@ class ScoreInput {
     this.setupEventListeners();
     this.loadCustomQuickActions();
     await this.loadSession();
+    await this.loadTeams();
     await this.loadActivities();
     this.loadRecentScores();
-    this.displayParticipantName();
-  }
-
-  displayParticipantName() {
-    const participantNameEl = document.getElementById('participant-name');
-    if (participantNameEl && this.participantName) {
-      participantNameEl.textContent = `Welkom, ${this.participantName}!`;
-      
-      // Hide admin controls for participants
-      this.hideAdminControls();
-    }
   }
 
   hideAdminControls() {
@@ -111,6 +105,9 @@ class ScoreInput {
     this.submitScoreBtn = document.getElementById('submit-score-btn');
     this.recentScores = document.getElementById('recent-scores');
 
+    // Quick scores
+    this.sportQuickButtons = document.getElementById('sport-quick-buttons');
+
     // Control buttons
     this.subtractBtn = document.getElementById('subtract-btn');
     this.addBtn = document.getElementById('add-btn');
@@ -132,18 +129,22 @@ class ScoreInput {
   }
 
   setupEventListeners() {
-    // Score input controls
-    this.subtractBtn.addEventListener('click', () => this.adjustPoints(-1));
-    this.addBtn.addEventListener('click', () => this.adjustPoints(1));
+    // Score input controls - only add if elements exist and are valid DOM elements
+    if (this.subtractBtn && typeof this.subtractBtn.addEventListener === 'function') {
+      this.subtractBtn.addEventListener('click', () => this.adjustPoints(-1));
+    }
+    if (this.addBtn && typeof this.addBtn.addEventListener === 'function') {
+      this.addBtn.addEventListener('click', () => this.adjustPoints(1));
+    }
 
     // Team selection change - load players for selected team
-    this.teamSelect.addEventListener('change', () => this.onTeamChange());
+    if (this.teamSelect) this.teamSelect.addEventListener('change', () => this.onTeamChange());
 
     // Form submission
-    this.submitScoreBtn.addEventListener('click', () => this.submitScore());
+    if (this.submitScoreBtn) this.submitScoreBtn.addEventListener('click', () => this.submitScore());
 
     // Points input validation
-    this.pointsInput.addEventListener('input', (e) => {
+    if (this.pointsInput) this.pointsInput.addEventListener('input', (e) => {
       let value = parseInt(e.target.value);
       if (isNaN(value) || value < -100) value = -100;
       if (value > 100) value = 100;
@@ -151,19 +152,19 @@ class ScoreInput {
     });
 
     // Enter key submission
-    this.reasonInput.addEventListener('keypress', (e) => {
+    if (this.reasonInput) this.reasonInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         this.submitScore();
       }
     });
 
     // Session controls
-    this.pauseSessionBtn.addEventListener('click', () => this.togglePause());
-    this.nextRoundBtn.addEventListener('click', () => this.nextRound());
-    this.endSessionBtn.addEventListener('click', () => this.endSession());
+    if (this.pauseSessionBtn) this.pauseSessionBtn.addEventListener('click', () => this.togglePause());
+    if (this.nextRoundBtn) this.nextRoundBtn.addEventListener('click', () => this.nextRound());
+    if (this.endSessionBtn) this.endSessionBtn.addEventListener('click', () => this.endSession());
 
     // Custom quick actions
-    this.addCustomBtn.addEventListener('click', () => this.addCustomQuickAction());
+    if (this.addCustomBtn) this.addCustomBtn.addEventListener('click', () => this.addCustomQuickAction());
 
     // Real-time updates
     api.on('session_score_update', (data) => this.handleScoreUpdate(data));
@@ -406,6 +407,12 @@ class ScoreInput {
           this.playerSelect.parentNode.insertBefore(hint, this.playerSelect.nextSibling);
         }
       }
+    } else if (mode === 'team_with_players') {
+      // Team-with-players: player selection is optional
+      if (this.playerSelect) {
+        this.playerSelect.disabled = false;
+        this.playerSelect.title = 'Optioneel: selecteer een speler of score het hele team';
+      }
     }
   }
 
@@ -414,79 +421,74 @@ class ScoreInput {
       const response = await api.getSessionActivities(this.sessionId);
       this.activities = response.activities || [];
       this.renderActivities();
+      // Auto-select the first activity if none is selected
+      if (!this.selectedActivityId && this.activities.length > 0) {
+        this.selectedActivityId = this.activities[0].id;
+        this.renderActivities();
+        this.loadLeaderboard();
+      }
     } catch (error) {
       console.error('Error loading activities:', error);
     }
   }
 
   renderActivities() {
-    // Render activities as scoring stations
+    // Render activities as selectable stations
     const container = document.getElementById('activities-container');
     if (!container) return;
 
     container.innerHTML = '';
+
+    // Add activity selection header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'activity-selection-header';
+    headerDiv.innerHTML = `
+      <h3>Kies een activiteit om scores in te geven</h3>
+      ${this.selectedActivityId ? `<p class="selected-activity">Geselecteerd: ${this.activities.find(a => a.id == this.selectedActivityId)?.name || 'Onbekend'}</p>` : '<p class="no-selection">Geen activiteit geselecteerd</p>'}
+    `;
+    container.appendChild(headerDiv);
+
     this.activities.forEach(activity => {
       const stationDiv = document.createElement('div');
-      stationDiv.className = 'station-card';
-      
-      if (this.participantName) {
-        // Participant mode: simple scoring buttons
-        stationDiv.innerHTML = `
-          <h3>${this.escapeHtml(activity.name)}</h3>
-          <p>${this.escapeHtml(activity.description || '')}</p>
-          <div class="score-buttons">
-            <button onclick="scoreInput.scoreForActivity(${activity.id}, 1)" class="score-btn small">+1</button>
-            <button onclick="scoreInput.scoreForActivity(${activity.id}, 5)" class="score-btn medium">+5</button>
-            <button onclick="scoreInput.scoreForActivity(${activity.id}, 10)" class="score-btn large">+10</button>
-          </div>
-        `;
-      } else {
-        // Admin mode: single score input button
-        stationDiv.innerHTML = `
-          <h3>${this.escapeHtml(activity.name)}</h3>
-          <p>${this.escapeHtml(activity.description || '')}</p>
-          <button onclick="scoreInput.scoreForActivity(${activity.id})">Score Ingeven</button>
-        `;
-      }
-      
+      stationDiv.className = `station-card ${this.selectedActivityId == activity.id ? 'selected' : ''} ${this.activeActivityId == activity.id ? 'active' : ''}`;
+
+      stationDiv.innerHTML = `
+        <h3>${this.escapeHtml(activity.name)}</h3>
+        <p>${this.escapeHtml(activity.description || '')}</p>
+        <div class="activity-actions">
+          <button onclick="scoreInput.selectActivity(${activity.id})" class="btn select-activity">
+            ${this.selectedActivityId == activity.id ? 'Geselecteerd' : 'Selecteren'}
+          </button>
+          <button onclick="scoreInput.setActiveActivity(${activity.id})" class="btn set-active ${this.activeActivityId == activity.id ? 'active-btn' : ''}">
+            ${this.activeActivityId == activity.id ? 'Actief op scherm' : 'Zet actief'}
+          </button>
+        </div>
+      `;
+
       container.appendChild(stationDiv);
     });
   }
 
-  async scoreForActivity(activityId, points = null) {
-    let score;
-    
-    if (points !== null) {
-      // Participant mode: points provided directly
-      score = points;
-    } else {
-      // Admin mode: prompt for score
-      score = prompt(`Voer je score in voor ${this.activities.find(a => a.id == activityId)?.name}:`);
-      if (score === null || score === '') {
-        return; // Cancelled
-      }
-      score = parseInt(score) || 0;
-    }
-    
+  selectActivity(activityId) {
+    this.selectedActivityId = activityId;
+    this.renderActivities();
+    this.loadLeaderboard(); // Reload leaderboard for selected activity
+    this.showScoreFeedback(`Activiteit geselecteerd: ${this.activities.find(a => a.id == activityId)?.name}`, 'success');
+  }
+
+  async setActiveActivity(activityId) {
     try {
-      await api.createStudentActivityScore(this.sessionId, activityId, {
-        player_name: this.participantName,
-        points: score
+      this.activeActivityId = activityId;
+      // Emit to server to update active activity for big screen
+      api.socket.emit('set_active_activity', {
+        sessionId: this.sessionId,
+        activityId: activityId
       });
-      
-      // Show success feedback
-      if (this.participantName) {
-        this.showScoreFeedback(`+${score} punten toegevoegd!`, 'success');
-      } else {
-        alert('Score ingegeven!');
-      }
+      this.renderActivities();
+      this.showScoreFeedback(`Activiteit ingesteld als actief op scherm: ${this.activities.find(a => a.id == activityId)?.name}`, 'success');
     } catch (error) {
-      console.error('Error submitting score:', error);
-      if (this.participantName) {
-        this.showScoreFeedback('Fout bij ingeven score', 'error');
-      } else {
-        alert('Fout bij ingeven score');
-      }
+      console.error('Error setting active activity:', error);
+      this.showScoreFeedback('Fout bij instellen actieve activiteit', 'error');
     }
   }
 
@@ -613,10 +615,76 @@ class ScoreInput {
   async onTeamChange() {
     const teamId = this.teamSelect.value;
     if (!teamId) {
-      this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+      this.playerSelect.innerHTML = '<option value="">Selecteer eerst een team</option>';
       return;
     }
-    await this.loadPlayersForTeam(teamId);
+
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+
+    // For player mode or team_with_players mode, show all players from all teams
+    if (mode === 'player' || mode === 'team_with_players') {
+      await this.loadAllPlayersForActivity();
+    } else {
+      // For regular team mode, show only players from the selected team
+      await this.loadPlayersForTeam(teamId);
+    }
+  }
+
+  async loadAllPlayersForActivity() {
+    try {
+      this.playerSelect.innerHTML = '<option value="">Laden...</option>';
+      
+      // Load all players from all teams
+      let allPlayers = [];
+      for (const team of this.teams) {
+        try {
+          const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
+          const teamPlayers = resp && resp.players ? resp.players : [];
+          
+          // Add team name to each player for clarity
+          teamPlayers.forEach(player => {
+            player.teamName = team.name;
+            player.displayName = `${player.name || player.player_name} (${team.name})`;
+          });
+          
+          allPlayers = allPlayers.concat(teamPlayers);
+        } catch (err) {
+          console.error(`Failed to load players for team ${team.id}:`, err);
+        }
+      }
+      
+      // Filter players if activity has specific player restrictions
+      if (this.selectedActivityId) {
+        try {
+          const activityResp = await api.getActivityPlayers(this.selectedActivityId);
+          const activityPlayerIds = new Set((activityResp.players || []).map(p => p.id));
+          // Only filter if there are explicit opt-ins; otherwise show all
+          if (activityPlayerIds.size > 0) {
+            allPlayers = allPlayers.filter(p => activityPlayerIds.has(p.id));
+          }
+        } catch (_) {
+          // If activity players can't be loaded, show all players
+        }
+      }
+      
+      // Sort players alphabetically by name
+      allPlayers.sort((a, b) => (a.name || a.player_name || '').localeCompare(b.name || b.player_name || ''));
+      
+      this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+      
+      if (allPlayers && allPlayers.length > 0) {
+        allPlayers.forEach((p) => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = p.displayName || (p.position ? `${p.name} (${p.position})` : p.name);
+          this.playerSelect.appendChild(option);
+        });
+      }
+    } catch (err) {
+      this.playerSelect.innerHTML = '<option value="">Heel team / geen specifieke speler</option>';
+      console.error('Failed to load all players:', err);
+    }
   }
 
   async loadPlayersForTeam(teamId) {
@@ -682,19 +750,12 @@ class ScoreInput {
   async loadLeaderboard() {
     try {
       let allScores = [];
-      if (this.activityId) {
-        // Prefer dedicated activity leaderboard if available
-        const lb = await api.getActivityLeaderboard(this.activityId).catch(() => null);
-        if (lb && lb.leaderboard) {
-          // Map leaderboard to expected structure when available
-          // Fallback to computing from raw scores if shape differs
-          allScores = [];
-          // We'll recompute from raw scores below if needed
-        }
-        const scoresResponse = await api.getActivityScores(this.activityId).catch(() => ({ scores: [] }));
+      if (this.selectedActivityId) {
+        // Load scores for selected activity
+        const scoresResponse = await api.getActivityScores(this.selectedActivityId).catch(() => ({ scores: [] }));
         allScores = scoresResponse.scores || [];
       } else {
-        // Session-based leaderboard
+        // Session-based leaderboard (all activities)
         const scoresResponse = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
         allScores = scoresResponse.scores || [];
       }
@@ -715,20 +776,27 @@ class ScoreInput {
   }
 
   async loadPlayersForAllTeams() {
+    if (!this.teams || !Array.isArray(this.teams)) {
+      console.warn('Teams not loaded yet, skipping player loading');
+      return;
+    }
+    
     let activityPlayerIds = null;
-    if (this.activityId) {
+    if (this.selectedActivityId) {
       try {
-        const activityResp = await api.getActivityPlayers(this.activityId);
-        activityPlayerIds = new Set((activityResp.players || []).map(p => p.id));
+        const activityResp = await api.getActivityPlayers(this.selectedActivityId);
+        const ids = new Set((activityResp.players || []).map(p => p.id));
+        // Only use the set if there are explicit opt-ins; otherwise leave as null
+        activityPlayerIds = ids.size > 0 ? ids : null;
       } catch (_) {
-        activityPlayerIds = new Set();
+        activityPlayerIds = null;
       }
     }
     for (const team of this.teams) {
       try {
         const resp = await api.get(`/api/v1/sessions/${this.sessionId}/teams/${team.id}/players`);
         let players = resp && resp.players ? resp.players : [];
-        if (activityPlayerIds) {
+        if (activityPlayerIds && activityPlayerIds.size > 0) {
           players = players.filter(p => activityPlayerIds.has(p.id));
         }
         team.players = players;
@@ -739,7 +807,7 @@ class ScoreInput {
           try {
             const fallback = await api.get(`/api/v1/players`);
             let players2 = fallback && fallback.players ? fallback.players : [];
-            if (activityPlayerIds) {
+            if (activityPlayerIds && activityPlayerIds.size > 0) {
               players2 = players2.filter(p => activityPlayerIds.has(p.id));
             }
             team.players = players2;
@@ -754,6 +822,11 @@ class ScoreInput {
   }
 
   calculateLeaderboard(allScores) {
+    if (!this.teams || !Array.isArray(this.teams)) {
+      console.warn('Teams not loaded yet, cannot calculate leaderboard');
+      return [];
+    }
+    
     const SportScores = {};
 
     // Initialize teams with 0 score and include players
@@ -793,6 +866,17 @@ class ScoreInput {
   displayLeaderboard(leaderboard) {
     if (!this.leaderboard) return;
 
+    // Update leaderboard title
+    const titleEl = document.getElementById('leaderboard-title');
+    if (titleEl) {
+      if (this.selectedActivityId) {
+        const activity = this.activities.find(a => a.id == this.selectedActivityId);
+        titleEl.textContent = `Scorebord - ${activity ? activity.name : 'Geselecteerde Activiteit'}`;
+      } else {
+        titleEl.textContent = 'Scorebord - Alle Activiteiten';
+      }
+    }
+
     if (!leaderboard || leaderboard.length === 0) {
       this.leaderboard.innerHTML = '<div class="no-teams">Geen teams gevonden</div>';
       return;
@@ -801,43 +885,31 @@ class ScoreInput {
     // Sort by score descending
     leaderboard.sort((a, b) => b.score - a.score);
 
-    // Check if session uses player-based scoring or team_with_players mode
-    const isPlayerMode = this.session && this.session.scoring_mode === 'player';
-    const showPlayers = isPlayerMode || (this.session && this.session.scoring_mode === 'team_with_players');
+    // Determine scoring mode (activity has priority over session)
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+    const isPlayerMode = mode === 'player';
+    const showPlayers = mode === 'player' || mode === 'team_with_players';
 
     const leaderboardHtml = leaderboard
       .map((team, index) => {
         let playersHtml = '';
 
         if (team.players && team.players.length > 0 && showPlayers) {
-          if (isPlayerMode) {
-            // Player mode: show player names with their individual scores
-            playersHtml = `<div class="team-players">
-                ${team.players
-                  .map((p) => {
-                    const playerScore = team.playerScores[p.id] || 0;
-                    return `
-                    <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
-                      ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}: <strong>${playerScore}</strong>
-                    </button>
-                  `;
-                  })
-                  .join('')}
-              </div>`;
-          } else {
-            // Team with players mode: just show player names as clickable badges
-            playersHtml = `<div class="team-players">
-                ${team.players
-                  .map(
-                    (p) => `
-                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${this.escapeHtml(p.name)} te selecteren">
-                    ${this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name)}
+          // Show player badges with their individual scores in player or team_with_players modes
+          playersHtml = `<div class="team-players">
+              ${team.players
+                .map((p) => {
+                  const playerScore = team.playerScores[p.id] || 0;
+                  const name = this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name);
+                  return `
+                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${name} te selecteren">
+                    ${name}${playerScore ? `: <strong>${playerScore}</strong>` : ''}
                   </button>
-                `
-                  )
-                  .join('')}
-              </div>`;
-          }
+                `;
+                })
+                .join('')}
+            </div>`;
         }
 
         return `
@@ -873,8 +945,10 @@ class ScoreInput {
         scoreElement.textContent = team.score;
       }
 
-      // Update player scores if in player mode
-      if (this.session && this.session.scoring_mode === 'player' && team.players) {
+      // Update player scores if in player or team_with_players mode
+      const currentActivity = this.getCurrentActivity();
+      const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+      if ((mode === 'player' || mode === 'team_with_players') && team.players) {
         team.players.forEach((player) => {
           const playerBadges = this.leaderboard.querySelectorAll('.player-badge');
           playerBadges.forEach((badge) => {
@@ -892,8 +966,8 @@ class ScoreInput {
 
   async loadRecentScores() {
     try {
-      const response = this.activityId
-        ? await api.getActivityScores(this.activityId)
+      const response = this.selectedActivityId
+        ? await api.getActivityScores(this.selectedActivityId)
         : await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
       const scores = response.scores || [];
       // Show most recent 10 scores (newest first)
@@ -965,12 +1039,24 @@ class ScoreInput {
     });
   }
 
+  getCurrentActivity() {
+    if (!this.selectedActivityId || !this.activities) return null;
+    return this.activities.find(a => a.id == this.selectedActivityId) || null;
+  }
+
   async submitScore() {
     // Prevent double submissions
     if (this.isSubmitting) {
       return;
     }
     this.isSubmitting = true;
+
+    // Check if activity is selected
+    if (!this.selectedActivityId) {
+      this.showScoreFeedback('Selecteer eerst een activiteit', 'error');
+      this.isSubmitting = false;
+      return;
+    }
 
     // Disable submit and quick buttons
     if (this.submitScoreBtn) this.submitScoreBtn.disabled = true;
@@ -992,7 +1078,8 @@ class ScoreInput {
     }
 
     // Validate scoring mode
-    const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
     if (mode === 'player' && !playerId) {
       this.showInlineError('player-select', '⚠️ Selecteer een specifieke speler in Speler Modus');
       this.playerSelect.focus();
@@ -1027,32 +1114,61 @@ class ScoreInput {
     });
 
     try {
-      const scoreData = this.activityId
-        ? {
-            activity_id: parseInt(this.activityId),
+      // Handle different scoring modes
+      if (mode === 'team_with_players') {
+        // Team-with-players: scoring whole team adds a single team score
+        if (!playerId) {
+          const scoreData = {
+            activity_id: parseInt(this.selectedActivityId),
             team_id: teamId,
             points: points,
-            reason: reason || 'Handmatig',
+            reason: reason || 'Team score',
             round_number: this.session.current_round,
+          };
+          if (this.selectedActivityId) {
+            await api.createActivityScore(this.selectedActivityId, scoreData);
+          } else {
+            await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
           }
-        : {
-            session_id: parseInt(this.sessionId),
+        } else {
+          // Scoring a specific player: create only the player score entry.
+          // Player scores already contribute to the team's total via team_id.
+          const playerScoreData = {
+            activity_id: parseInt(this.selectedActivityId),
             team_id: teamId,
+            player_id: playerId,
             points: points,
-            reason: reason || 'Handmatig',
+            reason: reason || 'Player score',
             round_number: this.session.current_round,
           };
 
-      // Include player_id if a specific player was selected
-      if (playerId) {
-        scoreData.player_id = playerId;
-      }
-
-      // posting score: use activity flow when available
-      if (this.activityId) {
-        await api.createActivityScore(this.activityId, scoreData);
+          if (this.selectedActivityId) {
+            await api.createActivityScore(this.selectedActivityId, playerScoreData);
+          } else {
+            await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, playerScoreData);
+          }
+        }
       } else {
-        await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+        // Standard team or player scoring
+        const scoreData = {
+          activity_id: parseInt(this.selectedActivityId),
+          team_id: teamId,
+          points: points,
+          reason: reason || 'Handmatig',
+          round_number: this.session.current_round,
+        };
+
+        // Include player_id if a specific player was selected
+        if (playerId) {
+          scoreData.player_id = playerId;
+        }
+
+        // posting score: use activity flow when available
+        if (this.selectedActivityId) {
+          await api.createActivityScore(this.selectedActivityId, scoreData);
+        } else {
+          await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+        }
       }
 
       // Treat as success
