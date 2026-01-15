@@ -23,7 +23,9 @@ class SimpleSetup {
     const templateData = sessionStorage.getItem('templateData');
     if (templateData) {
       try {
-        this.sessionData = JSON.parse(templateData);
+        const parsed = JSON.parse(templateData);
+        // Support both direct data and nested template_data structure
+        this.sessionData = parsed.template_data || parsed;
         sessionStorage.removeItem('templateData'); // Clear after loading
         this.isFromTemplate = true;
       } catch (error) {
@@ -471,90 +473,46 @@ class SimpleSetup {
   }
 
   async addActivity() {
-    const name = this.activityNameInput.value.trim();
-    const sport = this.activitySportSelect.value;
-    const scoring = this.activityScoringSelect.value;
-    const gameType = this.activityGameTypeSelect.value;
-    const rounds = parseInt(this.activityRoundsInput.value) || 1;
-    const time = this.activityTimeInput.value ? parseInt(this.activityTimeInput.value) : null;
-    const desc = this.activityDescInput.value.trim();
+    const name = (this.activityNameInput && this.activityNameInput.value || '').trim();
+    const sport = (this.activitySportSelect && this.activitySportSelect.value) || 'custom';
+    const scoring = (this.activityScoringSelect && this.activityScoringSelect.value) || 'team';
+    const gameType = (this.activityGameTypeSelect && this.activityGameTypeSelect.value) || 'custom';
+    const rounds = parseInt((this.activityRoundsInput && this.activityRoundsInput.value) || '1') || 1;
+    const time = (this.activityTimeInput && this.activityTimeInput.value) ? parseInt(this.activityTimeInput.value) : null;
+    const desc = (this.activityDescInput && this.activityDescInput.value || '').trim();
+
     if (!name) {
       alert('Voer een activiteit naam in.');
       return;
     }
-    const act = {
+
+    const activityData = {
       name,
       sport_type: sport,
       scoring_mode: scoring,
       game_type: gameType,
       total_rounds: rounds,
       time_limit: time,
-      description: desc || null,
+      description: desc || null
     };
 
     try {
-      let apiResult;
+      let resp;
       if (this.editingActivityIndex != null) {
-        // Update existing activity
         const existingActivity = this.activities[this.editingActivityIndex];
-        if (existingActivity.id) {
-          // Update via API if it has an id
-          apiResult = await this.api.updateActivity(existingActivity.id, act);
-        } else {
-          // Create new activity if it doesn't have an id
-          apiResult = await this.api.createActivity(act);
-        }
+        resp = await this.api.updateActivity(existingActivity.id, activityData);
+        this.showSuccessMessage(`Activiteit "${activityData.name}" succesvol bijgewerkt!`);
       } else {
-        // Create new activity
-        apiResult = await this.api.createActivity(act);
+        resp = await this.api.createActivity(activityData);
+        this.showSuccessMessage(`Activiteit "${activityData.name}" succesvol aangemaakt!`);
       }
-
-      const activityData = {
-        id: apiResult.id,
-        name,
-        sport_type: sport,
-        scoring_mode: scoring,
-        game_type: gameType,
-        total_rounds: rounds,
-        time_limit: time,
-        description: desc || null,
-      };
-
-      if (this.editingActivityIndex != null) {
-        // Update existing activity
-        this.activities[this.editingActivityIndex] = activityData;
-      } else {
-        // Add new activity
-        this.activities.push(activityData);
-      }
+      
+      this.hideActivityForm();
+      await this.loadActivitiesFromAPI();
     } catch (error) {
-      const errorMessage = this.api.getErrorMessage(error, 'creating activity', { name: act.name });
-      alert(errorMessage);
-      console.error('Error saving activity:', error);
-      // Continue with local storage
-      const activityData = {
-        id: Date.now(), // Temporary ID
-        name,
-        sport_type: sport,
-        scoring_mode: scoring,
-        game_type: gameType,
-        total_rounds: rounds,
-        time_limit: time,
-        description: desc || null,
-      };
-
-      if (this.editingActivityIndex != null) {
-        this.activities[this.editingActivityIndex] = activityData;
-      } else {
-        this.activities.push(activityData);
-      }
-      // Add to apiActivities for visibility
-      this.apiActivities.push(activityData);
-      this.saveActivitiesToLocalStorage();
+      this.api.handleError && this.api.handleError(error, 'creating/updating activity');
+      alert('Fout bij het opslaan van activiteit.');
     }
-    this.hideActivityForm();
-    this.updateActivitiesList();
-    this.updateExistingActivitiesSelect();
   }
 
   editActivity(index) {
@@ -646,61 +604,39 @@ class SimpleSetup {
   }
 
   async addTeam() {
-    const name = this.teamNameInput.value.trim();
-    const color = (this.teamColorInput.value || '').trim() || '#3B82F6';
-    const icon = this.teamIconSelect.value;
-    const description = this.teamDescriptionInput.value.trim();
+    const name = (this.teamNameInput && this.teamNameInput.value || '').trim();
+    if (!name) {
+      alert('Voer een teamnaam in.');
+      return;
+    }
+    const color = (this.teamColorInput && this.teamColorInput.value || '').trim() || '#3B82F6';
+    const icon = (this.teamIconSelect && this.teamIconSelect.value) || 'team';
+    const description = (this.teamDescriptionInput && this.teamDescriptionInput.value || '').trim();
 
-    if (name) {
-      try {
-        const apiTeamData = {
-          name: name,
-          color: color,
-          icon: icon,
-          description: description || `${name} team.`,
-        };
+    const teamData = {
+      name,
+      color,
+      icon,
+      description: description || null
+    };
 
-        let apiResult;
-        let existingTeam = null;
-        if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
-          // Update existing team
-          existingTeam = this.teams[this.editingTeamIndex];
-          apiResult = await this.api.updateStandaloneTeam(existingTeam.id, apiTeamData);
-        } else {
-          // Create new team
-          apiResult = await this.api.createStandaloneTeam(apiTeamData);
-        }
-
-        // Support different API response shapes (some endpoints return { team: {...} }, others return the team object directly)
-        const apiTeam = apiResult && (apiResult.team || apiResult) ? (apiResult.team || apiResult) : null;
-        const teamId = (apiTeam && apiTeam.id) ? apiTeam.id : (existingTeam ? existingTeam.id : Date.now());
-
-        const teamData = {
-          id: teamId,
-          name: name,
-          color: color,
-          icon: icon, // store icon key; render emoji via getIconEmoji()
-          description: description || `${name} team.`,
-          players: existingTeam && existingTeam.players ? [...existingTeam.players] : [],
-        };
-
-        if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
-          // Update existing team
-          this.teams[this.editingTeamIndex] = teamData;
-        } else {
-          // Add new team
-          this.teams.push(teamData);
-        }
-
-        this.updateTeamsList();
-        this.hideTeamForm();
-        this.updateTeamSelect();
-        this.displayAvailableTeams(); // Refresh available teams
-        this.updateExistingTeamsSelect();
-      } catch (error) {
-        console.error('Error creating/updating team:', error);
-        alert('Fout bij aanmaken/bewerken team: ' + error.message);
+    try {
+      let resp;
+      if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
+        const existingTeam = this.teams[this.editingTeamIndex];
+        resp = await this.api.updateStandaloneTeam(existingTeam.id, teamData);
+        this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
+      } else {
+        resp = await this.api.createStandaloneTeam(teamData);
+        this.showSuccessMessage(`Team "${teamData.name}" succesvol aangemaakt!`);
       }
+      
+      this.hideTeamForm();
+      await this.loadTeamsFromAPI();
+      this.updateTeamSelect();
+    } catch (error) {
+      this.api.handleError && this.api.handleError(error, 'creating/updating team');
+      alert('Fout bij het opslaan van team.');
     }
   }
 
@@ -927,13 +863,13 @@ class SimpleSetup {
   async assignPlayerToTeam(teamId, playerId) {
     try {
       await this.api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) });
-      // refresh lists
       await this.loadAssignedPlayersForTeam(teamId);
-      await this.loadAllPlayers(); // Refresh the players list
+      await this.loadAllPlayers();
       const ul = document.getElementById(`unassigned-players-${teamId}`);
       if (ul) ul.style.display = 'none';
+      this.showSuccessMessage('Speler succesvol toegewezen aan team!');
     } catch (err) {
-      this.api.handleError(err, 'assigning player to team');
+      this.api.handleError && this.api.handleError(err, 'assigning player to team');
       alert('Fout bij het toewijzen van speler aan team.');
     }
   }
@@ -956,21 +892,19 @@ class SimpleSetup {
 
   async loadAllPlayers() {
     try {
-      const resp = await this.api.get('/api/v1/players');
+      const resp = await this.api.request('/api/v1/players');
       this.allPlayers = this.api.extractArray(resp, 'players');
       this.playersLoaded = true;
       this.assignedMap.clear();
       this.players.forEach((p) => {
         if (p.id) this.assignedMap.set(p.id, true);
       });
-      // Only update players list if we're in step 4 (players section is visible)
       if (this.currentStep === 4) {
         this.updatePlayersList();
       }
     } catch (error) {
       console.error('Error loading players:', error);
-      this.api.handleError(error, 'loading players');
-      alert('Fout bij het laden van spelers: ' + error.message);
+      this.api.handleError && this.api.handleError(error, 'loading players');
     }
   }
 
@@ -1077,34 +1011,22 @@ class SimpleSetup {
 
   async assignPlayerToTeamFromList(playerId, teamId) {
     try {
-      // Find the player in our local players array
-      const playerIndex = this.players.findIndex(p => p.id === playerId);
-      if (playerIndex === -1) {
-        console.error('Player not found in local players array');
-        return;
-      }
-
-      // Update the player's team assignment locally
-      const teamIndex = teamId ? this.teams.findIndex(t => String(t.id) === String(teamId)) : null;
-      this.players[playerIndex].teamIndex = teamIndex;
-
-      // Update assigned map
       if (teamId) {
-        this.assignedMap.set(playerId, true);
+        // Assign player to team
+        await this.api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) });
+        this.showSuccessMessage('Speler toegewezen aan team!');
       } else {
-        this.assignedMap.delete(playerId);
+        // Remove player from team
+        await this.api.put(`/api/v1/players/${playerId}`, { team_id: null });
+        this.showSuccessMessage('Speler verwijderd uit team!');
       }
 
-      // Refresh the players list
+      // Refresh the data
+      await this.loadAllPlayers();
       this.updatePlayersList();
-
-      // If we're in step 3, also update the teams list
-      if (this.currentStep === 3) {
-        this.updateTeamsList();
-      }
-
     } catch (error) {
       console.error('Error assigning player:', error);
+      this.api.handleError && this.api.handleError(error, 'assigning player to team');
       alert('Fout bij het toewijzen van speler.');
     }
   }
@@ -1189,20 +1111,10 @@ class SimpleSetup {
         players: team.players || [],
       }));
 
-      // Do not auto-load teams - let user choose which ones to add
-      // if (this.teams.length === 0 && this.apiTeams.length > 0) {
-      //   // Load first 3 teams automatically, or fewer if there are less
-      //   const teamsToLoad = Math.min(3, this.apiTeams.length);
-      //   for (let i = 0; i < teamsToLoad; i++) {
-      //     this.addTeamFromAPI(this.apiTeams[i]);
-      //   }
-      // }
-
       this.displayAvailableTeams();
       this.updateExistingTeamsSelect();
     } catch (error) {
       console.error('Error loading teams:', error);
-      // Continue without API teams
       this.apiTeams = [];
     }
   }
@@ -1415,35 +1327,29 @@ class SimpleSetup {
   }
 
   async addPlayer() {
-    const name = this.playerNameInput.value.trim();
-    if (!name) return;
+    const name = (this.playerNameInput && this.playerNameInput.value || '').trim();
+    const teamId = (this.teamForPlayerSelect && this.teamForPlayerSelect.value) || null;
+    
+    if (!name) {
+      alert('Voer een speler naam in.');
+      return;
+    }
 
     try {
-      // Create player via API without team assignment initially
-      const playerData = { name };
-
-      const response = await this.api.createPlayer(playerData);
-      const newPlayer = response.player || response;
-
-      // Add to allPlayers
-      this.allPlayers.push(newPlayer);
-
-      // Add to session players without team assignment initially
-      const playerForSession = {
-        id: newPlayer.id,
-        name: newPlayer.name,
-        teamIndex: null, // No team assignment initially
-      };
-      this.players.push(playerForSession);
-
-      // Don't mark as assigned since no team assignment
-      // Players can be assigned to teams manually later
-
-      this.updatePlayersList();
-      this.playerNameInput.value = '';
+      const response = await this.api.request('/api/v1/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+      const player = response.player || response;
+      
+      this.showSuccessMessage(`Speler "${name}" toegevoegd!`);
+      
+      if (teamId) {
+        await this.assignPlayerToTeam(teamId, player.id);
+      }
+      
+      if (this.playerNameInput) this.playerNameInput.value = '';
+      await this.loadAllPlayers();
     } catch (error) {
-      console.error('Error creating player:', error);
-      alert('Fout bij het toevoegen van speler. Probeer opnieuw.');
+      this.api.handleError && this.api.handleError(error, 'creating player');
+      alert('Fout bij het toevoegen van de speler.');
     }
   }
 
@@ -1570,6 +1476,19 @@ class SimpleSetup {
     setTimeout(() => toast.remove(), 3000);
   }
 
+  showSuccessMessage(message) {
+    const existing = document.querySelector('.success-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000; font-weight: 500;';
+    toast.innerHTML = `<span style="font-size: 1.2em;">✓</span> ${this.escapeHtml(message)}`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+  }
+
   showErrorMessage(message) {
     const existing = document.querySelector('.error-toast');
     if (existing) existing.remove();
@@ -1673,8 +1592,13 @@ class SimpleSetup {
       // Add teams - use API team ids if available
       const sessionTeams = [];
       for (const team of this.teams) {
+        const teamColor = (team.color || '').trim() || '#3B82F6';
+        const teamIcon = team.icon || 'team';
         const teamData = {
           name: team.name,
+          color: teamColor,
+          icon: teamIcon,
+          description: team.description || null,
           ...(team.id && { id: team.id }), // Use API team id if available
         };
         const createdTeam = await this.api.createSessionTeam(sessionId, teamData);

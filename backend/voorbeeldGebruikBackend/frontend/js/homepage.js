@@ -32,7 +32,7 @@ class Homepage {
 
   async loadTemplates() {
     try {
-      const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
+      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
       this.renderTemplates(templates);
     } catch (error) {
       console.error('Error loading templates:', error);
@@ -51,18 +51,27 @@ class Homepage {
     this.templatesGrid.innerHTML = templates.map(template => `
       <div class="template-card">
         <h3>${this.escapeHtml(template.name)}</h3>
-        <p>${this.escapeHtml(template.description || 'Geen beschrijving')}</p>
-        <div class="template-stats">
-          <span>👥 ${template.teams?.length || 0} teams</span>
-          <span>🎯 ${template.activities?.length || 0} activiteiten</span>
-          <span>👤 ${template.players?.length || 0} spelers</span>
-        </div>
         <div class="template-actions">
-          <button class="btn btn-primary" onclick="window.homepage.useTemplate('${template.id}')">Gebruik Template</button>
-          <button class="btn btn-danger" onclick="window.homepage.deleteTemplate('${template.id}')">Verwijder</button>
+          <button class="btn btn-primary use-template-btn" data-template-id="${template.id}">Gebruik Template</button>
+          <button class="btn btn-danger delete-template-btn" data-template-id="${template.id}">Verwijder</button>
         </div>
       </div>
     `).join('');
+
+    // Add event listeners for the buttons
+    this.templatesGrid.querySelectorAll('.use-template-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const templateId = e.target.getAttribute('data-template-id');
+        this.useTemplate(templateId);
+      });
+    });
+
+    this.templatesGrid.querySelectorAll('.delete-template-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const templateId = e.target.getAttribute('data-template-id');
+        this.deleteTemplate(templateId);
+      });
+    });
   }
 
   async loadSessions() {
@@ -514,11 +523,19 @@ class Homepage {
   }
 
   useTemplate(templateId) {
-    const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
-    const template = templates.find(t => t.id === templateId);
-    if (template) {
-      sessionStorage.setItem('templateData', JSON.stringify(template));
-      window.location.href = 'simple-setup.html';
+    try {
+      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
+      const template = templates.find(t => String(t.id) === String(templateId));
+      if (template && template.template_data) {
+        sessionStorage.setItem('templateData', JSON.stringify(template.template_data));
+        window.location.href = 'simple-setup.html';
+      } else {
+        console.error('Template not found or invalid:', templateId);
+        alert('Template niet gevonden.');
+      }
+    } catch (error) {
+      console.error('Error loading template:', error);
+      alert('Fout bij laden template.');
     }
   }
 
@@ -526,9 +543,9 @@ class Homepage {
     if (!confirm('Weet je zeker dat je deze template wilt verwijderen?')) return;
     
     try {
-      const templates = JSON.parse(localStorage.getItem('sessionTemplates') || '[]');
+      const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
       const filtered = templates.filter(t => t.id !== templateId);
-      localStorage.setItem('sessionTemplates', JSON.stringify(filtered));
+      localStorage.setItem('sportScoreTemplates', JSON.stringify(filtered));
       this.loadTemplates();
       this.showSuccessMessage('Template verwijderd!');
     } catch (error) {
