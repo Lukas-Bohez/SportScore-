@@ -276,14 +276,16 @@ class Homepage {
   }
 
   createHistorySessionCard(session) {
-    const sport = session.sport || 'Algemeen';
+    const activities = session.activities || [];
+    const activityNames = activities.map(a => a.name).join(', ');
+    const sportTypes = [...new Set(activities.map(a => a.sport_type))].join(', ');
     return `
       <div class="history-session-card" data-session-id="${session.id}">
         <div class="history-session-header">
           <div>
             <div class="history-session-name">${this.escapeHtml(session.name)}</div>
             <div class="history-session-date">${this.formatDate(session.created_at)}</div>
-            <div class="history-session-sport">📊 ${this.escapeHtml(sport)} • ${session.activities?.length || 0} activiteiten</div>
+            <div class="history-session-sport">📊 ${this.escapeHtml(sportTypes || 'Algemeen')} • ${activityNames}</div>
           </div>
         </div>
       </div>
@@ -367,6 +369,12 @@ class Homepage {
     `;
 
     modal.classList.add('show');
+
+    // Limit modal height to avoid overlapping nav
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+      modalContent.style.maxHeight = '70vh';
+    }
   }
 
   async displayModalActivityScores(sessionId, activityId) {
@@ -879,9 +887,47 @@ class Homepage {
 
   async loadActivitiesForHighscores() {
     try {
-      const response = await this.api.getActivities();
-      const activities = this.api.extractArray(response, 'activities');
-      this.renderHighscores(activities);
+      // Use only history sessions, like history loading
+      const allSessions = this.historySessions || [];
+      
+      // Map activity names to their highest scoring instance
+      const activityMap = new Map(); // name -> {activity, maxScore}
+      
+      for (const session of allSessions) {
+        const activities = session.activities || [];
+        
+        for (const activity of activities) {
+          const key = activity.name;
+          let current = activityMap.get(key);
+          
+          if (!current) {
+            current = { activity: { ...activity, session_id: session.id }, maxScore: 0 };
+            activityMap.set(key, current);
+          }
+          
+          // Get leaderboard for this activity instance
+          try {
+            const lbResponse = await this.api.getActivityLeaderboard(activity.id);
+            const lb = lbResponse.leaderboard || [];
+            const max = lb.length > 0 ? Math.max(...lb.map(t => t.total_score || 0)) : 0;
+            
+            if (max > current.maxScore) {
+              current.maxScore = max;
+              current.activity = { ...activity, session_id: session.id }; // Ensure session_id is included
+            }
+          } catch (e) {
+            console.warn(`Error fetching leaderboard for activity ${activity.id}:`, e);
+          }
+        }
+      }
+      
+      // Convert to array for rendering
+      const activitiesWithScores = Array.from(activityMap.values()).map(({activity, maxScore}) => ({
+        ...activity,
+        highest_score: maxScore
+      }));
+      
+      this.renderHighscores(activitiesWithScores);
     } catch (error) {
       console.error('Error loading highscores:', error);
       const grid = document.getElementById('highscores-grid');
@@ -899,19 +945,412 @@ class Homepage {
     }
 
     grid.innerHTML = activities.map(activity => `
-      <div class="highscores-card">
+      <div class="highscores-card" data-activity-id="${activity.id}" data-session-id="${activity.session_id}">
         <h3>${this.escapeHtml(activity.name)}</h3>
         <div class="highscores-meta">
           <span>${this.escapeHtml(activity.sport_type)}</span>
           <span>${this.escapeHtml(activity.game_type || 'custom')}</span>
         </div>
-        <p>${this.escapeHtml(activity.description || 'Geen beschrijving')}</p>
+        <p>${activity.description ? this.escapeHtml(activity.description) : ''}</p>
         <div class="highscores-stats">
           <span>Rondes: ${activity.total_rounds || 1}</span>
           ${activity.time_limit ? `<span>Tijd: ${activity.time_limit} min</span>` : ''}
+          <span>Hoogste score: ${activity.highest_score || 0}</span>
         </div>
       </div>
     `).join('');
+
+    // Add click handlers
+    grid.querySelectorAll('.highscores-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const activityId = card.dataset.activityId;
+        this.showHighscoreDetails(activityId);
+      });
+    });
+  }
+
+  async showHighscoreDetails(activityId) {
+    try {
+      // Get all sessions that include this activity, using cached data like history
+      const allSessions = (this.activeSessions || []).concat(this.historySessions || []);
+      const relevantSessions = allSessions.filter(session => (session.activities || []).some(a => String(a.id) === String(activityId)));
+
+      if (relevantSessions.length === 0) {
+        this.showErrorMessage('Geen sessies gevonden voor deze activiteit.');
+        return;
+      }
+
+      // Collect all teams and players from all sessions to ensure we have all
+      const teamMap = new Map();
+      const playerMap = new Map();
+      allSessions.forEach(session => {
+        (session.teams || []).forEach(team => {
+          if (!teamMap.has(team.id)) teamMap.set(team.id, team);
+        });
+        (session.players || []).forEach(player => {
+          if (!playerMap.has(player.id)) playerMap.set(player.id, player);
+        });
+      });
+      const allTeams = Array.from(teamMap.values());
+      const allPlayers = Array.from(playerMap.values());
+      const combinedSession = { teams: allTeams, players: allPlayers };
+
+      // Get activity details (safe)
+      let activity;
+      try {
+        const activityResponse = await this.api.getActivity(activityId);
+        activity = activityResponse.activity || activityResponse;
+      } catch (err) {
+        console.warn('Could not fetch activity details for', activityId, err);
+        activity = { id: activityId, name: `Activiteit ${activityId}`, scoring_mode: 'team' };
+      }
+
+      // Aggregate scores across ALL instances of this activity name (so highscores show every team's best)
+      const activityName = activity.name;
+      const instances = [];
+      allSessions.forEach(sess => {
+        (sess.activities || []).forEach(a => {
+          if (String(a.name) === String(activityName)) instances.push({ activity: a, sessionId: sess.id });
+        });
+      });
+
+      if (instances.length === 0) {
+        // fallback to the current activity instance
+        instances.push({ activity, sessionId: activity.session_id || null });
+      }
+
+      const scoringMode = activity.scoring_mode || 'team';
+      let leaderboard = [];
+
+      if (scoringMode === 'team') {
+        // For team-only mode, prefer per-instance leaderboards (team totals). If leaderboard lists players, derive team totals by summing those players per team.
+        const teamScoresMap = {};
+
+        for (const inst of instances) {
+          try {
+            const lbResp = await this.api.getActivityLeaderboard(inst.activity.id);
+            const lb = lbResp.leaderboard || [];
+            console.debug(`Instance ${inst.activity.id} leaderboard:`, lb.slice(0,10));
+
+            // Detect whether leaderboard contains team totals (entries with team_id or team_name)
+            const hasTeamEntries = lb.some(entry => entry.team_id || entry.team_name);
+
+            if (hasTeamEntries) {
+              // Use team entries directly
+              lb.forEach(entry => {
+                const score = Number(entry.total_score || entry.score || 0);
+                // determine key
+                let tidKey;
+                if (entry.team_id !== undefined && entry.team_id !== null) tidKey = String(entry.team_id);
+                else if (entry.id !== undefined && entry.id !== null) tidKey = String(entry.id);
+                else if (entry.team_name) tidKey = `name:${entry.team_name}`;
+                else return;
+
+                const teamObj = (entry.team_id !== undefined && entry.team_id !== null) ? (teamMap.get(entry.team_id) || teamMap.get(parseInt(tidKey))) : null;
+                const tname = teamObj?.name || entry.team_name || `Team ${tidKey}`;
+                if (!teamScoresMap[tidKey]) teamScoresMap[tidKey] = { team_name: tname, total_score: 0 };
+                teamScoresMap[tidKey].total_score = Math.max(teamScoresMap[tidKey].total_score, score);
+              });
+            } else {
+              // Leaderboard lists players; try to aggregate per-team using player->team mapping first
+              const teamAccum = {};
+              lb.forEach(entry => {
+                const pid = entry.player_id || entry.id || entry.player_name;
+                const pts = Number(entry.total_score || entry.score || 0);
+                const player = playerMap.get(pid);
+                const teamId = player ? player.team_id : null;
+                if (!teamId) return;
+                const key = String(teamId);
+                if (!teamAccum[key]) teamAccum[key] = 0;
+                teamAccum[key] += pts;
+              });
+
+              // If teamAccum is empty, fallback to detailed scores
+              if (Object.keys(teamAccum).length === 0) {
+                try {
+                  const scoresResp = await this.api.getActivityScores(inst.activity.id);
+                  const scores = this.api.extractArray(scoresResp, 'scores');
+                  scores.forEach(s => {
+                    const teamId = s.team_id || (s.player_id ? (playerMap.get(s.player_id)?.team_id) : null);
+                    if (!teamId) return;
+                    const key = String(teamId);
+                    const pts = Number(s.points || s.score || 0);
+                    if (!teamAccum[key]) teamAccum[key] = 0;
+                    teamAccum[key] += pts;
+                  });
+                } catch (e) {
+                  console.warn(`Fallback: could not fetch detailed scores for instance ${inst.activity.id}:`, e);
+                }
+              }
+
+              Object.keys(teamAccum).forEach(key => {
+                const score = teamAccum[key];
+                const teamObj = teamMap.get(parseInt(key)) || teamMap.get(key);
+                const tname = teamObj?.name || `Team ${key}`;
+                if (!teamScoresMap[key]) teamScoresMap[key] = { team_name: tname, total_score: 0 };
+                teamScoresMap[key].total_score = Math.max(teamScoresMap[key].total_score, score);
+              });
+            }
+          } catch (e) {
+            console.warn(`Error processing instance ${inst.activity.id}:`, e);
+          }
+        }
+
+        leaderboard = Object.values(teamScoresMap).sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+      } else {
+        // For player and team_with_players, compute per-instance totals and keep the MAX per team/player across instances
+        if (scoringMode === 'player') {
+          const playerBest = {}; // key -> { player_name, total_score }
+
+          for (const inst of instances) {
+            try {
+              // Try leaderboard first (gives aggregate per-player directly)
+              const lbResp = await this.api.getActivityLeaderboard(inst.activity.id);
+              const lb = lbResp.leaderboard || [];
+              if (lb.length > 0 && (lb[0].hasOwnProperty('player_name') || lb[0].hasOwnProperty('player_id'))) {
+                // Build instance totals
+                const instanceTotals = {};
+                lb.forEach(entry => {
+                  const pid = entry.player_id || entry.id || entry.player_name;
+                  const name = entry.player_name || entry.name || (playerMap.get(pid)?.name) || `Speler ${pid}`;
+                  const score = Number(entry.total_score || entry.score || 0);
+                  if (!instanceTotals[pid]) instanceTotals[pid] = 0;
+                  instanceTotals[pid] = Math.max(instanceTotals[pid], score);
+                });
+                // Merge into best
+                Object.keys(instanceTotals).forEach(pid => {
+                  const sc = instanceTotals[pid];
+                  if (!playerBest[pid] || playerBest[pid].total_score < sc) {
+                    playerBest[pid] = { player_name: playerMap.get(pid)?.name || String(pid), total_score: sc };
+                  }
+                });
+                continue;
+              }
+
+              // Fallback: use detailed scores and aggregate per player within this instance
+              const scoresResp = await this.api.getActivityScores(inst.activity.id);
+              const scores = this.api.extractArray(scoresResp, 'scores');
+              const instanceTotals2 = {};
+              scores.forEach(s => {
+                if (!s.player_id) return;
+                const pid = s.player_id;
+                const pts = Number(s.points || s.score || 0);
+                if (!instanceTotals2[pid]) instanceTotals2[pid] = 0;
+                instanceTotals2[pid] += pts; // accumulate within instance
+              });
+              Object.keys(instanceTotals2).forEach(pid => {
+                const sc = instanceTotals2[pid];
+                if (!playerBest[pid] || playerBest[pid].total_score < sc) {
+                  playerBest[pid] = { player_name: playerMap.get(pid)?.name || String(pid), total_score: sc };
+                }
+              });
+            } catch (e) {
+              console.warn(`Error processing player instance ${inst.activity.id}:`, e);
+            }
+          }
+
+          leaderboard = Object.values(playerBest).sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+        } else if (scoringMode === 'team_with_players') {
+          const teamBest = {}; // teamKey -> { name, score, players }
+
+          for (const inst of instances) {
+            try {
+              // Prefer detailed scores
+              const scoresResp = await this.api.getActivityScores(inst.activity.id);
+              const scores = this.api.extractArray(scoresResp, 'scores');
+              if (scores && scores.length > 0) {
+                const teamsInstance = {};
+                scores.forEach(s => {
+                  // Determine team id
+                  let teamId = s.team_id;
+                  if (!teamId && s.player_id) {
+                    const player = playerMap.get(s.player_id);
+                    teamId = player ? player.team_id : null;
+                  }
+                  if (!teamId) return;
+                  const tid = String(teamId);
+                  if (!teamsInstance[tid]) teamsInstance[tid] = { score: 0, players: {} };
+                  const pid = s.player_id;
+                  const pts = Number(s.points || s.score || 0);
+                  teamsInstance[tid].score += pts;
+                  if (pid) {
+                    teamsInstance[tid].players[pid] = { name: playerMap.get(pid)?.name || `Speler ${pid}`, score: (teamsInstance[tid].players[pid]?.score || 0) + pts };
+                  }
+                });
+
+                // Merge into best
+                Object.keys(teamsInstance).forEach(tid => {
+                  const instData = teamsInstance[tid];
+                  if (!teamBest[tid] || (teamBest[tid].score < instData.score)) {
+                    const teamObj = teamMap.get(parseInt(tid)) || teamMap.get(tid);
+                    teamBest[tid] = { name: teamObj?.name || `Team ${tid}`, score: instData.score, players: instData.players };
+                  }
+                });
+                continue;
+              }
+
+              // Fallback to leaderboards for this instance
+              const lbResp = await this.api.getActivityLeaderboard(inst.activity.id);
+              const lb = lbResp.leaderboard || [];
+              // lb may contain player entries or team totals; try to build team totals
+              const teamsFromLb = {};
+              lb.forEach(entry => {
+                if (entry.team_id || entry.team_name) {
+                  const key = entry.team_id ? String(entry.team_id) : `name:${entry.team_name}`;
+                  const sc = Number(entry.total_score || entry.score || 0);
+                  if (!teamsFromLb[key]) teamsFromLb[key] = { score: 0, players: {} };
+                  teamsFromLb[key].score = Math.max(teamsFromLb[key].score, sc);
+                } else if (entry.player_id || entry.player_name) {
+                  // assign player's score to their team if possible
+                  const pid = entry.player_id || entry.id || entry.player_name;
+                  const sc = Number(entry.total_score || entry.score || 0);
+                  const player = playerMap.get(pid);
+                  const tid = player?.team_id ? String(player.team_id) : null;
+                  if (!tid) return;
+                  if (!teamsFromLb[tid]) teamsFromLb[tid] = { score: 0, players: {} };
+                  teamsFromLb[tid].players[pid] = { name: entry.player_name || player?.name || String(pid), score: sc };
+                  // total will be sum of player contributions later, so accumulate
+                  teamsFromLb[tid].score += sc;
+                }
+              });
+
+              Object.keys(teamsFromLb).forEach(tk => {
+                const instData = teamsFromLb[tk];
+                if (!teamBest[tk] || teamBest[tk].score < instData.score) {
+                  const teamObj = teamMap.get(parseInt(tk)) || teamMap.get(tk);
+                  teamBest[tk] = { name: teamObj?.name || `Team ${tk}`, score: instData.score, players: instData.players };
+                }
+              });
+            } catch (e) {
+              console.warn(`Error processing team instance ${inst.activity.id}:`, e);
+            }
+          }
+
+          leaderboard = Object.values(teamBest).sort((a, b) => b.score - a.score);
+        }
+      }
+
+      // Remove any existing modal
+      const existingModal = document.getElementById('highscores-modal');
+      if (existingModal) existingModal.remove();
+
+      // Create modal content
+      const modal = document.createElement('div');
+      modal.id = 'highscores-modal';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-height: 70vh; overflow-y: auto;">
+          <div class="modal-close">&times;</div>
+          <div id="highscores-modal-body">
+            <div class="active-session-card" style="border: none; box-shadow: none; padding: 0;">
+              <div class="session-header">
+                <div>
+                  <h3 class="session-title">${this.escapeHtml(activity.name)}</h3>
+                  <p style="margin: 5px 0; color: var(--text-secondary);">${this.escapeHtml(activity.sport_type)} • ${this.escapeHtml(activity.scoring_mode)}</p>
+                </div>
+              </div>
+              <div class="scores-display" id="highscores-details"></div>
+              <div class="session-controls">
+                <button class="btn btn-secondary" onclick="this.closest('.modal').classList.remove('show')">✕ Sluiten</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Display scores into this modal's container (avoid global ID collisions)
+      const detailsEl = modal.querySelector('#highscores-details');
+      console.debug('Opening highscores modal for activity', activityId, {
+        relevantSessions: (typeof relevantSessions !== 'undefined' ? relevantSessions.length : null),
+        allScoresCount: (typeof allScores !== 'undefined' ? (Array.isArray(allScores) ? allScores.length : null) : null),
+        leaderboardCount: (Array.isArray(leaderboard) ? leaderboard.length : null),
+        teams: (Array.isArray(allTeams) ? allTeams.length : null),
+        players: (Array.isArray(allPlayers) ? allPlayers.length : null)
+      });
+      await this.displayHighscoreScores(activityId, leaderboard, activity, combinedSession, detailsEl);
+
+      modal.classList.add('show');
+
+      // Setup close handler
+      const closeBtn = modal.querySelector('.modal-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          modal.classList.remove('show');
+          setTimeout(() => modal.remove(), 300);
+        });
+      }
+
+      // Close on outside click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('show');
+          setTimeout(() => modal.remove(), 300);
+        }
+      });
+
+    } catch (error) {
+      console.error('Error showing highscore details:', error);
+      this.showErrorMessage('Fout bij het laden van highscore details.');
+    }
+  }
+
+  async displayHighscoreScores(activityId, leaderboard, activity, session, containerEl = null) {
+    const container = containerEl || document.getElementById('highscores-details');
+    if (!container) {
+      console.warn('Highscores details container not found');
+      return;
+    }
+
+    console.debug('Displaying highscores', { activityId, leaderboard, activity, session });
+
+    if (!leaderboard || leaderboard.length === 0) {
+      container.innerHTML = '<p>Geen scores beschikbaar.</p>';
+      return;
+    }
+
+    const scoringMode = activity.scoring_mode || 'team';
+
+    if (scoringMode === 'player') {
+      const sortedPlayers = leaderboard.filter(p => p.total_score > 0);
+      container.innerHTML = sortedPlayers.map((player, index) => `
+        <div class="score-item">
+          <div class="score-item-name">#${index + 1} ${this.escapeHtml(player.player_name || 'Onbekend')}</div>
+          <div class="score-item-value">${player.total_score || 0}</div>
+        </div>
+      `).join('');
+    } else if (scoringMode === 'team') {
+      // Ensure numeric scores and always show teams (including zero scores)
+      const normalized = (leaderboard || []).map(t => ({
+        team_name: t.team_name || t.name || t.team || 'Onbekend',
+        total_score: Number(t.total_score || t.score || 0)
+      }));
+
+      // Debug: log what we will render
+      console.debug('Rendering team highscores', normalized);
+
+      const sortedTeams = normalized.sort((a, b) => b.total_score - a.total_score);
+      container.innerHTML = sortedTeams.map((team, index) => `
+        <div class="score-item">
+          <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.team_name || 'Onbekend')}</div>
+          <div class="score-item-value">${team.total_score}</div>
+        </div>
+      `).join('');
+    } else if (scoringMode === 'team_with_players') {
+      const sortedTeams = leaderboard.filter(t => t.score > 0);
+      container.innerHTML = sortedTeams.map((team, index) => {
+        const playersList = Object.values(team.players || {}).filter(p => p.score > 0);
+        return `
+          <div class="score-item">
+            <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.name || 'Onbekend')} (${team.score})</div>
+            <div class="score-item-value">
+              ${playersList.map(p => `${this.escapeHtml(p.name)}: ${p.score}`).join(', ')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   showSection(sectionName) {

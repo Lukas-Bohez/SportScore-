@@ -560,6 +560,12 @@ class BigScreenDisplay {
     // so we do a full refresh. For team mode, we can update incrementally.
     console.log('Score update received:', data);
 
+    // Ignore updates for non-active activities
+    if (this.activeActivityId && data.session_id && parseInt(data.session_id) !== this.activeActivityId) {
+      console.log('BigScreen: Ignoring score update for non-active activity', data.session_id, 'active:', this.activeActivityId);
+      return;
+    }
+
     if (!this.currentSession || !this.teamsContainer) {
       // If no session loaded yet, do full refresh
       this.loadInitialData();
@@ -567,8 +573,9 @@ class BigScreenDisplay {
     }
 
     // Check modes that need full refresh when player scores change
-    const isPlayerMode = this.currentSession && this.currentSession.scoring_mode === 'player';
-    const isTeamWithPlayers = this.currentSession && this.currentSession.scoring_mode === 'team_with_players';
+    const scoringMode = (this.activeActivity && this.activeActivity.scoring_mode) || (this.currentSession && this.currentSession.scoring_mode) || 'team';
+    const isPlayerMode = scoringMode === 'player';
+    const isTeamWithPlayers = scoringMode === 'team_with_players';
 
     if ((isPlayerMode || isTeamWithPlayers) && data.player_id) {
       // Player-related update - refresh to recalculate top players
