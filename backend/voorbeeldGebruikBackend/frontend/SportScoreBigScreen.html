@@ -64,7 +64,7 @@
         });
 
         // Generate QR code for WiFi
-        const wifiString = 'WIFI:S:PiHotspot;T:WPA;P:raspberry;;';
+        const wifiString = 'WIFI:T:WPA;S:pihotspot;P:raspberry;;';
         try {
             new QRCode(document.getElementById('qrcode'), {
                 text: wifiString,
@@ -77,7 +77,6 @@
         }
 
         // QR functionality is handled by BigScreenDisplay class in bigscreen.js
-    </script>
     </script>
     <style>
         .qr-overlay {
