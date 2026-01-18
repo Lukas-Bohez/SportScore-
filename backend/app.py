@@ -824,6 +824,12 @@ async def create_player_for_team(session_id: int, team_id: int, player: PlayerCr
     player_id = PlayerRepository.create_player(player.name, team_id, player.position)
     if not player_id:
         raise HTTPException(status_code=400, detail="Failed to create player")
+    # Also assign this new player to the session/team mapping for the session
+    try:
+        SessionPlayerRepository.assign_player_to_session(session_id, team_id, player_id)
+    except Exception:
+        # Ignore failures here (e.g., if already assigned) to preserve idempotency
+        pass
     created_player = PlayerRepository.get_player_by_id(player_id)
     return PlayerResponse(**created_player)
 
@@ -898,6 +904,8 @@ async def create_global_activity(activity: ActivityCreate):
         sport_type=activity.sport_type,
         game_type=activity.game_type,
         scoring_mode=activity.scoring_mode,
+        time_winner=(activity.time_winner or 'lower'),
+        aggregate_player_times=1 if activity.aggregate_player_times else 0,
         total_rounds=activity.total_rounds,
         time_limit=activity.time_limit,
         description=activity.description
@@ -930,6 +938,8 @@ async def create_activity_in_session(session_id: int, activity: ActivityCreate):
         sport_type=activity.sport_type,
         game_type=activity.game_type,
         scoring_mode=activity.scoring_mode,
+        time_winner=(activity.time_winner or 'lower'),
+        aggregate_player_times=1 if activity.aggregate_player_times else 0,
         total_rounds=activity.total_rounds,
         time_limit=activity.time_limit,
         description=activity.description
@@ -952,6 +962,8 @@ async def update_activity(activity_id: int, activity_update: ActivityUpdate):
         sport_type=activity_update.sport_type,
         game_type=activity_update.game_type,
         scoring_mode=activity_update.scoring_mode,
+        time_winner=activity_update.time_winner,
+        aggregate_player_times=activity_update.aggregate_player_times,
         status=activity_update.status,
         current_round=activity_update.current_round,
         total_rounds=activity_update.total_rounds,
@@ -1001,8 +1013,18 @@ async def remove_team_from_activity(activity_id: int, team_id: int):
 # Activity Players (opt-in)
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerListResponse, tags=["Activity Players"], summary="List players for activity")
 async def get_activity_players(activity_id: int):
-    players = ActivityPlayerRepository.get_players(activity_id)
-    return ActivityPlayerListResponse(players=[ActivityPlayerResponse(**p) for p in players])
+    rows = ActivityPlayerRepository.get_players(activity_id)
+    players = []
+    for r in rows:
+        player_obj = {
+            'id': r.get('id', -1),
+            'activity_id': r.get('activity_id', activity_id),
+            'player_id': r.get('player_id'),
+            'opted_in': r.get('opted_in', 1),
+            'joined_at': r.get('joined_at')
+        }
+        players.append(ActivityPlayerResponse(**player_obj))
+    return ActivityPlayerListResponse(players=players)
 
 @app.post(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerResponse, tags=["Activity Players"], summary="Add player to activity")
 async def add_player_to_activity(activity_id: int, request: Request):
@@ -1014,9 +1036,18 @@ async def add_player_to_activity(activity_id: int, request: Request):
     if not player_id:
         raise HTTPException(status_code=422, detail="Field 'player_id' is required")
     ActivityPlayerRepository.add_player(activity_id, player_id, 1)
-    players = ActivityPlayerRepository.get_players(activity_id)
-    player = next((p for p in players if int(p['id']) == int(player_id)), None)
-    return ActivityPlayerResponse(**player) if player else ActivityPlayerResponse(activity_id=activity_id, player_id=player_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
+    rows = ActivityPlayerRepository.get_players(activity_id)
+    player_row = next((r for r in rows if int(r.get('player_id')) == int(player_id)), None)
+    if player_row:
+        player_obj = {
+            'id': player_row.get('id', -1),
+            'activity_id': activity_id,
+            'player_id': player_row.get('player_id'),
+            'opted_in': player_row.get('opted_in', 1),
+            'joined_at': player_row.get('joined_at')
+        }
+        return ActivityPlayerResponse(**player_obj)
+    return ActivityPlayerResponse(activity_id=activity_id, player_id=player_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
 
 @app.delete(f"{ENDPOINT}/activities/{{activity_id}}/players/{{player_id}}", tags=["Activity Players"], summary="Remove player from activity")
 async def remove_player_from_activity(activity_id: int, player_id: int):

@@ -970,19 +970,20 @@ class ActivityRepository:
 
     @staticmethod
     def create_activity(session_id: Optional[int], name: str, sport_type: str = 'custom', game_type: str = 'custom',
-                        scoring_mode: str = 'team', total_rounds: int = 1, time_limit: Optional[int] = None,
+                        scoring_mode: str = 'team', time_winner: str = 'lower', aggregate_player_times: int = 0,
+                        total_rounds: int = 1, time_limit: Optional[int] = None,
                         description: Optional[str] = None) -> int:
         sql = """
-        INSERT INTO activities (session_id, name, sport_type, game_type, scoring_mode, total_rounds, time_limit, description, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'setup')
+        INSERT INTO activities (session_id, name, sport_type, game_type, scoring_mode, time_winner, aggregate_player_times, total_rounds, time_limit, description, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'setup')
         """
-        return Database.execute_sql(sql, [session_id, name, sport_type, game_type, scoring_mode, total_rounds, time_limit, description])
+        return Database.execute_sql(sql, [session_id, name, sport_type, game_type, scoring_mode, time_winner, aggregate_player_times, total_rounds, time_limit, description])
 
     @staticmethod
     def get_activities_by_session(session_id: Optional[int] = None) -> List[Dict[str, Any]]:
         if session_id is None:
             sql = """
-            SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+            SELECT id, session_id, name, sport_type, game_type, scoring_mode, time_winner, aggregate_player_times, status, total_rounds, time_limit, current_round, description,
                    created_at, updated_at
             FROM activities
             WHERE session_id IS NULL
@@ -991,7 +992,7 @@ class ActivityRepository:
             return Database.get_rows(sql)
         else:
             sql = """
-            SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+            SELECT id, session_id, name, sport_type, game_type, scoring_mode, time_winner, aggregate_player_times, status, total_rounds, time_limit, current_round, description,
                    created_at, updated_at
             FROM activities
             WHERE session_id = ?
@@ -1002,7 +1003,7 @@ class ActivityRepository:
     @staticmethod
     def get_activity_by_id(activity_id: int) -> Optional[Dict[str, Any]]:
         sql = """
-        SELECT id, session_id, name, sport_type, game_type, scoring_mode, status, total_rounds, time_limit, current_round, description,
+        SELECT id, session_id, name, sport_type, game_type, scoring_mode, time_winner, aggregate_player_times, status, total_rounds, time_limit, current_round, description,
                created_at, updated_at
         FROM activities
         WHERE id = ?
@@ -1011,7 +1012,7 @@ class ActivityRepository:
 
     @staticmethod
     def update_activity(activity_id: int, name: Optional[str] = None, sport_type: Optional[str] = None,
-                        game_type: Optional[str] = None, scoring_mode: Optional[str] = None, status: Optional[str] = None,
+                        game_type: Optional[str] = None, scoring_mode: Optional[str] = None, time_winner: Optional[str] = None, aggregate_player_times: Optional[bool] = None, status: Optional[str] = None,
                         current_round: Optional[int] = None, total_rounds: Optional[int] = None,
                         time_limit: Optional[int] = None, description: Optional[str] = None) -> bool:
         updates = []
@@ -1028,6 +1029,12 @@ class ActivityRepository:
         if scoring_mode is not None:
             updates.append("scoring_mode = ?")
             params.append(scoring_mode)
+        if time_winner is not None:
+            updates.append("time_winner = ?")
+            params.append(time_winner)
+        if aggregate_player_times is not None:
+            updates.append("aggregate_player_times = ?")
+            params.append(1 if aggregate_player_times else 0)
         if status is not None:
             updates.append("status = ?")
             params.append(status)
@@ -1102,13 +1109,17 @@ class ActivityPlayerRepository:
     @staticmethod
     def get_players(activity_id: int) -> List[Dict[str, Any]]:
         sql = """
-        SELECT p.id, p.name, p.team_id, ap.opted_in, ap.joined_at
+        SELECT ap.id as id, p.id as player_id, p.name as player_name, p.team_id, ap.opted_in, ap.joined_at
         FROM activity_players ap
         JOIN players p ON p.id = ap.player_id
         WHERE ap.activity_id = ?
         ORDER BY p.name ASC
         """
-        return Database.get_rows(sql, [activity_id])
+        rows = Database.get_rows(sql, [activity_id])
+        # Normalize rows to include activity_id for API responses
+        for r in rows:
+            r['activity_id'] = activity_id
+        return rows
 
 class ActivityScoreRepository:
     """

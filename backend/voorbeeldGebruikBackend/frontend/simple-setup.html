@@ -573,6 +573,21 @@
             color: var(--input-text, #495057);
             border: 1px solid var(--input-border, #ced4da);
         }
+
+        /* Improved layout for player input and Team-vs-Time settings */
+        .form-group.vertical { display: flex; flex-direction: column; gap: 8px; }
+        .full-width { width: 100%; box-sizing: border-box; }
+        .add-team-btn { padding: 8px 12px; }
+        .tvt-settings { background: var(--card-background, #ffffff); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-color, #e1e5e9); margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .tvt-title { font-weight: 700; display: block; margin-bottom: 8px; }
+        .tvt-controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+        .tvt-field { min-width: 220px; }
+        .tvt-help { color: var(--text-secondary, #6c757d); font-size: 0.9em; margin-top: 8px; }
+
+        @media (max-width: 720px) {
+            .tvt-controls { flex-direction: column; align-items: stretch; }
+            .tvt-field { min-width: 100%; }
+        }
     </style>
 </head>
 
@@ -613,14 +628,13 @@
                     </div>
 
                     <!-- Existing activities selection -->
-                    <div class="form-group" style="margin-bottom: 20px;">
+                    <div class="form-group label-left-control-right" style="margin-bottom: 20px;">
                         <label for="existing-activity-select">Of selecteer een bestaande activiteit:</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <select id="existing-activity-select" style="flex: 3;">
+                        <div class="control-group">
+                            <select id="existing-activity-select">
                                 <option value="">-- Selecteer een bestaande activiteit --</option>
                             </select>
-                            <button id="add-existing-activity-btn" class="add-team-btn btn-sm"
-                                style="padding: 8px 16px; flex: 1;">Toevoegen</button>
+                            <button id="add-existing-activity-btn" class="add-team-btn btn-sm">Toevoegen</button>
                         </div>
                     </div>
 
@@ -669,17 +683,47 @@
                                         <option value="golf">⛳ Golf Scoring</option>
                                     </select>
                                 </div>
+
+                                <!-- Team-vs-Time settings moved below for improved layout -->
                             </div>
+
+                            <!-- Better placed Team vs Time settings (full-width, clearer layout) -->
                             <div class="form-row">
+                                <div class="form-group full-width">
+                                    <div id="team-vs-time-settings" class="tvt-settings hidden">
+                                        <div class="tvt-title-row">
+                                            <span class="tvt-title">Team vs Tijd instellingen</span>
+                                        </div>
+
+                                        <div class="tvt-row">
+                                            <label for="activity-time-winner" class="tvt-row-label">Wie wint?</label>
+                                            <select id="activity-time-winner" name="activity-time-winner" class="tvt-select full-width-xs">
+                                                <option value="lower">Laagste tijd wint (aanbevolen)</option>
+                                                <option value="higher">Hoogste tijd wint</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="tvt-row">
+                                            <label for="activity-aggregate-times" class="tvt-row-label">Tel speler tijden op voor team totaal</label>
+                                            <div class="tvt-control">
+                                                <label class="switch" aria-label="Tel speler tijden op voor team totaal">
+                                                  <input type="checkbox" id="activity-aggregate-times" name="activity-aggregate-times">
+                                                  <span class="slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row" style="display:none;" data-removed-for-now="true">
                                 <div class="form-group">
                                     <label for="activity-rounds">Aantal Rondes:</label>
-                                    <input type="number" id="activity-rounds" name="activity-rounds" value="1" min="1"
-                                        max="10">
+                                    <input type="number" id="activity-rounds" name="activity-rounds" value="1" min="1" max="10">
                                 </div>
                                 <div class="form-group">
                                     <label for="activity-time">Tijdslimiet (min):</label>
-                                    <input type="number" id="activity-time" name="activity-time" placeholder="Optioneel"
-                                        min="1">
+                                    <input type="number" id="activity-time" name="activity-time" placeholder="Optioneel" min="1">
                                 </div>
                             </div>
                             <div class="form-group">
@@ -714,14 +758,13 @@
                     </div>
 
                     <!-- Existing teams selection -->
-                    <div class="form-group" style="margin-bottom: 20px;">
+                    <div class="form-group label-left-control-right" style="margin-bottom: 20px;">
                         <label for="existing-team-select">Of selecteer een bestaand team:</label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <select id="existing-team-select" style="flex: 3;">
+                        <div class="control-group">
+                            <select id="existing-team-select">
                                 <option value="">-- Selecteer een bestaand team --</option>
                             </select>
-                            <button id="add-existing-team-btn" class="add-team-btn btn-sm"
-                                style="padding: 8px 16px; flex: 1;">Toevoegen</button>
+                            <button id="add-existing-team-btn" class="add-team-btn btn-sm">Toevoegen</button>
                         </div>
                     </div>
 
@@ -792,12 +835,11 @@
                             <label for="team-for-player">Team:</label>
                             <select id="team-for-player" name="team-for-player"></select>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group vertical">
                             <label for="player-name">Speler Naam:</label>
-                            <input type="text" id="player-name" name="player-name" placeholder="bijv. Jan">
-                            <button id="add-player" class="add-team-btn" style="flex-shrink: 0;">Speler
-                                Toevoegen</button>
-                        </div>
+                            <input type="text" id="player-name" name="player-name" class="full-width" placeholder="bijv. Jan">
+                            <button id="add-player" class="add-team-btn">Speler Toevoegen</button>
+                        </div> 
                         <div class="form-group">
                             <label for="player-search">Zoek spelers:</label>
                             <input type="text" id="player-search" placeholder="Typ om te zoeken...">

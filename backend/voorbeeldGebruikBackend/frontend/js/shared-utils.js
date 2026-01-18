@@ -40,6 +40,72 @@ class SharedUtils {
   }
 
   /**
+   * Return whether lower values are better for the provided activity.
+   * - For `team_vs_time` uses the activity.time_winner ('lower'|'higher')
+   * - Otherwise falls back to checking for 'golf' in game_type/scoring_mode
+   * @param {Object} activity
+   * @returns {boolean}
+   */
+  static isLowerBetter(activity) {
+    if (!activity) return false;
+    const gameType = String(activity.game_type || '').toLowerCase();
+    if (gameType === 'team_vs_time') {
+      return String(activity.time_winner || 'lower').toLowerCase() === 'lower';
+    }
+    return (gameType + '|' + String(activity.scoring_mode || '')).toLowerCase().includes('golf');
+  }
+
+  isLowerBetter(activity) { return SharedUtils.isLowerBetter(activity); }
+
+  /**
+   * Parse a time string ("MM:SS(.ms)", "SS(.ms)", or seconds like "83.45") into integer milliseconds.
+   * Returns integer milliseconds or NaN if invalid.
+   */
+  static parseTimeToMs(str) {
+    if (str == null) return NaN;
+    const s = String(str).trim();
+    if (s === '') return NaN;
+
+    // MM:SS(.ms)
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      if (parts.length !== 2) return NaN;
+      const mins = parseInt(parts[0]);
+      const secs = parseFloat(parts[1]);
+      if (isNaN(mins) || isNaN(secs)) return NaN;
+      return Math.round((mins * 60 + secs) * 1000);
+    }
+
+    // Plain numeric -> interpret as seconds (supports fractional seconds)
+    const asFloat = parseFloat(s);
+    if (!isNaN(asFloat)) {
+      return Math.round(asFloat * 1000);
+    }
+
+    return NaN;
+  }
+
+  parseTimeToMs(str) { return SharedUtils.parseTimeToMs(str); }
+
+  /**
+   * Format milliseconds to "M:SS.mmm" string (minutes:seconds.milliseconds)
+   */
+  static formatMs(ms) {
+    if (ms == null || isNaN(ms)) return '';
+    const totalMs = Number(ms);
+    const sign = totalMs < 0 ? '-' : '';
+    const abs = Math.abs(totalMs);
+    const minutes = Math.floor(abs / 60000);
+    const seconds = Math.floor((abs % 60000) / 1000);
+    const milliseconds = abs % 1000;
+    const secStr = String(seconds).padStart(2, '0');
+    const msStr = String(milliseconds).padStart(3, '0');
+    return `${sign}${minutes}:${secStr}.${msStr}`;
+  }
+
+  formatMs(ms) { return SharedUtils.formatMs(ms); }
+
+  /**
    * Standardized edit handler for finding and displaying items
    * @param {string} itemType - Type of item ('team', 'activity', 'player')
    * @param {number} itemId - ID of the item to edit

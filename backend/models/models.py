@@ -59,6 +59,10 @@ class ActivityBase(BaseModel):
     sport_type: str = "custom"
     game_type: str = "custom"
     scoring_mode: str = "team"  # "team", "team_with_players", or "player"
+    # For time-based activities (e.g., team_vs_time): 'lower' means lower time wins, 'higher' means higher time wins
+    time_winner: str = "lower"
+    # If true, aggregate individual player times to produce a team total
+    aggregate_player_times: bool = False
     total_rounds: int = 1
     time_limit: Optional[int] = None
     description: Optional[str] = None
@@ -71,6 +75,8 @@ class ActivityUpdate(BaseModel):
     sport_type: Optional[str] = None
     game_type: Optional[str] = None
     scoring_mode: Optional[str] = None
+    time_winner: Optional[str] = None
+    aggregate_player_times: Optional[bool] = None
     status: Optional[str] = None
     current_round: Optional[int] = None
     total_rounds: Optional[int] = None

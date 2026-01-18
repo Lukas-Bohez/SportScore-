@@ -37,6 +37,7 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/shared-utils.js"></script>
     <script src="js/bigscreen.js"></script>
     <script>
         // Wait for API to initialize socket, then set up logging
@@ -99,6 +100,9 @@
             border-radius: 10px;
             text-align: center;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            max-width: 92vw; /* ensure it never extends beyond viewport width */
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .qr-container h2 {

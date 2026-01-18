@@ -301,7 +301,7 @@
                 </div>
 
                 <!-- Points Input -->
-                <div class="form-group">
+                <div class="form-group" id="points-group">
                     <label for="points-input">Punten:</label>
                     <div class="points-controls">
                         <button id="subtract-btn" type="button">-</button>
@@ -310,10 +310,30 @@
                     </div>
                 </div>
 
-                <!-- Reason Input -->
-                <div class="form-group">
+                <!-- Time Controls (visible for team_vs_time activities) -->
+                <div id="time-controls" class="form-group" style="display: none;">
+                    <label>Tijd invoer (Team vs Time)</label>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <div style="font-weight:600; margin-bottom:6px; width:100%;">Tijd</div>
+                            <input type="number" id="set-minutes" placeholder="min" min="0" style="width:68px;" />
+                            <span>:</span>
+                            <input type="number" id="set-seconds" placeholder="sec" min="0" max="59" style="width:68px;" />
+                            <span>.</span>
+                            <input type="number" id="set-ms" placeholder="ms" min="0" max="999" style="width:90px;" />
+                            <button id="set-time-btn" class="control-btn" type="button">Set</button>
+                            <button id="add-time-btn" class="control-btn" type="button">Add</button>
+                        </div>
+
+                        <!-- removed redundant record button - Set/Add will submit immediately -->
+                    </div>
+                    <div style="margin-top:8px;color:var(--text-secondary);font-size:0.9em;">Tip: vul minuten, seconden of milliseconden in en klik op <strong>Set</strong> of <strong>Add</strong> — de waarde wordt direct geregistreerd.</div>
+                </div>
+
+                <!-- Reason Input (visible except in team_vs_time) -->
+                <div class="form-group" id="reason-group">
                     <label for="reason-input">Reden:</label>
-                    <input type="text" id="reason-input" placeholder="Bijv. Doelpunt, Bonus, etc." required>
+                    <input type="text" id="reason-input" placeholder="Bijv. Doelpunt, Bonus, etc.">
                 </div>
 
                 <!-- Submit Button -->
@@ -373,6 +393,7 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/shared-utils.js"></script>
     <script src="js/simple-scoreinput.js"></script>
 </body>
 

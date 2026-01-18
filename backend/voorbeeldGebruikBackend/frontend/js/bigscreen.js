@@ -370,7 +370,9 @@ class BigScreenDisplay {
         liveData = await api.getActivityLeaderboard(this.activeActivityId);
         // Load active activity details for header/context
         try {
-          this.activeActivity = await api.getActivity(this.activeActivityId);
+          let fetched = await api.getActivity(this.activeActivityId);
+          if (fetched && fetched.activity) fetched = fetched.activity;
+          this.activeActivity = fetched;
         } catch (e) {
           console.warn('BigScreen: Unable to load active activity details:', e);
           this.activeActivity = null;
@@ -388,6 +390,9 @@ class BigScreenDisplay {
             const activeFromSession = liveData.session.activities.find(a => a.is_active || a.active || a.status === 'active');
             if (activeFromSession && activeFromSession.id) {
               this.activeActivityId = activeFromSession.id;
+            } else if (liveData.session.activities.length === 1) {
+              // If there's exactly one activity in the session, use it as the active activity
+              this.activeActivityId = liveData.session.activities[0].id;
             }
           }
         } catch (_) {}
@@ -395,7 +400,19 @@ class BigScreenDisplay {
         // Apply theme based on sport_type
         this.applyTheme(liveData.session.sport_type || 'custom');
 
-        // If backend returned participant leaderboard, convert to team leaderboard
+        // Ensure we have detailed activeActivity object available (helps determine time rules)
+        if (this.activeActivityId && !this.activeActivity) {
+          try {
+            let fetched = await api.getActivity(this.activeActivityId);
+            if (fetched && fetched.activity) fetched = fetched.activity;
+            this.activeActivity = fetched;
+          } catch (e) {
+            console.warn('BigScreen: could not fetch active activity details:', e);
+            this.activeActivity = null;
+          }
+        }
+
+        // If backend returned participant leaderboard, convert to team leaderboard,
         const lb = liveData.leaderboard || [];
         const isParticipantData = lb.length > 0 && Object.prototype.hasOwnProperty.call(lb[0], 'player_name');
         if (isParticipantData) {
@@ -482,11 +499,37 @@ class BigScreenDisplay {
       console.warn('Could not load scores for player stats:', err);
     }
 
-    // Compute team totals from allScores to ensure correct totals
+    // Try to determine activity settings (time mode / aggregation) early so we can parse scores correctly
+    let activity = this.activeActivity;
+    if (!activity && activityId) {
+      try {
+        activity = await api.getActivity(activityId);
+      } catch (_) {
+        activity = null;
+      }
+    }
+    const isTimeActivity = !!(activity && String(activity.game_type) === 'team_vs_time');
+    const aggregatePlayerTimes = !!(activity && activity.aggregate_player_times);
+    const timeWinner = (activity && activity.time_winner) ? String(activity.time_winner).toLowerCase() : 'lower';
+
+    // Helper to parse points into numeric value (ms when time activity)
+    const parsePoints = (raw) => {
+      if (raw == null) return 0;
+      if (!isTimeActivity) {
+        const n = Number(raw);
+        return isNaN(n) ? 0 : n;
+      }
+      const n = Number(raw);
+      if (!isNaN(n)) return n;
+      const ms = SharedUtils.parseTimeToMs(String(raw));
+      return isNaN(ms) ? 0 : ms;
+    };
+
+    // Compute team totals from allScores (fallback) to ensure we have a baseline, using parser
     const teamTotals = {};
     for (const s of allScores) {
       const tid = s.team_id;
-      const pts = Number(s.points) || 0;
+      const pts = parsePoints(s.points);
       if (!tid) continue;
       teamTotals[tid] = (teamTotals[tid] || 0) + pts;
     }
@@ -499,11 +542,6 @@ class BigScreenDisplay {
         continue;
       }
 
-      // Override team total score when computed
-      if (Object.prototype.hasOwnProperty.call(teamTotals, team.team_id)) {
-        team.total_score = teamTotals[team.team_id];
-      }
-      
       try {
         const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
         team.players = resp && resp.players ? resp.players : [];
@@ -517,9 +555,50 @@ class BigScreenDisplay {
             // Sum up all scores for this player; restrict to this team when team_id present
             const playerPoints = allScores
               .filter((score) => score.player_id === player.id && (!team.team_id || score.team_id === team.team_id))
-              .reduce((sum, score) => sum + score.points, 0);
-            team.playerScores[player.id] = playerPoints;
+              .reduce((sum, score) => sum + parsePoints(score.points), 0);
+            team.playerScores[String(player.id)] = playerPoints;
           });
+
+          // If this activity is a time activity, compute team total according to settings
+          if (isTimeActivity) {
+            const playerVals = Object.values(team.playerScores).map(v => Number(v) || 0);
+
+            // Debug: show current activity flags and raw values for diagnosis
+            try { console.debug('BigScreen: time activity flags', { activityId: activityId, isTimeActivity, aggregatePlayerTimes, timeWinner, allScoresCount: allScores.length, team_id: team.team_id, playerVals }); } catch(_) {}
+
+            if (playerVals.length > 0) {
+              if (aggregatePlayerTimes) {
+                // Sum player times (include zeros)
+                team.total_score = playerVals.reduce((a, b) => a + b, 0);
+              } else {
+                // Use best player according to time_winner (consider zeros valid)
+                if (timeWinner === 'higher') {
+                  team.total_score = Math.max(...playerVals);
+                } else {
+                  // lower wins
+                  team.total_score = Math.min(...playerVals);
+                }
+              }
+              // Debug log for diagnosis
+              try { console.debug('BigScreen: computed team.total_score', { team_id: team.team_id, total_score: team.total_score, playerScores: team.playerScores, aggregatePlayerTimes, timeWinner, playerVals }); } catch(_) {}
+            } else {
+              // Fallback to any precomputed teamTotals (e.g., if team-level scores were recorded)
+              if (Object.prototype.hasOwnProperty.call(teamTotals, team.team_id)) {
+                team.total_score = teamTotals[team.team_id];
+              }
+            }
+          } else {
+            // Not a time activity - fallback to teamTotals when available
+            if (Object.prototype.hasOwnProperty.call(teamTotals, team.team_id)) {
+              team.total_score = teamTotals[team.team_id];
+            }
+          }
+        } else {
+          // No players for team - fallback to teamTotals
+          team.playerScores = {};
+          if (Object.prototype.hasOwnProperty.call(teamTotals, team.team_id)) {
+            team.total_score = teamTotals[team.team_id];
+          }
         }
       } catch (err) {
         const msg = err && err.message ? err.message : '';
@@ -577,8 +656,90 @@ class BigScreenDisplay {
     const isPlayerMode = scoringMode === 'player';
     const isTeamWithPlayers = scoringMode === 'team_with_players';
 
-    if ((isPlayerMode || isTeamWithPlayers) && data.player_id) {
-      // Player-related update - refresh to recalculate top players
+    if (data.player_id) {
+      // In time-mode or team-with-players we can update the affected player incrementally
+      const scoringModeLocal = (this.activeActivity && this.activeActivity.scoring_mode) || (this.currentSession && this.currentSession.scoring_mode) || 'team';
+      const isTimeModeLocal = this.isTimeMode();
+
+      if (isTimeModeLocal || scoringModeLocal === 'team_with_players') {
+        // Update player and team incrementally
+        const teamId = data.team_id;
+        const playerId = data.player_id;
+        const pointsChange = data.points || 0;
+
+        // Find the team element
+        const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
+        for (const teamElement of teamElements) {
+          const teamIdAttr = teamElement.getAttribute('data-team-id');
+          if (teamIdAttr && parseInt(teamIdAttr) === parseInt(teamId)) {
+            // Update team score
+            const scoreElement = teamElement.querySelector('.team-score');
+            if (scoreElement) {
+              // If the activity aggregates player times to compute team totals, recompute from player badges
+              const aggregatePlayerTimes = !!(this.activeActivity && this.activeActivity.aggregate_player_times);
+              const timeWinner = (this.activeActivity && this.activeActivity.time_winner) ? String(this.activeActivity.time_winner).toLowerCase() : 'lower';
+              let newTeamMs;
+              const playerBadges = teamElement.querySelectorAll('[data-player-score-ms]');
+              if (aggregatePlayerTimes) {
+                // Sum all player badge ms under this team element
+                newTeamMs = 0;
+                playerBadges.forEach(pb => {
+                  newTeamMs += parseInt(pb.getAttribute('data-player-score-ms')) || 0;
+                });
+              } else {
+                // Non-aggregate: derive team score from best/worst player time
+                const vals = Array.from(playerBadges).map(pb => parseInt(pb.getAttribute('data-player-score-ms')) || 0);
+                if (vals.length > 0) {
+                  newTeamMs = (timeWinner === 'higher') ? Math.max(...vals) : Math.min(...vals);
+                } else {
+                  // Fallback: apply delta to current team ms (legacy behavior)
+                  const currentTeamMs = parseInt(scoreElement.getAttribute('data-team-score-ms')) || 0;
+                  newTeamMs = currentTeamMs + (pointsChange || 0);
+                }
+              }
+
+              scoreElement.setAttribute('data-team-score-ms', String(newTeamMs));
+              scoreElement.textContent = isTimeModeLocal ? SharedUtils.formatMs(newTeamMs) : newTeamMs;
+              scoreElement.classList.add('score-flash');
+              setTimeout(() => scoreElement.classList.remove('score-flash'), 500);
+            }
+
+            // Update player badge if present
+            const playerBadge = teamElement.querySelector(`[data-player-id="${playerId}"]`);
+            if (playerBadge) {
+              const currentPlayerMs = parseInt(playerBadge.getAttribute('data-player-score-ms')) || 0;
+              const newPlayerMs = currentPlayerMs + (pointsChange || 0);
+              playerBadge.setAttribute('data-player-score-ms', String(newPlayerMs));
+
+              const scorePart = playerBadge.querySelector('.player-score-part');
+              if (scorePart) {
+                scorePart.textContent = isTimeModeLocal ? SharedUtils.formatMs(newPlayerMs) : newPlayerMs;
+              } else if (isTimeModeLocal || newPlayerMs > 0) {
+                // In time mode, even 0 is a valid / meaningful value to display
+                const span = document.createElement('span');
+                span.className = 'player-score-part';
+                span.textContent = isTimeModeLocal ? SharedUtils.formatMs(newPlayerMs) : newPlayerMs;
+                playerBadge.appendChild(span);
+              }
+
+              // small flash animation
+              playerBadge.classList.add('player-score-flash');
+              setTimeout(() => playerBadge.classList.remove('player-score-flash'), 500);
+            }
+
+            // After updating values, re-sort leaderboard if necessary
+            this.sortLeaderboard();
+            return;
+          }
+        }
+
+        // If no team element found, fallback to full refresh
+        console.log('BigScreen: Could not find team element for player update, doing full refresh');
+        this.loadInitialData();
+        return;
+      }
+
+      // Otherwise (player mode), do a full refresh to recalc player leaderboard
       console.log('Player-related score update, refreshing to recalculate player scores');
       this.loadInitialData();
       return;
@@ -597,9 +758,24 @@ class BigScreenDisplay {
       if (teamIdAttr && parseInt(teamIdAttr) === teamId) {
         const scoreElement = teamElement.querySelector('.team-score');
         if (scoreElement) {
-          const currentScore = parseInt(scoreElement.textContent) || 0;
-          const newScore = currentScore + pointsChange;
-          scoreElement.textContent = newScore;
+          const currentActivity = this.activeActivity || this.currentSession;
+          const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+
+          // If aggregation is enabled for this activity, recompute team total from player badges
+          const aggregatePlayerTimes = !!(this.activeActivity && this.activeActivity.aggregate_player_times);
+          let newScore;
+          if (isTimeMode && aggregatePlayerTimes) {
+            // Sum player badges inside this team element
+            newScore = 0;
+            const playerBadges = teamElement.querySelectorAll('[data-player-score-ms]');
+            playerBadges.forEach(pb => { newScore += parseInt(pb.getAttribute('data-player-score-ms')) || 0; });
+          } else {
+            const currentScore = parseInt(scoreElement.getAttribute('data-team-score-ms')) || 0;
+            newScore = currentScore + pointsChange;
+          }
+
+          scoreElement.setAttribute('data-team-score-ms', String(newScore));
+          scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(newScore) : newScore;
 
           // Add flash animation
           scoreElement.classList.add('score-flash');
@@ -671,7 +847,9 @@ class BigScreenDisplay {
           iconElement.textContent = this.getEmojiFromName(teamData.team_icon);
         }
         if (scoreElement) {
-          scoreElement.textContent = teamData.total_score;
+          const isTimeMode = this.isTimeMode();
+          scoreElement.setAttribute('data-team-score-ms', String(teamData.total_score || 0));
+          scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(teamData.total_score || 0) : (teamData.total_score || 0);
         }
         teamElement.style.borderLeftColor = teamData.team_color || '#333';
 
@@ -700,11 +878,13 @@ class BigScreenDisplay {
 
     const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
 
-    // Sort by score descending
+    // Sort by score (respect activity rules)
+    const currentActivity = this.activeActivity || this.currentSession;
+    const lowerIsBetter = SharedUtils.isLowerBetter(currentActivity);
     teamElements.sort((a, b) => {
-      const scoreA = parseInt(a.querySelector('.team-score').textContent) || 0;
-      const scoreB = parseInt(b.querySelector('.team-score').textContent) || 0;
-      return scoreB - scoreA;
+      const scoreA = parseInt(a.querySelector('.team-score').getAttribute('data-team-score-ms')) || 0;
+      const scoreB = parseInt(b.querySelector('.team-score').getAttribute('data-team-score-ms')) || 0;
+      return lowerIsBetter ? (scoreA - scoreB) : (scoreB - scoreA);
     });
 
     // Re-append in sorted order and update positions
@@ -765,19 +945,52 @@ class BigScreenDisplay {
       return;
     }
 
+    // Determine scoring mode and whether lower-is-better applies (golf or team_vs_time)
+    const scoringMode = (this.activeActivity && this.activeActivity.scoring_mode) || (this.currentSession && this.currentSession.scoring_mode) || 'team';
+
+    // Ensure effective activity has up-to-date details for time rules. If the effective activity claims to be time-mode
+    // but lacks explicit `time_winner`, fetch details from API and re-render after fetching.
+    const effective = this.getEffectiveActivity();
+    if (effective && String(effective.game_type) === 'team_vs_time' && (effective.time_winner === undefined || effective.time_winner === null)) {
+      // Fetch and re-render asynchronously; return early to avoid rendering with incomplete data
+      (async () => {
+        try {
+          const aid = this.activeActivityId || effective.id;
+          if (aid) {
+            let fetched = await api.getActivity(aid);
+            if (fetched && fetched.activity) fetched = fetched.activity;
+            if (fetched) this.activeActivity = fetched;
+          }
+        } catch (e) {
+          console.warn('BigScreen: Could not refresh activity details for time rules:', e);
+        } finally {
+          // Re-call update with the same leaderboard once we have attempted to refresh details
+          try { this.updateLeaderboard(leaderboard); } catch (_) {}
+        }
+      })();
+      return;
+    }
+
+    const lowerIsBetter = SharedUtils.isLowerBetter(this.getEffectiveActivity());
+
     // Check if this is participant-based data (has player_name) or team-based
     const isParticipantData = leaderboard.length > 0 && leaderboard[0].hasOwnProperty('player_name');
 
-    if (isParticipantData) {
-      this.updateParticipantLeaderboard(leaderboard);
+    // If the session/activity is in player scoring mode, show a player-centric leaderboard
+    if (scoringMode === 'player') {
+      // Ensure we have player details loaded (teams may already have players via loadPlayersForLeaderboard)
+      this.updatePlayerLeaderboard(leaderboard, { lowerIsBetter });
+    } else if (isParticipantData) {
+      this.updateParticipantLeaderboard(leaderboard, { lowerIsBetter });
     } else {
-      this.updateTeamLeaderboard(leaderboard);
+      this.updateTeamLeaderboard(leaderboard, { lowerIsBetter });
     }
   }
 
-  updateParticipantLeaderboard(participants) {
-    // Sort by total score descending
-    participants.sort((a, b) => b.total_score - a.total_score);
+  updateParticipantLeaderboard(participants, options = {}) {
+    const lowerIsBetter = !!options.lowerIsBetter;
+    // Sort participants: ascending for golf (lower is better), otherwise descending
+    participants.sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
 
     // Add class for layout
     this.teamsContainer.className = 'leaderboard-container participant-leaderboard';
@@ -789,15 +1002,41 @@ class BigScreenDisplay {
     });
   }
 
-  updateTeamLeaderboard(leaderboard) {
+  // Render a player-first leaderboard using team/player data
+  updatePlayerLeaderboard(leaderboard, options = {}) {
+    const lowerIsBetter = !!options.lowerIsBetter;
+
+    // Flatten players from team structures into a single participant list
+    const players = [];
+    leaderboard.forEach((team) => {
+      if (!team.players || team.players.length === 0) return;
+      team.players.forEach((p) => {
+        const score = (team.playerScores && team.playerScores[p.id] !== undefined) ? team.playerScores[p.id] : 0;
+        players.push({ player_name: p.name || p.player_name || `Speler ${p.id}`, total_score: score, player_id: p.id, team_name: team.team_name || null });
+      });
+    });
+
+    // Sort players according to golf or normal ordering
+    players.sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
+
+    // Render participants view
+    this.teamsContainer.className = 'leaderboard-container participant-leaderboard';
+    players.forEach((participant, idx) => {
+      const el = this.createParticipantElement({ player_name: participant.player_name, total_score: participant.total_score }, idx + 1);
+      this.teamsContainer.appendChild(el);
+    });
+  }
+
+  updateTeamLeaderboard(leaderboard, options = {}) {
+    const lowerIsBetter = !!options.lowerIsBetter;
     // Original team-based logic
     // Filter eliminated teams in elimination mode
     if (this.currentSession && this.currentSession.game_mode === 'elimination') {
       leaderboard = leaderboard.filter((team) => !team.is_eliminated);
     }
 
-    // Sort leaderboard by total_score descending (backend returns 'total_score', not 'score')
-    leaderboard.sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+    // Sort leaderboard by total_score (respect golf ordering)
+    leaderboard.sort((a, b) => lowerIsBetter ? (a.total_score || 0) - (b.total_score || 0) : (b.total_score || 0) - (a.total_score || 0));
 
     // Add class based on number of teams for layout
     this.teamsContainer.className = 'leaderboard-container';
@@ -831,50 +1070,65 @@ class BigScreenDisplay {
     const players = team.players || [];
     const playerScores = team.playerScores || {};
 
+    // Heuristic: if activity is not explicitly time-mode but scores look like milliseconds (>=1000), treat as time for display
+    const heuristicLooksLikeTime = (arrScores) => arrScores && arrScores.some(v => Number(v) >= 1000);
+
     // Player rendering: varies by mode
     let playersHtml = '';
     if (players.length > 0 && showPlayers && (isPlayerMode || isTeamWithPlayers)) {
       const entries = players.map((p) => ({ p, s: playerScores[p.id] || 0 }));
       
       if (isPlayerMode) {
-        // In player mode: show all players, sorted by score descending
-        entries.sort((a, b) => b.s - a.s);
+        // In player mode: show all players, sorted by score (respect activity rules)
+        const lowerIsBetter = SharedUtils.isLowerBetter(this.getEffectiveActivity());
+        entries.sort((a, b) => lowerIsBetter ? (a.s - b.s) : (b.s - a.s));
+        const isTimeModeLocal = this.isTimeMode() || heuristicLooksLikeTime(entries.map(e => e.s));
         playersHtml = `<div class="team-players-bigscreen all-players">
           ${entries
             .map(({ p, s }) => {
               const name = p.position ? `${p.name} (${p.position})` : p.name;
-              return `<span class="player-badge-bigscreen ${s > 0 ? 'with-score positive' : 'no-score'}">
+              const hasPlayerScore = (s !== undefined && s !== null && (s !== 0 || isTimeModeLocal));
+              const displayPlayerScore = isTimeModeLocal && (s !== undefined && s !== null) ? SharedUtils.formatMs(s) : s;
+              const scoreClass = hasPlayerScore ? 'with-score' : 'no-score';
+              return `<span class="player-badge-bigscreen ${scoreClass}" data-player-id="${p.id}" data-player-score-ms="${s || 0}" title="raw-ms:${s || 0}">
                 <span class="player-name-part">${this.escapeHtml(name)}</span>
-                ${s > 0 ? `<span class="player-score-part">${s}</span>` : ''}
+                ${hasPlayerScore ? `<span class="player-score-part">${displayPlayerScore}</span>` : ''}
               </span>`;
             })
             .join('')}
         </div>`;
       } else if (isTeamWithPlayers) {
-        // In team_with_players mode: show only top player(s) if score > 0
-        const maxScore = entries.reduce((m, e) => (e.s > m ? e.s : m), 0);
-        if (maxScore > 0) {
-          const top = entries.filter((e) => e.s === maxScore);
-          playersHtml = `<div class="team-players-bigscreen top-players">
-            ${top
-              .map(({ p, s }) => {
-                const name = p.position ? `${p.name} (${p.position})` : p.name;
-                return `<span class="player-badge-bigscreen with-score positive">
-                  <span class="player-name-part">${this.escapeHtml(name)}</span>
-                  <span class="player-score-part">+${s}</span>
-                </span>`;
-              })
-              .join('')}
-          </div>`;
-        }
+        // Show all players for team_with_players (sorted by score) but highlight top players
+        const lowerIsBetter = SharedUtils.isLowerBetter(this.getEffectiveActivity());
+        entries.sort((a, b) => lowerIsBetter ? (a.s - b.s) : (b.s - a.s));
+        const isTimeModeLocal = this.isTimeMode() || heuristicLooksLikeTime(entries.map(e => e.s));
+        // Determine best score (may be undefined)
+        const bestScore = entries.length > 0 ? entries[0].s : null;
+
+        playersHtml = `<div class="team-players-bigscreen team-with-players">
+          ${entries
+            .map(({ p, s }, idx) => {
+              const name = p.position ? `${p.name} (${p.position})` : p.name;
+              const hasPlayerScore = (s !== undefined && s !== null && (s !== 0 || isTimeModeLocal));
+              const displayPlayerScore = isTimeModeLocal && (s !== undefined && s !== null) ? SharedUtils.formatMs(s) : s;
+              const topClass = (bestScore !== null && s === bestScore) ? 'top-player' : '';
+              return `<span class="player-badge-bigscreen ${topClass} ${hasPlayerScore ? 'with-score' : 'no-score'}" data-player-id="${p.id}" data-player-score-ms="${s || 0}" title="raw-ms:${s || 0}">
+                <span class="player-name-part">${this.escapeHtml(name)}</span>
+                ${hasPlayerScore ? `<span class="player-score-part">${displayPlayerScore}</span>` : ''}
+              </span>`;
+            })
+            .join('')}
+        </div>`;
       }
     }
 
+    const isTimeMode = this.isTimeMode();
+    const displayTeamScore = isTimeMode ? SharedUtils.formatMs(team.total_score || 0) : (team.total_score || 0);
     teamDiv.innerHTML = `
       <div class="team-position">${position}</div>
       <div class="team-name">${team.team_name}</div>
       <div class="team-icon">${this.getEmojiFromName(team.team_icon)}</div>
-      <div class="team-score">${team.total_score || 0}</div>
+      <div class="team-score" data-team-score-ms="${team.total_score || 0}" title="raw-ms:${team.total_score || 0}">${displayTeamScore}</div>
       ${playersHtml}
     `;
 
@@ -902,12 +1156,15 @@ class BigScreenDisplay {
       activityScoresHtml += '</div>';
     }
 
+    const isTimeModeParticipant = this.isTimeMode();
+    const displayTotal = isTimeModeParticipant ? SharedUtils.formatMs(participant.total_score || 0) : `${participant.total_score} punten`;
+
     participantDiv.innerHTML = `
       <div class="team-position">${position}</div>
       <div class="participant-medal">${medal}</div>
       <div class="participant-name">${this.escapeHtml(participant.player_name)}</div>
       ${activityScoresHtml}
-      <div class="participant-total">${participant.total_score} punten</div>
+      <div class="participant-total">${displayTotal}</div>
     `;
 
     return participantDiv;
@@ -919,17 +1176,42 @@ class BigScreenDisplay {
     return div.innerHTML;
   }
 
+  // Get the most specific activity available (active activity, matching activeActivityId, or single session activity)
+  getEffectiveActivity() {
+    if (this.activeActivity && this.activeActivity.game_type) return this.activeActivity;
+    try {
+      if (this.activeActivityId && this.currentSession && Array.isArray(this.currentSession.activities)) {
+        const match = this.currentSession.activities.find(a => String(a.id) === String(this.activeActivityId));
+        if (match) return match;
+      }
+    } catch (_) {}
+    try {
+      if (this.currentSession && Array.isArray(this.currentSession.activities) && this.currentSession.activities.length === 1) {
+        return this.currentSession.activities[0];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Return whether the current display should be treated as time mode
+  isTimeMode() {
+    const eff = this.getEffectiveActivity();
+    return !!(eff && String(eff.game_type) === 'team_vs_time');
+  }
+
   sortTeams() {
     // Re-sort teams by score
     if (!this.teamsContainer) return;
 
     const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
 
-    // Sort by score (descending)
+    // Sort by numeric score. Respect activity rules (lower is better for golf/time when configured)
+    const lowerIsBetter = SharedUtils.isLowerBetter(this.activeActivity || this.currentSession);
     teamElements.sort((a, b) => {
-      const scoreA = parseInt(a.querySelector('.team-score')?.textContent || '0');
-      const scoreB = parseInt(b.querySelector('.team-score')?.textContent || '0');
-      return scoreB - scoreA;
+      const scoreA = parseInt(a.querySelector('.team-score')?.getAttribute('data-team-score-ms') || '0', 10) || 0;
+      const scoreB = parseInt(b.querySelector('.team-score')?.getAttribute('data-team-score-ms') || '0', 10) || 0;
+      // If lower is better, ascending order (A - B); otherwise descending (B - A)
+      return lowerIsBetter ? (scoreA - scoreB) : (scoreB - scoreA);
     });
 
     // Re-append in sorted order and update positions
@@ -994,7 +1276,12 @@ class BigScreenDisplay {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  new BigScreenDisplay();
+  try {
+    new BigScreenDisplay();
+  } catch (e) {
+    console.error('Failed to initialize BigScreenDisplay', e);
+    window.showGlobalFatalError && window.showGlobalFatalError('Fout bij initialisatie BigScreen: ' + (e && e.message ? e.message : String(e)));
+  }
 });
 
 // Admin login functions

@@ -340,6 +340,8 @@
             bottom: 0;
             left: 0;
             right: 0;
+            width: 100%;
+            box-sizing: border-box;
             background: var(--card-bg);
             border-top: 2px solid var(--border-color);
             display: flex;
@@ -1096,9 +1098,9 @@
                             </div>
 
                             <div id="player-manager" style="display: block;">
-                                <div class="player-manager-input-row">
-                                    <input type="text" id="pm-player-name" class="player-manager-input"
-                                        placeholder="Nieuwe speler naam">
+                                <div class="player-manager-input-row form-group vertical">
+                                    <input type="text" id="pm-player-name" class="player-manager-input full-width"
+                                        placeholder="Nieuwe speler naam" aria-label="Nieuwe speler naam">
                                     <button id="add-player-global-btn" class="add-team-btn btn-sm">Toevoegen</button>
                                 </div>
                                 <div id="pm-players-list"></div>
@@ -1168,12 +1170,43 @@
                                                 <option value="golf">⛳ Golf Scoring</option>
                                             </select>
                                         </div>
+
+                                        <!-- Team-vs-Time settings moved below for improved layout -->
                                     </div>
+
+                                    <!-- Team-vs-Time settings (improved layout) -->
                                     <div class="form-row">
+                                        <div class="form-group full-width">
+                                            <div id="team-vs-time-settings" class="tvt-settings hidden">
+                                                <div class="tvt-title-row">
+                                                    <span class="tvt-title">Team vs Tijd instellingen</span>
+                                                </div>
+
+                                                <div class="tvt-row">
+                                                    <label for="activity-time-winner" class="tvt-row-label">Wie wint?</label>
+                                                    <select id="activity-time-winner" name="activity-time-winner" class="tvt-select full-width-xs">
+                                                        <option value="lower">Laagste tijd wint (aanbevolen)</option>
+                                                        <option value="higher">Hoogste tijd wint</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="tvt-row">
+                                                    <label for="activity-aggregate-times" class="tvt-row-label">Tel speler tijden op voor team totaal</label>
+                                                    <div class="tvt-control">
+                                                        <label class="switch" aria-label="Tel speler tijden op voor team totaal">
+                                                          <input type="checkbox" id="activity-aggregate-times" name="activity-aggregate-times">
+                                                          <span class="slider"></span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row" style="display:none;" data-removed-for-now="true">
                                         <div class="form-group">
                                             <label for="activity-rounds">Aantal Rondes:</label>
-                                            <input type="number" id="activity-rounds" name="activity-rounds" value="1"
-                                                min="1" max="10">
+                                            <input type="number" id="activity-rounds" name="activity-rounds" value="1" min="1" max="10">
                                         </div>
                                         <div class="form-group">
                                             <label for="activity-time">Tijdslimiet (min):</label>

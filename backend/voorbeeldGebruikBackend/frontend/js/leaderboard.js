@@ -420,5 +420,10 @@ class LeaderboardView {
 
 // Initialize the leaderboard view when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new LeaderboardView();
+  try {
+    new LeaderboardView();
+  } catch (e) {
+    console.error('Failed to initialize LeaderboardView', e);
+    window.showGlobalFatalError && window.showGlobalFatalError('Fout bij initialisatie Leaderboard: ' + (e && e.message ? e.message : String(e)));
+  }
 });
