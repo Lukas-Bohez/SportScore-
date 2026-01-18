@@ -21,13 +21,17 @@ class ScoreInput {
     this.customQuickActions = [];
     this.isSubmitting = false;
 
+    // Shared utilities instance
+    this.sharedUtils = new SharedUtils(api);
+
     // Activity selection properties
     this.selectedActivityId = null;
     this.activeActivityId = null; // For big screen display
 
     if (!this.sessionId) {
-      alert('Geen sessie ID gevonden. Ga terug naar de startpagina.');
-      window.location.href = 'index.html';
+      // Show a friendly banner instead of immediately redirecting so the user can debug
+      this.showFatalError('Geen sessie ID gevonden in de URL. Voeg ?session=<id> toe of ga terug naar de startpagina.');
+      // Stop initialization (no redirect)
       return;
     }
 
@@ -35,13 +39,21 @@ class ScoreInput {
   }
 
   async init() {
-    this.bindElements();
-    this.setupEventListeners();
-    this.loadCustomQuickActions();
-    await this.loadSession();
-    await this.loadTeams();
-    await this.loadActivities();
-    this.loadRecentScores();
+    try {
+      this.bindElements();
+      this.setupEventListeners();
+      this.loadCustomQuickActions();
+
+      console.debug(`ScoreInput: initializing for session=${this.sessionId} apiBase=${api.baseURL}`);
+
+      await this.loadSession();
+      await this.loadTeams();
+      await this.loadActivities();
+      this.loadRecentScores();
+    } catch (err) {
+      console.error('ScoreInput init failed:', err);
+      this.showFatalError('Fout bij initialisatie. Controleer de console voor details.');
+    }
   }
 
   hideAdminControls() {
@@ -105,8 +117,13 @@ class ScoreInput {
     this.submitScoreBtn = document.getElementById('submit-score-btn');
     this.recentScores = document.getElementById('recent-scores');
 
+    // Sections to hide/show in time-mode
+    this.leaderboardSection = document.querySelector('.leaderboard-section');
+    this.recentScoresSection = document.querySelector('.recent-scores-section');
+
     // Quick scores
     this.sportQuickButtons = document.getElementById('sport-quick-buttons');
+    this.customQuickActionsSection = document.querySelector('.custom-quick-actions-section');
 
     // Control buttons
     this.subtractBtn = document.getElementById('subtract-btn');
@@ -114,6 +131,32 @@ class ScoreInput {
     this.pauseSessionBtn = document.getElementById('pause-session-btn');
     this.nextRoundBtn = document.getElementById('next-round-btn');
     this.endSessionBtn = document.getElementById('end-session-btn');
+
+    // Time controls (for team_vs_time)
+    this.timeControls = document.getElementById('time-controls');
+    // Older markup had multiple minute/sec/ms inputs; prefer a single input created dynamically for simplicity
+    this.setMinInput = document.getElementById('set-minutes');
+    this.setSecInput = document.getElementById('set-seconds');
+    this.setMsInput = document.getElementById('set-ms');
+    this.setTimeBtn = document.getElementById('set-time-btn');
+    this.addMinInput = document.getElementById('add-minutes');
+    this.addSecInput = document.getElementById('add-seconds');
+    this.addMsInput = document.getElementById('add-ms');
+    this.addTimeBtn = document.getElementById('add-time-btn');
+    this.recordTimeBtn = document.getElementById('record-time-btn');
+
+    // No unified text time input — use explicit minute/second/millisecond fields for Set/Add clarity
+    this.timeInput = null;
+
+    // Ensure minute/second/millisecond inputs are visible and usable (preferred for time mode)
+    ['set-minutes','set-seconds','set-ms'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.style) el.style.display = '';
+    });
+
+    // Groups we need to show/hide
+    this.pointsGroup = document.getElementById('points-group');
+    this.reasonGroup = document.getElementById('reason-group');
 
     // Animation elements
     this.scoreAnimation = document.getElementById('score-animation');
@@ -143,13 +186,34 @@ class ScoreInput {
     // Form submission
     if (this.submitScoreBtn) this.submitScoreBtn.addEventListener('click', () => this.submitScore());
 
-    // Points input validation
+    // Points input validation (supports both numeric and time input for team_vs_time)
     if (this.pointsInput) this.pointsInput.addEventListener('input', (e) => {
+      const currentActivity = this.getCurrentActivity();
+      // For time-based activities allow mm:ss(.ms) or seconds input
+      if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+        // Allow digits, colon, dot and spaces only
+        e.target.value = e.target.value.replace(/[^0-9:\.\s]/g, '').trim();
+        return;
+      }
       let value = parseInt(e.target.value);
       if (isNaN(value) || value < -100) value = -100;
       if (value > 100) value = 100;
       e.target.value = value;
     });
+
+    // Time control buttons - prefer minute/second/ms handlers for clarity
+    if (this.setTimeBtn) this.setTimeBtn.addEventListener('click', () => this.setTimeFromInputs());
+    if (this.addTimeBtn) this.addTimeBtn.addEventListener('click', () => this.addTimeFromInputs());
+
+    // No unified time input. Enter in ms input triggers Set via setupTimeInputEnter().
+
+    // Enter key handling for ms inputs is set up via setupTimeInputEnter() (keeps handlers in one place)
+
+    // Remove legacy handler if present
+    if (this.recordTimeBtn) this.recordTimeBtn.remove();
+
+    // Setup Enter handling for quick submission from ms inputs (legacy kept safe)
+    this.setupTimeInputEnter();
 
     // Enter key submission
     if (this.reasonInput) this.reasonInput.addEventListener('keypress', (e) => {
@@ -225,15 +289,19 @@ class ScoreInput {
 
   async loadSession() {
     try {
+      console.debug(`ScoreInput: fetching session ${this.sessionId} from ${api.baseURL}`);
       this.session = await api.get(`/api/v1/sessions/${this.sessionId}`);
+      if (!this.session) throw new Error('Lege sessie respons');
       this.applyTheme();
       this.loadSportQuickButtons();
       this.updateSessionDisplay();
       this.startTimer();
     } catch (error) {
+      console.error('Error loading session', error);
       api.handleError(error, 'loading session');
-      alert('Fout bij het laden van de sessie.');
-      window.location.href = 'index.html';
+      // Show a non-blocking banner so the user can still inspect the console
+      this.showFatalError(`Fout bij het laden van de sessie: ${error && error.message ? error.message : String(error)}`);
+      // Do not redirect abruptly to index - let user see the error
     }
   }
 
@@ -360,6 +428,8 @@ class ScoreInput {
   }
 
   updateSessionDisplay() {
+    // Clear any previous fatal error if session successfully loaded
+    this.clearFatalError();
     if (this.sessionName) {
       const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
       const scoringModeIndicator = mode === 'player' ? ' 👤' : ' 👥';
@@ -378,18 +448,22 @@ class ScoreInput {
   }
 
   updateScoringModeUI() {
-    const mode = (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
     if (!mode) return;
 
+    const playerGroup = document.getElementById('player-select-group');
     if (mode === 'team') {
-      // Team mode: disable player selection
+      // Team mode: hide and disable player selection -- except when this activity is time-based, we need players visible for selection
+      if (playerGroup) playerGroup.style.display = 'none';
       if (this.playerSelect) {
         this.playerSelect.disabled = true;
         this.playerSelect.innerHTML = '<option value="">Team modus - spelers uitgeschakeld</option>';
         this.playerSelect.title = 'In team modus kunnen alleen punten aan teams worden gegeven';
       }
     } else if (mode === 'player') {
-      // Player mode: enable player selection and show warning for team-only scoring
+      // Player mode: show and enable player selection and show warning for team-only scoring
+      if (playerGroup) playerGroup.style.display = 'block';
       if (this.playerSelect) {
         this.playerSelect.disabled = false;
         this.playerSelect.title = 'Selecteer een speler om punten toe te kennen';
@@ -408,11 +482,95 @@ class ScoreInput {
         }
       }
     } else if (mode === 'team_with_players') {
-      // Team-with-players: player selection is optional
+      // Team-with-players: show player selection (optional)
+      if (playerGroup) playerGroup.style.display = 'block';
       if (this.playerSelect) {
         this.playerSelect.disabled = false;
         this.playerSelect.title = 'Optioneel: selecteer een speler of score het hele team';
       }
+    }
+
+    // If the activity is team_vs_time, override team-mode hiding and make players visible and selectable
+    if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+      if (playerGroup) playerGroup.style.display = 'block';
+      if (this.playerSelect) {
+        this.playerSelect.disabled = false;
+        this.playerSelect.title = 'Selecteer een speler om een tijd in te voeren (of laat leeg om het team te scoren)';
+      }
+    }
+
+    // If this activity is a Team vs Time, adjust points input to accept time strings
+    if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+      if (this.pointsInput) {
+        try {
+          this.pointsInput.type = 'text';
+        } catch(_) {}
+        this.pointsInput.placeholder = 'Tijd invoer (mm:ss(.ms) of seconden)';
+        // If current value is not a valid time, initialize to 0:00.000 for clarity
+        if (isNaN(SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')))) {
+          this.pointsInput.value = SharedUtils.formatMs(0);
+        }
+      }
+      // Show time controls and hide +/- buttons since time uses mm:ss(.ms)
+      if (this.timeControls) this.timeControls.style.display = 'block';
+      if (this.subtractBtn) this.subtractBtn.style.display = 'none';
+      if (this.addBtn) this.addBtn.style.display = 'none';
+
+      // Hide the original points and reason inputs and the default submit button to avoid confusion
+      if (this.pointsGroup) this.pointsGroup.style.display = 'none';
+      // Remove reason UI entirely - we don't use a free-text reason field anymore
+      if (this.reasonGroup) this.reasonGroup.style.display = 'none';
+      if (this.submitScoreBtn) this.submitScoreBtn.style.display = 'none';
+
+      // Show the explicit minute/second/ms inputs so the user can set or add times easily
+      if (this.setMinInput && this.setSecInput && this.setMsInput) {
+        this.setMinInput.style.display = '';
+        this.setSecInput.style.display = '';
+        this.setMsInput.style.display = '';
+      }
+
+      // Hide quick action areas in time mode
+      if (this.sportQuickButtons && this.sportQuickButtons.parentNode) this.sportQuickButtons.parentNode.style.display = 'none';
+      if (this.customQuickActionsSection) this.customQuickActionsSection.style.display = 'none';
+
+      // Keep leaderboard and recent scores visible in time mode so teams/players remain clickable
+      // (do not hide leaderboard in team_vs_time to allow selecting players/teams)
+
+    } else {
+      // Restore leaderboard and recent scores
+      if (this.leaderboardSection) this.leaderboardSection.style.display = '';
+      if (this.recentScoresSection) this.recentScoresSection.style.display = '';      if (this.pointsInput) {
+        try {
+          this.pointsInput.type = 'number';
+        } catch(_) {}
+        this.pointsInput.placeholder = '';
+      }
+      // Hide time controls and show +/- buttons
+      if (this.timeControls) this.timeControls.style.display = 'none';
+      if (this.subtractBtn) this.subtractBtn.style.display = '';
+      if (this.addBtn) this.addBtn.style.display = '';
+
+      // Show normal inputs
+      if (this.pointsGroup) this.pointsGroup.style.display = '';
+      // Show reason input for non-time modes
+      if (this.reasonGroup) this.reasonGroup.style.display = '';
+      if (this.submitScoreBtn) this.submitScoreBtn.style.display = '';
+
+      // Hide explicit minute/second inputs when not in time mode
+      if (this.setMinInput && this.setSecInput && this.setMsInput) {
+        this.setMinInput.style.display = 'none';
+        this.setSecInput.style.display = 'none';
+        this.setMsInput.style.display = 'none';
+      }
+      if (this.addMinInput && this.addSecInput && this.addMsInput) {
+        this.addMinInput.style.display = 'none';
+        this.addSecInput.style.display = 'none';
+        this.addMsInput.style.display = 'none';
+      }
+
+      // Restore quick action areas
+      if (this.sportQuickButtons && this.sportQuickButtons.parentNode) this.sportQuickButtons.parentNode.style.display = '';
+      if (this.customQuickActionsSection) this.customQuickActionsSection.style.display = '';
     }
   }
 
@@ -425,6 +583,8 @@ class ScoreInput {
       if (!this.selectedActivityId && this.activities.length > 0) {
         this.selectedActivityId = this.activities[0].id;
         this.renderActivities();
+        this.updateSessionDisplay(); // Ensure UI reflects auto-selected activity's scoring mode
+        await this.loadTeams(); // Load teams/players for the selected activity
         this.loadLeaderboard();
       }
     } catch (error) {
@@ -469,9 +629,12 @@ class ScoreInput {
     });
   }
 
-  selectActivity(activityId) {
+  async selectActivity(activityId) {
+    console.log('selectActivity called for', activityId);
     this.selectedActivityId = activityId;
     this.renderActivities();
+    this.updateSessionDisplay(); // Ensure UI reflects activity-specific scoring mode
+    await this.loadTeams(); // Reload teams/players if activity changes (to populate player select)
     this.loadLeaderboard(); // Reload leaderboard for selected activity
     this.showScoreFeedback(`Activiteit geselecteerd: ${this.activities.find(a => a.id == activityId)?.name}`, 'success');
   }
@@ -479,11 +642,15 @@ class ScoreInput {
   async setActiveActivity(activityId) {
     try {
       this.activeActivityId = activityId;
-      // Emit to server to update active activity for big screen
-      api.socket.emit('set_active_activity', {
-        sessionId: this.sessionId,
-        activityId: activityId
-      });
+      // Emit to server to update active activity for big screen (guarded)
+      if (api.socket && typeof api.socket.emit === 'function') {
+        api.socket.emit('set_active_activity', {
+          sessionId: this.sessionId,
+          activityId: activityId
+        });
+      } else {
+        console.debug('Socket not available, skipping set_active_activity emit');
+      }
       this.renderActivities();
       this.showScoreFeedback(`Activiteit ingesteld als actief op scherm: ${this.activities.find(a => a.id == activityId)?.name}`, 'success');
     } catch (error) {
@@ -517,6 +684,37 @@ class ScoreInput {
         document.body.removeChild(feedback);
       }, 300);
     }, 2000);
+  }
+
+  // Show a persistent fatal error banner (non-blocking) so users can inspect console
+  showFatalError(message) {
+    this.clearFatalError();
+    const banner = document.createElement('div');
+    banner.id = 'fatal-error-banner';
+    banner.style.cssText = 'position:fixed;left:0;right:0;top:0;background:#b71c1c;color:white;padding:12px;text-align:center;z-index:10000;font-weight:700;';
+    banner.textContent = message;
+    const actions = document.createElement('span');
+    actions.style.cssText = 'margin-left:12px';
+
+    const homeBtn = document.createElement('button');
+    homeBtn.textContent = '↩ Ga terug';
+    homeBtn.style.cssText = 'margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;padding:6px 10px;border-radius:4px;cursor:pointer;';
+    homeBtn.onclick = () => { window.location.href = 'index.html'; };
+    actions.appendChild(homeBtn);
+
+    const close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = 'margin-left:12px;background:transparent;border:none;color:white;font-size:16px;cursor:pointer;';
+    close.onclick = () => this.clearFatalError();
+    actions.appendChild(close);
+
+    banner.appendChild(actions);
+    document.body.appendChild(banner);
+  }
+
+  clearFatalError() {
+    const existing = document.getElementById('fatal-error-banner');
+    if (existing) existing.remove();
   }
 
   async loadTeams() {
@@ -760,16 +958,23 @@ class ScoreInput {
         allScores = scoresResponse.scores || [];
       }
 
+      // Determine scoring mode and whether lower scores are better (golf or team_vs_time rules)
+      const currentActivity = this.getCurrentActivity();
+      const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
+      const lowerIsBetter = SharedUtils.isLowerBetter(currentActivity);
+
       // Load players for all teams
       await this.loadPlayersForAllTeams();
 
-      // Calculate leaderboard from teams and scores
-      const leaderboard = this.calculateLeaderboard(allScores);
+      // Calculate leaderboard from teams and scores, provide mode and sorting hint
+      const leaderboard = this.calculateLeaderboard(allScores, { mode, lowerIsBetter });
 
-      // Cache leaderboard data for incremental updates
+      // Cache leaderboard data and mode info for incremental updates
       this.leaderboardData = leaderboard;
+      this.leaderboardMode = mode;
+      this.leaderboardLowerIsBetter = lowerIsBetter;
 
-      this.displayLeaderboard(leaderboard);
+      this.displayLeaderboard(leaderboard, { mode, lowerIsBetter });
     } catch (error) {
       api.handleError(error, 'loading leaderboard');
     }
@@ -821,12 +1026,59 @@ class ScoreInput {
     }
   }
 
-  calculateLeaderboard(allScores) {
+  calculateLeaderboard(allScores, options = {}) {
+    const mode = options.mode || ((this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team');
+    const lowerIsBetter = !!options.lowerIsBetter;
+
     if (!this.teams || !Array.isArray(this.teams)) {
       console.warn('Teams not loaded yet, cannot calculate leaderboard');
       return [];
     }
-    
+
+    // Player mode: aggregate per-player
+    if (mode === 'player') {
+      const PlayerScores = {};
+
+      // Initialize players from teams
+      this.teams.forEach((team) => {
+        (team.players || []).forEach((player) => {
+          PlayerScores[player.id] = {
+            id: player.id,
+            name: player.name || player.player_name || `Speler ${player.id}`,
+            team_id: team.id,
+            team_name: team.name,
+            icon: player.icon,
+            color: player.color,
+            score: 0,
+          };
+        });
+      });
+
+      // Accumulate per-player scores (consider only player-specific entries)
+      allScores.forEach((score) => {
+        const pid = score.player_id;
+        if (pid !== undefined && pid !== null) {
+          const key = String(pid);
+          if (!PlayerScores[pid]) {
+            // Player might not be in team list (opt-in), add a fallback
+            PlayerScores[pid] = {
+              id: pid,
+              name: (score.player_name || `Speler ${pid}`),
+              team_id: score.team_id || null,
+              team_name: null,
+              icon: null,
+              color: null,
+              score: 0,
+            };
+          }
+          PlayerScores[pid].score += (score.points || 0);
+        }
+      });
+
+      return Object.values(PlayerScores);
+    }
+
+    // Team mode (default)
     const SportScores = {};
 
     // Initialize teams with 0 score and include players
@@ -840,31 +1092,105 @@ class ScoreInput {
         playerScores: {}, // Track individual player scores
       };
 
-      // Initialize player scores to 0
+      // Initialize player scores to null (we'll set them when actual scores exist). Using string keys for robust lookup.
       if (team.players) {
         team.players.forEach((player) => {
-          SportScores[team.id].playerScores[player.id] = 0;
+          SportScores[team.id].playerScores[String(player.id)] = null;
         });
       }
     });
 
-    // Add up all scores
-    allScores.forEach((score) => {
-      if (SportScores[score.team_id]) {
-        SportScores[score.team_id].score += score.points;
+    // Determine most specific activity early so we can correctly parse time scores
+    let effectiveActivity = this.getCurrentActivity() || this.activity || null;
+    try {
+      if (!effectiveActivity && this.session && Array.isArray(this.session.activities) && this.session.activities.length === 1) {
+        effectiveActivity = this.session.activities[0];
+      }
+    } catch (_) {}
 
-        // If this score is for a specific player, track it
-        if (score.player_id && SportScores[score.team_id].playerScores[score.player_id] !== undefined) {
-          SportScores[score.team_id].playerScores[score.player_id] += score.points;
+    const isTimeMode = !!(effectiveActivity && String(effectiveActivity.game_type) === 'team_vs_time');
+    const aggregatePlayerTimes = !!(effectiveActivity && effectiveActivity.aggregate_player_times);
+    const timeWinner = (effectiveActivity && effectiveActivity.time_winner) ? String(effectiveActivity.time_winner).toLowerCase() : 'lower';
+
+    // Helper to parse a stored score into a number. In time mode, accept formatted strings ("M:SS.mmm" or seconds) and numeric ms.
+    const parsePoints = (raw) => {
+      if (raw == null) return 0;
+      if (!isTimeMode) {
+        const n = Number(raw);
+        return isNaN(n) ? 0 : n;
+      }
+      // Time mode: prefer numeric (ms) when possible, otherwise parse time string
+      const n = Number(raw);
+      if (!isNaN(n)) return n;
+      const ms = SharedUtils.parseTimeToMs(String(raw));
+      return isNaN(ms) ? 0 : ms;
+    };
+
+    // Add up all scores using the parser so time-formatted strings don't collapse to 0
+    allScores.forEach((score) => {
+      const teamKey = score.team_id;
+      if (SportScores[teamKey]) {
+        const pts = parsePoints(score.points);
+        SportScores[teamKey].score += pts;
+
+        // If this score is for a specific player, track it (use parsed value for consistency)
+        if (score.player_id !== undefined && score.player_id !== null) {
+          const pid = String(score.player_id);
+          const existing = SportScores[teamKey].playerScores[pid];
+          if (existing !== undefined && existing !== null) {
+            SportScores[teamKey].playerScores[pid] = Number(existing) + pts;
+          } else {
+            // If player was not present in the player list, or had no prior score, initialize to pts
+            SportScores[teamKey].playerScores[pid] = pts;
+          }
         }
       }
     });
 
+    // Debug: show raw activity scores and SportScores mapping for time activities (helps diagnose missing player aggregation)
+    if (isTimeMode) {
+      try {
+        const sample = (allScores || []).slice(0,5).map(s => ({ team_id: s.team_id, player_id: s.player_id, points: s.points }));
+        const playerKeys = Object.fromEntries(Object.entries(SportScores).map(([k,v]) => [k, Object.keys(v.playerScores || {})]));
+        console.debug('ScoreInput: raw allScores for activity', JSON.stringify({ allScoresCount: allScores.length, sample, sportScoresKeys: Object.keys(SportScores), sportScoresPlayerKeys: playerKeys }));
+      } catch(_) {}
+    }
+
+    // Apply time-mode aggregation rules when appropriate
+    if (isTimeMode) {
+      Object.values(SportScores).forEach(team => {
+        // Ensure values are numeric milliseconds (include zero as valid time)
+        const playerVals = Object.values(team.playerScores || {}).map(v => Number(v) || 0);
+        if (playerVals.length > 0) {
+          if (aggregatePlayerTimes) {
+            team.score = playerVals.reduce((a, b) => a + b, 0);
+          } else {
+            // Best (or worst) according to configured winner
+            team.score = (timeWinner === 'higher') ? Math.max(...playerVals) : Math.min(...playerVals);
+          }
+          // Debug
+          try { console.debug('ScoreInput: applied time-mode aggregation', { team_id: team.id, score: team.score, playerVals, aggregatePlayerTimes, timeWinner }); } catch(_) {}
+        } else {
+          // Safety fallback: sum parsed player scores to avoid dropping team totals to 0 when players had parseable values
+          const fallbackSum = Object.values(team.playerScores || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+          if ((team.score === 0 || team.score === null || typeof team.score === 'undefined') && fallbackSum > 0) {
+            team.score = fallbackSum;
+            try { console.debug('ScoreInput: fallback summed player scores for team', { team_id: team.id, fallbackSum }); } catch(_) {}
+          }
+        }
+      });
+    }
+
     return Object.values(SportScores);
   }
 
-  displayLeaderboard(leaderboard) {
+  displayLeaderboard(leaderboard, options = {}) {
     if (!this.leaderboard) return;
+
+    const mode = options.mode || ((this.getCurrentActivity() && this.getCurrentActivity().scoring_mode) || (this.session && this.session.scoring_mode) || 'team');
+    const currentActivity = this.getCurrentActivity();
+    const lowerIsBetter = (options.lowerIsBetter !== undefined) ? options.lowerIsBetter : SharedUtils.isLowerBetter(currentActivity);
+    const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
 
     // Update leaderboard title
     const titleEl = document.getElementById('leaderboard-title');
@@ -882,29 +1208,54 @@ class ScoreInput {
       return;
     }
 
-    // Sort by score descending
-    leaderboard.sort((a, b) => b.score - a.score);
+    // Player mode: render players as top-level items
+    if (mode === 'player') {
+      // Sort players ascending for golf or descending otherwise
+      leaderboard.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
 
-    // Determine scoring mode (activity has priority over session)
-    const currentActivity = this.getCurrentActivity();
-    const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
-    const isPlayerMode = mode === 'player';
-    const showPlayers = mode === 'player' || mode === 'team_with_players';
+      const playersHtml = leaderboard.map((player, index) => {
+        const teamLabel = player.team_name ? ` <span class="player-team">(${this.escapeHtml(player.team_name)})</span>` : '';
+        const displayScore = isTimeMode ? SharedUtils.formatMs(player.score) : player.score;
+        return `
+          <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" data-player-id="${player.id}" onclick="scoreInput.selectTeamAndPlayer(${player.team_id || 'null'}, ${player.id}); event.stopPropagation();" style="cursor: pointer;">
+            <div class="rank">#${index + 1}</div>
+            <div class="team-info">
+              <div class="team-icon">${this.getIconEmoji(player.icon)}</div>
+              <div class="team-name">${this.escapeHtml(player.name)}${teamLabel}</div>
+            </div>
+            <div class="team-score" data-player-score="${player.id}" title="raw-ms:${player.score || 0}">${displayScore}</div>
+          </div>
+        `;
+      }).join('');
+
+      this.leaderboard.innerHTML = playersHtml;
+      return;
+    }
+
+    // Team mode: Sort by score (respect golf ordering)
+    leaderboard.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
+
+    // In team_vs_time mode we also want to show per-player scores (times) so
+    // operators can select individual players and see their times.
+    const showPlayers = mode === 'player' || mode === 'team_with_players' || isTimeMode;
 
     const leaderboardHtml = leaderboard
       .map((team, index) => {
         let playersHtml = '';
 
         if (team.players && team.players.length > 0 && showPlayers) {
-          // Show player badges with their individual scores in player or team_with_players modes
+          // Show player badges with their individual scores. In time mode display formatted times.
           playersHtml = `<div class="team-players">
               ${team.players
                 .map((p) => {
-                  const playerScore = team.playerScores[p.id] || 0;
+                  const playerScore = team.playerScores[String(p.id)];
+                  // Only show when a real score exists (null/undefined means no score yet)
+                  const hasPlayerScore = (playerScore !== undefined && playerScore !== null);
+                  const displayPlayerScore = isTimeMode && (playerScore !== undefined && playerScore !== null) ? SharedUtils.formatMs(playerScore) : playerScore;
                   const name = this.escapeHtml(p.position ? `${p.name} (${p.position})` : p.name);
                   return `
-                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${name} te selecteren">
-                    ${name}${playerScore ? `: <strong>${playerScore}</strong>` : ''}
+                  <button class="player-badge" onclick="scoreInput.selectTeamAndPlayer(${team.id}, ${p.id}); event.stopPropagation();" title="Klik om ${name} te selecteren (raw-ms: ${playerScore || 0})">
+                    ${name}${hasPlayerScore ? `: <strong>${this.escapeHtml(String(displayPlayerScore))}</strong>` : ''}
                   </button>
                 `;
                 })
@@ -912,6 +1263,7 @@ class ScoreInput {
             </div>`;
         }
 
+        const displayTeamScore = isTimeMode ? SharedUtils.formatMs(team.score) : team.score;
         return `
             <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" data-team-id="${team.id}" onclick="scoreInput.selectTeam(${team.id})" style="cursor: pointer;">
               <div class="rank">#${index + 1}</div>
@@ -919,7 +1271,7 @@ class ScoreInput {
                 <div class="team-icon">${this.getIconEmoji(team.icon)}</div>
                 <div class="team-name">${this.escapeHtml(team.name)}</div>
               </div>
-              <div class="team-score" data-team-score="${team.id}">${team.score}</div>
+              <div class="team-score" data-team-score="${team.id}">${displayTeamScore}</div>
               ${playersHtml}
             </div>
           `;
@@ -939,24 +1291,43 @@ class ScoreInput {
   updateLeaderboardScores(leaderboard) {
     if (!this.leaderboard || !leaderboard) return;
 
+    const currentActivity = this.getCurrentActivity();
+    const mode = this.leaderboardMode || ((currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team');
+    const lowerIsBetter = (this.leaderboardLowerIsBetter !== undefined) ? this.leaderboardLowerIsBetter : SharedUtils.isLowerBetter(currentActivity);
+    const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+
+    if (mode === 'player') {
+      // leaderboard is a player array
+      leaderboard.forEach((player) => {
+        const scoreElement = this.leaderboard.querySelector(`[data-player-score="${player.id}"]`);
+        if (scoreElement) scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(player.score) : player.score;
+      });
+      return;
+    }
+
+    // Team mode update
     leaderboard.forEach((team) => {
       const scoreElement = this.leaderboard.querySelector(`[data-team-score="${team.id}"]`);
       if (scoreElement) {
-        scoreElement.textContent = team.score;
+        scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(team.score) : team.score;
       }
 
-      // Update player scores if in player or team_with_players mode
-      const currentActivity = this.getCurrentActivity();
-      const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
-      if ((mode === 'player' || mode === 'team_with_players') && team.players) {
+      // Update player badges if in team_with_players mode or in time mode
+      if ((mode === 'player' || mode === 'team_with_players' || isTimeMode) && team.players) {
         team.players.forEach((player) => {
           const playerBadges = this.leaderboard.querySelectorAll('.player-badge');
           playerBadges.forEach((badge) => {
             const badgeText = badge.textContent;
-            const playerScore = team.playerScores[player.id] || 0;
+            const playerScore = team.playerScores[String(player.id)];
+            const hasPlayerScore = (playerScore !== undefined && playerScore !== null);
+            const displayPlayerScore = isTimeMode && (playerScore !== undefined && playerScore !== null) ? SharedUtils.formatMs(playerScore) : playerScore;
             const playerName = player.position ? `${player.name} (${player.position})` : player.name;
             if (badgeText.includes(playerName)) {
-              badge.innerHTML = `${this.escapeHtml(playerName)}: <strong>${playerScore}</strong>`;
+              if (hasPlayerScore) {
+                badge.innerHTML = `${this.escapeHtml(playerName)}: <strong>${this.escapeHtml(String(displayPlayerScore))}</strong>`;
+              } else {
+                badge.innerHTML = `${this.escapeHtml(playerName)}`;
+              }
             }
           });
         });
@@ -1012,6 +1383,15 @@ class ScoreInput {
   }
 
   adjustPoints(delta) {
+    const currentActivity = this.getCurrentActivity();
+    // In time mode, delta represents seconds to add/subtract
+    if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+      const currentMs = SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0;
+      const newMs = Math.max(0, currentMs + (delta * 1000));
+      this.pointsInput.value = SharedUtils.formatMs(newMs);
+      return;
+    }
+
     let currentValue = parseInt(this.pointsInput.value) || 0;
     currentValue += delta;
     if (currentValue < -100) currentValue = -100;
@@ -1023,40 +1403,352 @@ class ScoreInput {
     this.teamSelect.value = teamId;
     // Trigger the team change event to load players
     this.onTeamChange();
-    // Optional: Add visual feedback or focus the points input
-    this.pointsInput.focus();
+
+    // Populate current team points/time into hidden pointsInput and clear time/minute inputs for new input
+    const lb = this.leaderboardData || [];
+    const entry = lb.find(t => String(t.id) === String(teamId));
+    const currentActivity = this.getCurrentActivity();
+    const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+    const currentScore = entry ? (entry.score || 0) : 0;
+    if (this.pointsInput) {
+      this.pointsInput.value = isTimeMode ? SharedUtils.formatMs(currentScore) : currentScore;
+    }
+    // Clear dedicated minute/second inputs so user can type a delta (for Add) or a replacement (for Set)
+    if (this.setMinInput) this.setMinInput.value = '';
+    if (this.setSecInput) this.setSecInput.value = '';
+    if (this.setMsInput) this.setMsInput.value = '';
+
+    // Focus appropriate input depending on scoring mode
+    if (isTimeMode) {
+      // prefer minute inputs for time mode
+      if (this.setMinInput) this.setMinInput.focus();
+    } else {
+      if (this.pointsInput) this.pointsInput.focus();
+    }
   }
 
+  // Select a team and player together (used by leaderboard player badges)
   selectTeamAndPlayer(teamId, playerId) {
+    if (!teamId) return;
     this.teamSelect.value = teamId;
     // Trigger team change first to load players
     this.onTeamChange().then(() => {
-      // After players are loaded, select the specific player
+      // After players are loaded, select the specific player when available
       setTimeout(() => {
-        this.playerSelect.value = playerId;
-        this.pointsInput.focus();
+        if (this.playerSelect && String(playerId) !== 'null') {
+          this.playerSelect.value = playerId;
+        }
+
+        // Populate current player points/time into hidden pointsInput and clear timeInput for new input
+        const lb = this.leaderboardData || [];
+        const teamEntry = lb.find(t => String(t.id) === String(teamId));
+        let playerScore = 0;
+        if (teamEntry && teamEntry.playerScores && playerId && teamEntry.playerScores[playerId] !== undefined) {
+          playerScore = teamEntry.playerScores[playerId];
+        }
+        const currentActivity = this.getCurrentActivity();
+        const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+        if (this.pointsInput) this.pointsInput.value = isTimeMode ? SharedUtils.formatMs(playerScore) : playerScore;
+        // Clear minute/second inputs
+        if (this.setMinInput) this.setMinInput.value = '';
+        if (this.setSecInput) this.setSecInput.value = '';
+        if (this.setMsInput) this.setMsInput.value = '';
+
+        // Focus appropriate input depending on scoring mode
+        if (isTimeMode) {
+          if (this.setMinInput) this.setMinInput.focus();
+        } else {
+          if (this.pointsInput) this.pointsInput.focus();
+        }
       }, 100);
-    });
+    }).catch((e) => console.warn('selectTeamAndPlayer: failed to load players', e));
   }
 
+  // Set time using minute/second/ms inputs (primary flow)
+  setTimeFromInput() {
+    // Delegate to setTimeFromInputs for consistent behavior
+    this.setTimeFromInputs();
+  }
+
+  // Add time fallback delegates to the consolidated Add handler
+  addTimeFromInput() {
+    this.addTimeFromInputs();
+  }
+
+  // Set time from the "Set Time" inputs (mins, secs, ms) — now fetches authoritative current value before computing delta
+  async setTimeFromInputs() {
+    if (!this.setMinInput || !this.setSecInput || !this.setMsInput || !this.pointsInput) return;
+    const mins = parseInt(this.setMinInput.value) || 0;
+    const secs = parseInt(this.setSecInput.value) || 0;
+    const ms = parseInt(this.setMsInput.value) || 0;
+    if (secs < 0 || secs > 59 || ms < 0 || ms > 999 || mins < 0) {
+      alert('Voer een geldige tijd in (seconden 0-59, milliseconden 0-999).');
+      return;
+    }
+    const desiredMs = (mins * 60000) + (secs * 1000) + ms;
+
+    // Determine the team/player context
+    const teamId = parseInt(this.teamSelect && this.teamSelect.value) || null;
+    const playerId = this.playerSelect && this.playerSelect.value ? parseInt(this.playerSelect.value) : null;
+
+    // Disable buttons to avoid double actions
+    if (this.setTimeBtn) this.setTimeBtn.disabled = true;
+    if (this.addTimeBtn) this.addTimeBtn.disabled = true;
+
+    // Get authoritative current value (try API, fallback to cached leaderboard or UI)
+    let currentMs = 0;
+    try {
+      currentMs = await this.getCurrentRecordedMs(teamId, playerId);
+    } catch (err) {
+      // fallback
+      const lb = this.leaderboardData || [];
+      if (playerId && teamId) {
+        const teamEntry = lb.find(t => String(t.id) === String(teamId));
+        if (teamEntry && teamEntry.playerScores && teamEntry.playerScores[playerId] !== undefined) {
+          currentMs = teamEntry.playerScores[playerId] || 0;
+        } else {
+          currentMs = SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0;
+        }
+      } else if (teamId) {
+        const teamEntry = lb.find(t => String(t.id) === String(teamId));
+        currentMs = teamEntry ? (teamEntry.score || 0) : (SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0);
+      } else {
+        currentMs = SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0;
+      }
+    }
+
+    const deltaMs = desiredMs - currentMs;
+
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('Set Time (after refresh):', { teamId, playerId, desiredMs, currentMs, deltaMs });
+    }
+
+    if (deltaMs === 0) {
+      this.showScoreFeedback('Tijd is al ingesteld op die waarde', 'info');
+      if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+      if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+      return;
+    }
+
+    const newMs = Math.max(0, currentMs + deltaMs);
+    this.pointsInput.value = SharedUtils.formatMs(newMs);
+    this.pointsInput.focus();
+
+    // Submit the delta so backend applies the change as an incremental score
+    await this.submitDeltaScore(deltaMs);
+
+    if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+    if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+  }
+
+  // Add time using the same minute/second/ms inputs used for Set (consolidated UX)
+  async addTimeFromInputs() {
+    if (!this.setMinInput || !this.setSecInput || !this.setMsInput || !this.pointsInput) return;
+    const mins = parseInt(this.setMinInput.value) || 0;
+    const secs = parseInt(this.setSecInput.value) || 0;
+    const ms = parseInt(this.setMsInput.value) || 0;
+    if (secs < 0 || secs > 59 || ms < 0 || ms > 999 || mins < 0) {
+      alert('Voer een geldige tijd in (seconden 0-59, milliseconden 0-999).');
+      return;
+    }
+    const deltaMs = (mins * 60000) + (secs * 1000) + ms;
+
+    // Determine the team/player context
+    const teamId = parseInt(this.teamSelect && this.teamSelect.value) || null;
+    const playerId = this.playerSelect && this.playerSelect.value ? parseInt(this.playerSelect.value) : null;
+
+    // Disable buttons to avoid double actions
+    if (this.setTimeBtn) this.setTimeBtn.disabled = true;
+    if (this.addTimeBtn) this.addTimeBtn.disabled = true;
+
+    // Get authoritative current value (try API, fallback to cached leaderboard or UI)
+    let currentMs = 0;
+    try {
+      currentMs = await this.getCurrentRecordedMs(teamId, playerId);
+    } catch (err) {
+      const lb = this.leaderboardData || [];
+      if (playerId && teamId) {
+        const teamEntry = lb.find(t => String(t.id) === String(teamId));
+        if (teamEntry && teamEntry.playerScores && teamEntry.playerScores[playerId] !== undefined) {
+          currentMs = teamEntry.playerScores[playerId] || 0;
+        } else {
+          currentMs = SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0;
+        }
+      } else if (teamId) {
+        const teamEntry = lb.find(t => String(t.id) === String(teamId));
+        currentMs = teamEntry ? (teamEntry.score || 0) : (SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0);
+      } else {
+        currentMs = SharedUtils.parseTimeToMs(String(this.pointsInput.value || '')) || 0;
+      }
+    }
+
+    const newMs = Math.max(0, currentMs + deltaMs);
+    this.pointsInput.value = SharedUtils.formatMs(newMs);
+    this.pointsInput.focus();
+
+    // Debug
+    if (typeof console !== 'undefined' && console.debug) console.debug('Add Time (after refresh):', { teamId, playerId, deltaMs, currentMs, newMs });
+
+    // Submit the delta so backend applies the change as an incremental score
+    await this.submitDeltaScore(deltaMs);
+
+    if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+    if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+  }
+
+  // Submit current time as a session score (time mode) — kept for compatibility
+  submitTimeAsScore() {
+    // call the submitScore path but indicate it's a time submission
+    this.submitScore(true);
+  }
+
+  // Retrieve the current recorded total time (ms) for a team or player from API (fresh)
+  async getCurrentRecordedMs(teamId, playerId) {
+    // Prefer activity-level scores when available
+    try {
+      let allScores = [];
+      if (this.selectedActivityId) {
+        const resp = await api.getActivityScores(this.selectedActivityId).catch(() => ({ scores: [] }));
+        allScores = resp.scores || [];
+      } else {
+        const resp = await api.get(`/api/v1/sessions/${this.sessionId}/scores`).catch(() => ({ scores: [] }));
+        allScores = resp.scores || [];
+      }
+
+      // Sum up points that apply to the team/player
+      let total = 0;
+      allScores.forEach((s) => {
+        if (Number(s.team_id) !== Number(teamId)) return;
+        if (playerId && Number(s.player_id) !== Number(playerId)) return;
+        total += (s.points || 0);
+      });
+      return total || 0;
+    } catch (err) {
+      console.warn('getCurrentRecordedMs: failed to fetch scores, will fallback', err);
+      throw err;
+    }
+  }
+
+  // Submit a delta score (used for Set which calculates difference and Add which adds a delta)
+  async submitDeltaScore(deltaMs) {
+    // Prevent double submissions
+    if (this.isSubmitting) return;
+    this.isSubmitting = true;
+
+    // Disable submit and quick buttons
+    if (this.submitScoreBtn) this.submitScoreBtn.disabled = true;
+    if (this.setTimeBtn) this.setTimeBtn.disabled = true;
+    if (this.addTimeBtn) this.addTimeBtn.disabled = true;
+    const quickButtons = document.querySelectorAll('.quick-btn, .custom-action-btn');
+    quickButtons.forEach((b) => (b.disabled = true));
+
+    const teamId = parseInt(this.teamSelect.value);
+    const playerId = this.playerSelect.value ? parseInt(this.playerSelect.value) : null;
+
+    if (!teamId) {
+      alert('Selecteer een team.');
+      this.teamSelect.focus();
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+      if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
+    // Log for diagnostics
+    if (typeof console !== 'undefined' && console.debug) console.debug('Submitting delta:', deltaMs, { teamId, playerId });
+
+    // Block team-level time delta when activity requires player times for aggregation
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
+    const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+    const aggregatePlayerTimes = !!(currentActivity && currentActivity.aggregate_player_times);
+    if (isTimeMode && mode === 'team_with_players' && aggregatePlayerTimes && !playerId) {
+      this.showInlineError('set-ms', 'Selecteer een speler: tijden moeten per-speler worden ingegeven in deze activiteit.');
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+      if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+      const quickButtons = document.querySelectorAll('.quick-btn, .custom-action-btn');
+      quickButtons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
+    // Prepare real-time acknowledgement listener before sending
+    const ackPromise = new Promise((resolve) => {
+      const handler = (data) => {
+        if (data && String(data.session_id) === String(this.sessionId) && Number(data.team_id) === teamId && Number(data.points) === deltaMs) {
+          api.off('session_score_update', handler);
+          resolve(true);
+        }
+      };
+      api.on('session_score_update', handler);
+
+      // Fallback timeout
+      setTimeout(() => {
+        api.off('session_score_update', handler);
+        resolve(false);
+      }, 1500);
+    });
+
+    try {
+      const currentActivity = this.getCurrentActivity();
+
+      // Construct score payload using deltaMs as points
+      const scoreDataBase = {
+        activity_id: parseInt(this.selectedActivityId),
+        team_id: teamId,
+        points: deltaMs,
+        round_number: this.session.current_round,
+      };
+
+      if (playerId) {
+        scoreDataBase.player_id = playerId;
+      }
+
+      if (this.selectedActivityId) {
+        await api.createActivityScore(this.selectedActivityId, scoreDataBase);
+      } else {
+        await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreDataBase);
+      }
+
+      this.onScoreSubmitSuccess(teamId, deltaMs);
+    } catch (error) {
+      const acknowledged = await ackPromise;
+      if (acknowledged) {
+        this.onScoreSubmitSuccess(teamId, deltaMs);
+      } else {
+        api.handleError(error, 'submitting delta score');
+        alert('Fout bij het toevoegen van de score.');
+      }
+    } finally {
+      this.isSubmitting = false;
+      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+      if (this.setTimeBtn) this.setTimeBtn.disabled = false;
+      if (this.addTimeBtn) this.addTimeBtn.disabled = false;
+      quickButtons.forEach((b) => (b.disabled = false));
+    }
+  }
+
+  // Return the currently selected activity object or null
   getCurrentActivity() {
     if (!this.selectedActivityId || !this.activities) return null;
-    return this.activities.find(a => a.id == this.selectedActivityId) || null;
+    return this.activities.find(a => String(a.id) === String(this.selectedActivityId)) || null;
   }
 
-  async submitScore() {
+    // Allow Enter key in ms input to submit Set immediately
+    setupTimeInputEnter() {
+      if (this.setMsInput) this.setMsInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.setTimeFromInputs(); });
+    }
+
+
+  async submitScore(isTimeSubmit = false) {
     // Prevent double submissions
     if (this.isSubmitting) {
       return;
     }
     this.isSubmitting = true;
-
-    // Check if activity is selected
-    if (!this.selectedActivityId) {
-      this.showScoreFeedback('Selecteer eerst een activiteit', 'error');
-      this.isSubmitting = false;
-      return;
-    }
 
     // Disable submit and quick buttons
     if (this.submitScoreBtn) this.submitScoreBtn.disabled = true;
@@ -1065,33 +1757,42 @@ class ScoreInput {
 
     const teamId = parseInt(this.teamSelect.value);
     const playerId = this.playerSelect.value ? parseInt(this.playerSelect.value) : null;
-    const points = parseInt(this.pointsInput.value);
-    const reason = this.reasonInput.value.trim();
+    let points = this.pointsInput.value;
+    const currentActivity = this.getCurrentActivity();
+    const mode = (currentActivity && currentActivity.scoring_mode) || (this.activity && this.activity.scoring_mode) || (this.session && this.session.scoring_mode);
+
+    // Reason should be included for non-time modes; for team_vs_time we send no reason
+    const reason = (currentActivity && String(currentActivity.game_type) === 'team_vs_time') ? '' : (this.reasonInput ? this.reasonInput.value.trim() : '');
+
+    if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+      // Parse time string into milliseconds
+      points = SharedUtils.parseTimeToMs(String(points || '').trim());
+      if (isNaN(points)) {
+        alert('Voer een geldige tijd in (mm:ss(.ms) of seconden).');
+        this.pointsInput.focus();
+        this.isSubmitting = false;
+        if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+        quickButtons.forEach((b) => (b.disabled = false));
+        return;
+      }
+
+      // If activity requires player-times aggregation and scoring mode expects players,
+      // block team-level time submissions to avoid inconsistent team totals.
+      const aggregatePlayerTimes = !!(currentActivity && currentActivity.aggregate_player_times);
+      if (mode === 'team_with_players' && aggregatePlayerTimes && !playerId) {
+        this.showInlineError('points-input', 'Selecteer een speler: deze activiteit gebruikt speler-tijden om het teamtotaal te berekenen.');
+        this.isSubmitting = false;
+        if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
+        quickButtons.forEach((b) => (b.disabled = false));
+        return;
+      }
+    } else {
+      points = parseInt(points);
+    }
 
     if (!teamId) {
       alert('Selecteer een team.');
       this.teamSelect.focus();
-      this.isSubmitting = false;
-      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
-      quickButtons.forEach((b) => (b.disabled = false));
-      return;
-    }
-
-    // Validate scoring mode
-    const currentActivity = this.getCurrentActivity();
-    const mode = (currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team';
-    if (mode === 'player' && !playerId) {
-      this.showInlineError('player-select', '⚠️ Selecteer een specifieke speler in Speler Modus');
-      this.playerSelect.focus();
-      this.isSubmitting = false;
-      if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
-      quickButtons.forEach((b) => (b.disabled = false));
-      return;
-    }
-
-    if (isNaN(points)) {
-      alert('Voer een geldig aantal punten in.');
-      this.pointsInput.focus();
       this.isSubmitting = false;
       if (this.submitScoreBtn) this.submitScoreBtn.disabled = false;
       quickButtons.forEach((b) => (b.disabled = false));
@@ -1107,6 +1808,8 @@ class ScoreInput {
         }
       };
       api.on('session_score_update', handler);
+
+      // Fallback timeout
       setTimeout(() => {
         api.off('session_score_update', handler);
         resolve(false);
@@ -1216,9 +1919,22 @@ class ScoreInput {
     // Show animation
     this.showScoreAnimation(teamId, points);
 
+    const currentActivity = this.getCurrentActivity();
+
     // Reset form (but keep team and player selected for quick re-entry)
-    this.reasonInput.value = '';
-    this.pointsInput.value = 1;
+    if (currentActivity && String(currentActivity.game_type) === 'team_vs_time') {
+      // reset to 0 time display and clear set/add inputs
+      if (this.pointsInput) this.pointsInput.value = SharedUtils.formatMs(0);
+      if (this.setMinInput) this.setMinInput.value = '';
+      if (this.setSecInput) this.setSecInput.value = '';
+      if (this.setMsInput) this.setMsInput.value = '';
+      if (this.addMinInput) this.addMinInput.value = '';
+      if (this.addSecInput) this.addSecInput.value = '';
+      if (this.addMsInput) this.addMsInput.value = '';
+    } else {
+      if (this.reasonInput) this.reasonInput.value = '';
+      if (this.pointsInput) this.pointsInput.value = 1;
+    }
 
     // Reload leaderboard to show updated scores (this also loads players)
     this.loadLeaderboard();
@@ -1252,7 +1968,9 @@ class ScoreInput {
     if (!team) return;
 
     this.animTeamIcon.textContent = this.getIconEmoji(team.icon);
-    this.animScoreChange.textContent = `${points >= 0 ? '+' : ''}${points}`;
+    const currentActivity = this.getCurrentActivity();
+    const isTimeMode = !!(currentActivity && String(currentActivity.game_type) === 'team_vs_time');
+    this.animScoreChange.textContent = `${points >= 0 ? '+' : ''}${isTimeMode ? SharedUtils.formatMs(points) : points}`;
     this.animScoreChange.className = `score-change ${points >= 0 ? 'positive' : 'negative'}`;
     this.animTeamName.textContent = team.name;
 
@@ -1403,26 +2121,49 @@ class ScoreInput {
 
   handleScoreUpdate(data) {
     if (data.session_id == this.sessionId) {
+      // Determine scoring mode (prefer stored values from last load)
+      const currentActivity = this.getCurrentActivity();
+      const mode = this.leaderboardMode || ((currentActivity && currentActivity.scoring_mode) || (this.session && this.session.scoring_mode) || 'team');
+      const lowerIsBetter = (this.leaderboardLowerIsBetter !== undefined) ? this.leaderboardLowerIsBetter : SharedUtils.isLowerBetter(currentActivity);
+
       // Update the cached leaderboard data
       if (this.leaderboardData) {
-        const teamIndex = this.leaderboardData.findIndex((t) => t.id === data.team_id);
-        if (teamIndex !== -1) {
-          // Update team score
-          this.leaderboardData[teamIndex].score += data.points;
+        if (mode === 'player') {
+          // Player mode: update by player_id
+          const pid = data.player_id;
+          const playerIndex = this.leaderboardData.findIndex((p) => p.id === pid);
+          if (playerIndex !== -1) {
+            this.leaderboardData[playerIndex].score += (data.points || 0);
 
-          // Update player scores if available
-          if (data.player_scores) {
-            this.leaderboardData[teamIndex].playerScores = data.player_scores;
+            // Sort using lowerIsBetter if golf
+            this.leaderboardData.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
+
+            this.updateLeaderboardScores(this.leaderboardData);
+          } else {
+            // Player not present, reload full leaderboard
+            this.loadLeaderboard();
           }
-
-          // Sort leaderboard by score
-          this.leaderboardData.sort((a, b) => b.score - a.score);
-
-          // Update scores in place without full re-render (preserves player badges)
-          this.updateLeaderboardScores(this.leaderboardData);
         } else {
-          // Team not in leaderboard yet, do full reload
-          this.loadLeaderboard();
+          // Team mode: existing behavior
+          const teamIndex = this.leaderboardData.findIndex((t) => t.id === data.team_id);
+          if (teamIndex !== -1) {
+            // Update team score
+            this.leaderboardData[teamIndex].score += (data.points || 0);
+
+            // Update player scores if available
+            if (data.player_scores) {
+              this.leaderboardData[teamIndex].playerScores = data.player_scores;
+            }
+
+            // Sort leaderboard by score (respect golf)
+            this.leaderboardData.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
+
+            // Update scores in place without full re-render (preserves player badges)
+            this.updateLeaderboardScores(this.leaderboardData);
+          } else {
+            // Team not in leaderboard yet, do full reload
+            this.loadLeaderboard();
+          }
         }
       } else {
         // No cached data, do full reload
@@ -1563,5 +2304,10 @@ let scoreInput;
 
 // Initialize the score input when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  scoreInput = new ScoreInput();
+  try {
+    scoreInput = new ScoreInput();
+  } catch (e) {
+    console.error('Failed to initialize ScoreInput', e);
+    window.showGlobalFatalError && window.showGlobalFatalError('Fout bij initialisatie ScoreInput: ' + (e && e.message ? e.message : String(e)));
+  }
 });

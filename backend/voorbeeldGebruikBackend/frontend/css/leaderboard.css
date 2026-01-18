@@ -5,6 +5,11 @@
     box-sizing: border-box;
 }
 
+html, body {
+    max-width: 100%;
+    overflow-x: hidden; /* Prevent page-level horizontal scroll caused by wide elements */
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--background-color);
@@ -201,6 +206,7 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     border: 2px solid rgba(0, 0, 0, 0.05);
+    min-width: 0; /* allow children to shrink rather than forcing horizontal scroll */
 }
 
 .leaderboard-item:hover {
@@ -256,6 +262,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0; /* prevent flex children from forcing container width */
 }
 
 .participant-name {
@@ -278,6 +285,10 @@ body {
     font-weight: 500;
     color: var(--text-color);
     min-width: 40px;
+    max-width: 160px; /* avoid overly wide score chips */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     text-align: center;
     border: 1px solid var(--border-color);
 }
@@ -287,7 +298,7 @@ body {
     font-weight: bold;
     color: var(--primary-color);
     text-align: right;
-    min-width: 120px;
+    min-width: 80px; /* smaller minimum prevents layout breaks on narrow screens */
 }
 
 /* Teams Section */

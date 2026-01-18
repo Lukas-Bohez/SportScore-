@@ -37,6 +37,51 @@
     --transition: all 0.3s ease;
 }
 
+/* Global page safety and helper classes */
+html, body { max-width: 100%; overflow-x: hidden; }
+.form-group.vertical { display:flex; flex-direction:column; gap:8px; }
+.full-width { width:100%; box-sizing: border-box; }
+.add-team-btn, .save-team-btn { padding: 8px 12px; }
+
+/* Team-vs-Time helpers */
+.tvt-settings { background: var(--card-bg, #ffffff); padding: 12px 14px; border-radius: var(--border-radius, 8px); border: 1px solid var(--border-color, #e1e5e9); margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.tvt-title { font-weight:700; display:block; margin-bottom:8px; }
+.tvt-controls { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+.tvt-field { min-width:220px; }
+..tvt-settings { display:flex; flex-direction:column; gap:10px; background: var(--card-bg, #ffffff); padding: 12px 14px; border-radius: var(--border-radius, 8px); border: 1px solid var(--border-color, #e1e5e9); margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.tvt-title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.tvt-title { font-weight:700; display:block; }
+
+/* TVT row helpers: label+control rows, switch control, responsive stacking */
+.tvt-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; width:100%; justify-content: space-between; }
+.tvt-row-label { min-width: 160px; font-weight:600; }
+.tvt-control { margin-left: auto; display:flex; align-items:center; }
+
+/* Toggle switch */
+.switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #dcdcdc; transition: .18s; border-radius: 999px; }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .18s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.switch input:checked + .slider { background: var(--primary-color); }
+.switch input:checked + .slider:before { transform: translateX(20px); }
+
+/* Label-left / control-right helper */
+.label-left-control-right { display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+.label-left-control-right > label, .label-left-control-right > span { margin-bottom: 0; }
+.label-left-control-right .control-group { display:flex; gap:8px; align-items:center; }
+.player-row { padding: 4px 0; border-bottom: 1px solid #eee; }
+.player-card { display: flex; gap: 12px; align-items: center; }
+
+.full-width-xs { min-width: 220px; }
+
+/* TVT row helpers: label+control rows, checkbox alignment, responsive stacking */
+.tvt-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; width:100%; }
+.tvt-row-label { min-width: 160px; font-weight:600; }
+.tvt-row .tvt-checkbox { width: 18px; height: 18px; margin-right: 8px; }
+.full-width-xs { min-width: 220px; }
+
+@media (max-width:720px) { .tvt-row { flex-direction: column; align-items:flex-start; } .tvt-row-label { min-width: auto; margin-left:0; } .tvt-control { margin-left: 0; align-self: flex-end; } }
+
 /* Quiz Theme */
 body[data-sport="quiz"] {
     --theme-primary: #007bff;
@@ -321,3 +366,181 @@ body:not([data-sport]) .header h1::before {
     position: relative;
     z-index: 1;
 }
+
+/* Team-vs-Time (TVT) settings styles */
+.tvt-settings {
+  border: 1px solid var(--input-border);
+  padding: 12px;
+  border-radius: var(--border-radius);
+  background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent);
+  margin-top: 8px;
+}
+
+.tvt-title {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.tvt-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tvt-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tvt-select {
+  padding: 6px 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 6px;
+  color: var(--input-text);
+}
+
+.tvt-aggregate .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95em;
+}
+
+.tvt-help {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* Make sure the settings look good on small screens */
+@media (max-width: 520px) {
+  .tvt-controls { flex-direction: column; align-items: flex-start; }
+  .tvt-field { width: 100%; }
+  .tvt-select { width: 100%; }
+}
+
+/* ===== Global cohesive app styles ===== */
+/* Typography & layout */
+:root {
+  --app-font: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --card-padding: 18px;
+  --card-radius: 12px;
+  --muted: var(--text-secondary);
+}
+
+body {
+  font-family: var(--app-font);
+  background: linear-gradient(180deg, #f6f8fb 0%, #ffffff 100%);
+  color: var(--text-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+/* Cards */
+.card,
+.station-card,
+.leaderboard-item,
+.score-input-section,
+.participant-info {
+  background: var(--card-bg);
+  padding: var(--card-padding);
+  border-radius: var(--card-radius);
+  box-shadow: 0 6px 16px rgba(16,24,40,0.04);
+  border: 1px solid rgba(16,24,40,0.03);
+}
+
+.header h1 {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--text-color);
+}
+
+/* Buttons */
+.control-btn, .btn, .save-team-btn, .cancel-team-btn {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 8px rgba(16,24,40,0.06);
+}
+
+.control-btn:hover, .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16,24,40,0.08);
+}
+
+.cancel-team-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(16,24,40,0.06);
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-row {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group { flex: 1 1 240px; }
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  box-sizing: border-box;
+}
+
+input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(0,123,255,0.06);
+}
+
+/* Leaderboard & items */
+.leaderboard { gap: 12px; }
+.leaderboard-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rank { font-weight: 700; margin-right: 12px; }
+.team-info { display:flex; align-items:center; gap: 10px; }
+.team-icon { font-size: 1.6rem; }
+.team-name { font-weight: 600; }
+.team-score { font-weight: 700; font-size: 1.1rem; }
+
+/* Responsive tweaks */
+@media (max-width: 760px) {
+  .form-row { flex-direction: column; }
+  .leaderboard-item { flex-direction: column; align-items: flex-start; }
+  .team-score { align-self: flex-end; }
+}
+
+/* Small helpers */
+.muted { color: var(--muted); font-size: 0.95em; }
+.inline-note { font-size: 0.9em; color: var(--muted); }
+
+/* End of cohesive styles */
