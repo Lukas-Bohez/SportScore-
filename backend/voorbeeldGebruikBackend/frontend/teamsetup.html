@@ -27,12 +27,14 @@
                     <!-- Bestaande teams selecteren -->
                     <div class="existing-teams-section">
                         <h3>Bestaand Team Toevoegen</h3>
-                        <div class="flex-row">
-                            <select id="existing-team-select" title="Selecteer een bestaand team"
-                                aria-label="Bestaand team selecteren">
-                                <option value="">-- Selecteer een bestaand team --</option>
-                            </select>
-                            <button id="add-existing-team-btn" class="save-team-btn">Team Toevoegen</button>
+                        <div class="label-left-control-right">
+                            <label for="existing-team-select" class="visually-hidden">Bestaand team</label>
+                            <div class="control-group">
+                                <select id="existing-team-select" title="Selecteer een bestaand team" aria-label="Bestaand team selecteren">
+                                    <option value="">-- Selecteer een bestaand team --</option>
+                                </select>
+                                <button id="add-existing-team-btn" class="save-team-btn">Team Toevoegen</button>
+                            </div>
                         </div>
                         <p>
                             💡 Teams kunnen hergebruikt worden in meerdere sessies
@@ -78,9 +80,9 @@
                 <!-- Player Manager: create / edit / assign players -->
                 <div class="players-manager-section">
                     <h2>Spelers Beheren</h2>
-                    <div class="player-create">
-                        <input class="input" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam"
-                            maxlength="100">
+                    <div class="player-create form-group vertical">
+                        <input class="input full-width" type="text" id="new-player-name-global" placeholder="Nieuwe speler naam"
+                            maxlength="100" aria-label="Nieuwe speler naam">
                         <button id="add-player-global-btn" class="save-team-btn">Speler aanmaken</button>
                     </div>
 

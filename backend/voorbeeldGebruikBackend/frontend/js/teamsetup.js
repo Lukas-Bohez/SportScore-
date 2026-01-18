@@ -117,14 +117,17 @@ class TeamSetup {
 
   async loadSession() {
     try {
+      console.debug(`TeamSetup: fetching session ${this.sessionId} from ${api.baseURL}`);
       this.session = await api.get(`/api/v1/sessions/${this.sessionId}`);
       if (this.session) {
         this.updateSessionDisplay();
       }
     } catch (error) {
+      console.error('Error loading session', error);
       api.handleError(error, 'loading session');
-      alert('Fout bij het laden van de sessie.');
-      window.location.href = 'index.html';
+      // Show detailed error so we can diagnose (keeps user on page to examine console)
+      alert(`Fout bij het laden van de sessie: ${error && error.message ? error.message : String(error)}`);
+      return;
     }
   }
 
@@ -1226,5 +1229,10 @@ let teamSetup;
 
 // Initialize the team setup when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  teamSetup = new TeamSetup();
+  try {
+    teamSetup = new TeamSetup();
+  } catch (e) {
+    console.error('Failed to initialize TeamSetup', e);
+    window.showGlobalFatalError && window.showGlobalFatalError('Fout bij initialisatie Team Setup: ' + (e && e.message ? e.message : String(e)));
+  }
 });

@@ -122,6 +122,10 @@ class SimpleSetup {
     this.activitiesList = document.getElementById('activities-list');
     this.existingActivitySelect = document.getElementById('existing-activity-select');
     this.addExistingActivityBtn = document.getElementById('add-existing-activity-btn');
+    // Team vs Time elements
+    this.teamVsTimeSettings = document.getElementById('team-vs-time-settings');
+    this.activityTimeWinnerSelect = document.getElementById('activity-time-winner');
+    this.activityAggregateTimesCheckbox = document.getElementById('activity-aggregate-times');
 
     // Team management elements
     this.addTeamBtn = document.getElementById('add-team-btn');
@@ -196,6 +200,15 @@ class SimpleSetup {
     }
     if (this.cancelActivityBtn) {
       this.cancelActivityBtn.addEventListener('click', this.handleCancelActivity.bind(this));
+    }
+    if (this.activityGameTypeSelect) {
+      this.activityGameTypeSelect.addEventListener('change', this.handleActivityGameTypeChange.bind(this));
+      // Set initial visibility based on selected value
+      if (this.activityGameTypeSelect.value === 'team_vs_time') {
+        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.remove('hidden');
+      } else {
+        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
+      }
     }
 
     // Team management
@@ -302,6 +315,17 @@ class SimpleSetup {
   handleScoringModeChange(e) {
     // Store the selected scoring mode in session data
     this.sessionData.scoring_mode = e.target.value;
+  }
+
+  handleActivityGameTypeChange(e) {
+    const value = e.target.value;
+    if (value === 'team_vs_time') {
+      if (this.teamVsTimeSettings) this.teamVsTimeSettings.classList.remove('hidden');
+    } else {
+      if (this.teamVsTimeSettings) this.teamVsTimeSettings.classList.add('hidden');
+      if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
+      if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
+    }
   }
 
   handleGameTypeChange(e) {
@@ -453,6 +477,17 @@ class SimpleSetup {
       this.activityTimeInput.value = activity.time_limit || '';
       this.activityDescInput.value = activity.description || '';
       this.editingActivityIndex = this.activities.indexOf(activity);
+
+      // Populate Team vs Time settings if applicable
+      if (activity.game_type === 'team_vs_time') {
+        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.remove('hidden');
+        if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = activity.time_winner || 'lower';
+        if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = !!activity.aggregate_player_times;
+      } else {
+        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
+        if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
+        if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
+      }
     } else {
       this.activityNameInput.value = '';
       this.activitySportSelect.value = 'custom';
@@ -462,6 +497,11 @@ class SimpleSetup {
       this.activityTimeInput.value = '';
       this.activityDescInput.value = '';
       this.editingActivityIndex = null;
+
+      // Reset Team vs Time settings
+      this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
+      if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
+      if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
     }
     this.activityNameInput.focus();
   }
@@ -477,8 +517,9 @@ class SimpleSetup {
     const sport = (this.activitySportSelect && this.activitySportSelect.value) || 'custom';
     const scoring = (this.activityScoringSelect && this.activityScoringSelect.value) || 'team';
     const gameType = (this.activityGameTypeSelect && this.activityGameTypeSelect.value) || 'custom';
-    const rounds = parseInt((this.activityRoundsInput && this.activityRoundsInput.value) || '1') || 1;
-    const time = (this.activityTimeInput && this.activityTimeInput.value) ? parseInt(this.activityTimeInput.value) : null;
+    // Rounds/time are out of scope for now - default to 1 / null and keep hidden inputs for future use
+    const rounds = 1;
+    const time = null;
     const desc = (this.activityDescInput && this.activityDescInput.value || '').trim();
 
     if (!name) {
@@ -491,6 +532,9 @@ class SimpleSetup {
       sport_type: sport,
       scoring_mode: scoring,
       game_type: gameType,
+      // team_vs_time specific options
+      time_winner: (gameType === 'team_vs_time') ? (this.activityForm ? (this.activityForm.querySelector('#activity-time-winner')?.value || 'lower') : 'lower') : 'lower',
+      aggregate_player_times: (gameType === 'team_vs_time') ? !!(this.activityForm && this.activityForm.querySelector('#activity-aggregate-times')?.checked) : false,
       total_rounds: rounds,
       time_limit: time,
       description: desc || null
@@ -548,14 +592,13 @@ class SimpleSetup {
         <div class="team-card" data-activity-id="${index + 1}">
           <div class="team-card-header">
             <div class="team-title">
-              <span class="team-icon">🎯</span>
               <div class="team-name-wrap">
                 <span class="team-name">${this.escapeHtml(act.name)}</span>
                 <span class="team-color-hex">${this.escapeHtml(act.sport_type || act.sport || '')} • ${this.escapeHtml(act.scoring_mode)} • ${this.escapeHtml(act.game_type || '')}</span>
               </div>
             </div>
           </div>
-          <p class="team-description">${this.escapeHtml(act.description || '')} Rondes: ${act.total_rounds || act.rounds || 1}${act.time_limit ? ' • Tijd: ' + act.time_limit + 'min' : ''}</p>
+          <p class="team-description">${this.escapeHtml(act.description || '')}</p>
           <div class="team-actions">
             <button class="delete-team-btn" onclick="simpleSetup.deleteActivity(${index})">Verwijderen</button>
             <button class="save-team-btn compact" onclick="simpleSetup.editActivity(${index})">Bewerken</button>
@@ -1417,10 +1460,12 @@ class SimpleSetup {
       container.innerHTML = '';
       unassigned.forEach((p) => {
         const playerDiv = document.createElement('div');
-        playerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;';
+        playerDiv.className = 'label-left-control-right player-row';
         playerDiv.innerHTML = `
           <span>${p.name}</span>
-          <button class="save-team-btn compact" onclick="simpleSetup.assignPlayerToTeam(${teamIndex}, '${p.id}', '${prefix}')">Toevoegen</button>
+          <div class="control-group">
+            <button class="save-team-btn compact" onclick="simpleSetup.assignPlayerToTeam(${teamIndex}, '${p.id}', '${prefix}')">Toevoegen</button>
+          </div>
         `;
         container.appendChild(playerDiv);
       });
@@ -1529,7 +1574,7 @@ class SimpleSetup {
     this.reviewSessionName.textContent = this.sessionData.name;
     if (this.reviewActivities) {
       this.reviewActivities.innerHTML = this.activities
-        .map((a) => `<li>${this.escapeHtml(a.name)} — ${this.escapeHtml(a.scoring_mode)} (${this.escapeHtml(a.sport_type)}, ${this.escapeHtml(a.game_type)}, ${a.total_rounds} rondes${a.time_limit ? `, ${a.time_limit} min` : ''})</li>`)
+        .map((a) => `<li>${this.escapeHtml(a.name)} — ${this.escapeHtml(a.scoring_mode)} (${this.escapeHtml(a.sport_type)}, ${this.escapeHtml(a.game_type)})</li>`)
         .join('');
     }
     this.reviewTeams.innerHTML = this.teams.map((team) => `<li><span style="color: ${team.color};">●</span> ${team.name}</li>`).join('');

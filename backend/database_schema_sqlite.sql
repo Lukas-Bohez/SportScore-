@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS activities (
     sport_type VARCHAR(50) DEFAULT 'custom',
     game_type TEXT CHECK(game_type IN ('custom', 'quiz', 'sport_challenge', 'elimination', 'team_vs_time', 'golf')) DEFAULT 'custom',
     scoring_mode TEXT CHECK(scoring_mode IN ('team', 'team_with_players', 'player')) DEFAULT 'team',
+    -- For time-based activities (team_vs_time) controls how times are judged
+    time_winner TEXT CHECK(time_winner IN ('lower','higher')) DEFAULT 'lower',
+    -- Whether to aggregate individual player times into a team total (0/1)
+    aggregate_player_times INTEGER DEFAULT 0,
     status TEXT CHECK(status IN ('setup', 'active', 'paused', 'completed', 'cancelled')) DEFAULT 'setup',
     total_rounds INTEGER DEFAULT 1,
     time_limit INTEGER NULL,

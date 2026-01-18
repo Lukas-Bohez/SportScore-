@@ -116,6 +116,18 @@ export class HomepageManagement {
 				e.preventDefault();
 				this.handleActivitySubmit(e);
 			});
+			// Show/hide team_vs_time settings based on game type selection
+			try {
+				const gameTypeEl = this.activityForm.querySelector('#activity-game-type');
+				if (gameTypeEl) {
+					gameTypeEl.addEventListener('change', (ev) => {
+						const tvtSettings = document.getElementById('team-vs-time-settings');
+						if (!tvtSettings) return;
+						if (ev.target.value === 'team_vs_time') tvtSettings.classList.remove('hidden');
+						else tvtSettings.classList.add('hidden');
+					});
+				}
+			} catch (_) {}
 			this.activityForm.dataset.handlerAttached = 'true';
 		}
 		if (this.cancelActivityBtn) this.cancelActivityBtn.addEventListener('click', () => this.hideActivityForm());
@@ -161,14 +173,13 @@ export class HomepageManagement {
 			<div class="team-card" data-activity-id="${activity.id}">
 				<div class="team-card-header">
 					<div class="team-title">
-						<span class="team-icon">🎯</span>
 						<div class="team-name-wrap">
 							<span class="team-name">${this.escapeHtml(activity.name)}</span>
 							<span class="team-color-hex">${this.escapeHtml(activity.sport_type)} • ${this.escapeHtml(activity.scoring_mode || 'team')} • ${this.escapeHtml(activity.game_type || 'custom')}</span>
 						</div>
 					</div>
 				</div>
-				<p class="team-description">${this.escapeHtml(activity.description || '')} Rondes: ${activity.total_rounds || 1}${activity.time_limit ? ' • Tijd: ' + activity.time_limit + 'min' : ''}</p>
+				<p class="team-description">${this.escapeHtml(activity.description || '')}</p>
 				<div class="team-actions">
 					<button class="btn btn-sm btn-secondary" onclick="window.homepage.editActivity(${activity.id})" style="flex: 1; text-align: center;">
 						Bewerken
@@ -211,10 +222,16 @@ export class HomepageManagement {
 			sport_type: formData.get('activity-sport'),
 			game_type: formData.get('activity-game-type'),
 			scoring_mode: formData.get('activity-scoring'),
-			total_rounds: parseInt(formData.get('activity-rounds')) || 1,
-			time_limit: formData.get('activity-time') ? parseInt(formData.get('activity-time')) : null,
+			// Rounds/time are hidden and defaulted for now
+			total_rounds: 1,
+			time_limit: null,
 			description: formData.get('activity-desc')
 		};
+		// Include team_vs_time specific settings if selected
+		if (String(activityData.game_type) === 'team_vs_time') {
+			activityData.time_winner = formData.get('activity-time-winner') || 'lower';
+			activityData.aggregate_player_times = !!formData.get('activity-aggregate-times');
+		}
 		this.processingActivity = true;
 		const done = async () => {
 			this.processingActivity = false;
@@ -245,6 +262,17 @@ export class HomepageManagement {
 			form['activity-rounds'].value = activity.total_rounds || 1;
 			form['activity-time'].value = activity.time_limit || '';
 			form['activity-desc'].value = activity.description || '';
+			// Team vs Time settings handling
+			const tvtSettings = document.getElementById('team-vs-time-settings');
+			if (tvtSettings) {
+				if (activity.game_type === 'team_vs_time') {
+					tvtSettings.classList.remove('hidden');
+					try { form['activity-time-winner'].value = activity.time_winner || 'lower'; } catch(_) {}
+					try { form['activity-aggregate-times'].checked = !!activity.aggregate_player_times; } catch(_) {}
+				} else {
+					tvtSettings.classList.add('hidden');
+				}
+			}
 			const submitBtn = form.querySelector('button[type="submit"]'); if (submitBtn) submitBtn.textContent = 'Bijwerken';
 			try { form['activity-name'].focus(); } catch (_) {}
 		} else {
@@ -391,9 +419,9 @@ export class HomepageManagement {
 			html += '<h4 style="margin-top: 10px; margin-bottom: 10px; color: var(--text-color);">Niet toegewezen spelers</h4>';
 			unassignedPlayers.forEach(player => {
 				html += `
-					<div class="player-item">
-						<span>${this.escapeHtml(player.name)}</span>
-						<div class="player-actions" style="display: flex; gap: 8px; align-items: center;">
+				<div class="player-item label-left-control-right">
+					<span>${this.escapeHtml(player.name)}</span>
+					<div class="control-group">
 							<select class="team-select" style="padding: 4px 8px; font-size: 13px;" onchange="window.homepage.assignPlayerToTeamFromSelect(${player.id}, this.value)">
 								<option value="">-- Selecteer team --</option>
 								${this.teams.map(t => `<option value="${t.id}">${this.escapeHtml(t.name)}</option>`).join('')}
@@ -415,9 +443,9 @@ export class HomepageManagement {
 			</h4>`;
 			teamPlayers[teamId].forEach(player => {
 				html += `
-					<div class="player-item">
-						<span>${this.escapeHtml(player.name)}</span>
-						<div class="player-actions" style="display: flex; gap: 8px;">
+				<div class="player-item label-left-control-right">
+					<span>${this.escapeHtml(player.name)}</span>
+					<div class="control-group">
 							<button class="btn btn-sm btn-secondary" style="font-size: 12px;" onclick="window.homepage.unassignPlayerFromTeam(${player.id})">❌ Verwijder uit team</button>
 							<button class="btn btn-sm" style="background: #dc3545; color: white;" onclick="window.homepage.deletePlayer(${player.id})">🗑️</button>
 						</div>

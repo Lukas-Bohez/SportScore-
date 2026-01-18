@@ -472,8 +472,12 @@ class Homepage {
     const container = document.getElementById(`modal-scores-${sessionId}`);
     if (!container) return;
 
+    // Determine ordering and time-based formatting rules
+    const lowerIsBetter = SharedUtils.isLowerBetter(activity);
+    const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
+
     let scoresList = Object.values(aggregatedScores);
-    scoresList.sort((a, b) => b.score - a.score);
+    scoresList.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
 
     if (scoresList.length === 0) {
       container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Geen scores beschikbaar voor deze activiteit.</p>';
@@ -485,6 +489,7 @@ class Homepage {
           const iconEmoji = this.getIconEmoji(team.icon);
           const colorStyle = team.color ? `background-color: ${team.color}22; border-left: 4px solid ${team.color};` : '';
           const playersList = Object.values(team.players || {});
+          playersList.sort((x, y) => lowerIsBetter ? (x.score - y.score) : (y.score - x.score));
           return `
             <div class="score-card" style="background: var(--background-color); padding: 16px; border-radius: 8px; margin-bottom: 16px; ${colorStyle}">
               <div style="font-weight: 600; color: var(--text-color); margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
@@ -492,14 +497,14 @@ class Homepage {
                 <span style="font-size: 1.3em;">${iconEmoji}</span>
                 <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
               </div>
-              <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${team.score} punten</div>
+              <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}</div>
               ${playersList.length > 0 ? `
                 <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
                   <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
                   ${playersList.map(p => `
                     <div style="padding: 12px 14px; background: var(--card-bg, #fff); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                       <span style="font-size: 1.05em; font-weight: 500; color: var(--text-color);">${this.escapeHtml(p.name)}</span>
-                      <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${p.score}</span>
+                      <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${isTimeMode ? SharedUtils.formatMs(p.score) : p.score}</span>
                     </div>
                   `).join('')}
                 </div>
@@ -518,7 +523,7 @@ class Homepage {
                 <span>${iconEmoji}</span>
                 <span>${this.escapeHtml(item.name)}</span>
               </div>
-              <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color);">${item.score} punten</div>
+              <div style="font-size: 1.3em; font-weight: 700; color: var(--primary-color);">${isTimeMode ? SharedUtils.formatMs(item.score) : (item.score + ' punten')}</div>
             </div>
           `;
         }).join('');
@@ -552,7 +557,8 @@ class Homepage {
     
     try {
       const templates = JSON.parse(localStorage.getItem('sportScoreTemplates') || '[]');
-      const filtered = templates.filter(t => t.id !== templateId);
+      // Ensure type-insensitive comparison (ids may be number or string)
+      const filtered = templates.filter(t => String(t.id) !== String(templateId));
       localStorage.setItem('sportScoreTemplates', JSON.stringify(filtered));
       this.loadTemplates();
       this.showSuccessMessage('Template verwijderd!');
@@ -620,7 +626,9 @@ class Homepage {
       }
       
       const scoringMode = activity.scoring_mode || 'team';
-      console.log(`Loading scores for activity ${activityId}, mode: ${scoringMode}`);
+      const lowerIsBetter = SharedUtils.isLowerBetter(activity);
+      const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
+      console.log(`Loading scores for activity ${activityId}, mode: ${scoringMode}, timeMode: ${isTimeMode}`);
       
       // Use teams and players from session (already loaded)
       const teams = session.teams || [];
@@ -715,9 +723,9 @@ class Homepage {
       
       if (!container) return;
 
-      // Convert to array and sort by score
+      // Convert to array and sort by score (respect time/golf ordering)
       let scoresList = Object.values(aggregatedScores);
-      scoresList.sort((a, b) => b.score - a.score);
+      scoresList.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
 
       if (scoresList.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Geen scores beschikbaar voor deze activiteit.</p>';
@@ -737,14 +745,14 @@ class Homepage {
                   <span style="font-size: 1.3em;">${iconEmoji}</span>
                   <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
                 </div>
-                <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${team.score} punten</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}</div>
                 ${playersList.length > 0 ? `
                   <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
                     ${playersList.map(player => `
-                      <div style="padding: 12px 14px; background: var(--card-bg, #fff); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                      <div class="label-left-control-right player-card" style="padding: 12px 14px; background: var(--card-bg, #fff); border-radius: 6px rgba(0,0,0,0.1);">
                         <span style="font-size: 1.05em; font-weight: 500; color: var(--text-color);">${this.escapeHtml(player.name)}</span>
-                        <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${player.score}</span>
+                        <span style="font-weight: 700; color: var(--primary-color); font-size: 1.15em;">${isTimeMode ? SharedUtils.formatMs(player.score) : (player.score + ' punten')}</span>
                       </div>
                     `).join('')}
                   </div>
@@ -759,13 +767,13 @@ class Homepage {
             const colorStyle = player.color ? `background-color: ${player.color}22; border-left: 4px solid ${player.color};` : '';
             return `
               <div class="score-item" style="background: var(--background-color); padding: 12px; border-radius: 6px; margin-bottom: 10px; ${colorStyle}">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="label-left-control-right" style="align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                     <span style="font-weight: 700; color: var(--primary-color);">${index + 1}.</span>
                     <span>${iconEmoji}</span>
                     <span style="font-weight: 600; color: var(--text-color);">${this.escapeHtml(player.name)}</span>
                   </div>
-                  <span style="font-size: 1.2em; font-weight: 700; color: var(--primary-color);">${player.score} punten</span>
+                  <span style="font-size: 1.2em; font-weight: 700; color: var(--primary-color);">${isTimeMode ? SharedUtils.formatMs(player.score) : (player.score + ' punten')}</span>
                 </div>
               </div>
             `;
@@ -927,7 +935,10 @@ class Homepage {
         highest_score: maxScore
       }));
       
-      this.renderHighscores(activitiesWithScores);
+      // Store for client-side filtering & wire controls
+      this.highscoresActivities = activitiesWithScores;
+      this.setupHighscoresControls();
+      this.filterAndRenderHighscores();
     } catch (error) {
       console.error('Error loading highscores:', error);
       const grid = document.getElementById('highscores-grid');
@@ -953,8 +964,6 @@ class Homepage {
         </div>
         <p>${activity.description ? this.escapeHtml(activity.description) : ''}</p>
         <div class="highscores-stats">
-          <span>Rondes: ${activity.total_rounds || 1}</span>
-          ${activity.time_limit ? `<span>Tijd: ${activity.time_limit} min</span>` : ''}
           <span>Hoogste score: ${activity.highest_score || 0}</span>
         </div>
       </div>
@@ -967,6 +976,52 @@ class Homepage {
         this.showHighscoreDetails(activityId);
       });
     });
+  }
+
+  // Wire the highscores filter/search controls within the active highscores pane and attach handlers
+  setupHighscoresControls() {
+    // Prefer controls inside the tab pane, fall back to embedded section
+    const controlsContainer = document.querySelector('#highscores-tab .highscores-controls') || document.querySelector('#highscores-section .highscores-controls');
+    if (!controlsContainer) return;
+
+    const filterEl = controlsContainer.querySelector('#filter-sport');
+    const searchEl = controlsContainer.querySelector('#search-activity');
+
+    // Remove existing listeners to avoid duplicates
+    if (!this._highscoresHandler) this._highscoresHandler = () => this.filterAndRenderHighscores();
+    if (filterEl) {
+      filterEl.removeEventListener('change', this._highscoresHandler);
+      filterEl.addEventListener('change', this._highscoresHandler);
+    }
+    if (searchEl) {
+      searchEl.removeEventListener('input', this._highscoresHandler);
+      searchEl.addEventListener('input', this._highscoresHandler);
+    }
+  }
+
+  // Apply active filters and render highscores
+  filterAndRenderHighscores() {
+    let activities = (this.highscoresActivities || []).slice();
+    const controlsContainer = document.querySelector('#highscores-tab .highscores-controls') || document.querySelector('#highscores-section .highscores-controls');
+    if (!controlsContainer) {
+      this.renderHighscores(activities);
+      return;
+    }
+
+    const filterEl = controlsContainer.querySelector('#filter-sport');
+    const searchEl = controlsContainer.querySelector('#search-activity');
+
+    const sport = filterEl ? (filterEl.value || '').trim().toLowerCase() : '';
+    const search = searchEl ? (searchEl.value || '').trim().toLowerCase() : '';
+
+    if (sport) {
+      activities = activities.filter(a => ((a.sport_type || '') + '').toLowerCase() === sport);
+    }
+    if (search) {
+      activities = activities.filter(a => ((a.name || '') + '').toLowerCase().includes(search));
+    }
+
+    this.renderHighscores(activities);
   }
 
   async showHighscoreDetails(activityId) {
@@ -985,15 +1040,20 @@ class Homepage {
       const playerMap = new Map();
       allSessions.forEach(session => {
         (session.teams || []).forEach(team => {
-          if (!teamMap.has(team.id)) teamMap.set(team.id, team);
+          const key = String(team.id);
+          if (!teamMap.has(key)) teamMap.set(key, team);
         });
         (session.players || []).forEach(player => {
-          if (!playerMap.has(player.id)) playerMap.set(player.id, player);
+          const key = String(player.id);
+          if (!playerMap.has(key)) playerMap.set(key, player);
         });
       });
       const allTeams = Array.from(teamMap.values());
       const allPlayers = Array.from(playerMap.values());
       const combinedSession = { teams: allTeams, players: allPlayers };
+      // helper getters to avoid mismatched string/number keys
+      const getPlayer = (id) => playerMap.get(String(id)) || playerMap.get(Number(id));
+      const getTeam = (id) => teamMap.get(String(id)) || teamMap.get(Number(id));
 
       // Get activity details (safe)
       let activity;
@@ -1005,19 +1065,32 @@ class Homepage {
         activity = { id: activityId, name: `Activiteit ${activityId}`, scoring_mode: 'team' };
       }
 
-      // Aggregate scores across ALL instances of this activity name (so highscores show every team's best)
-      const activityName = activity.name;
+      // Determine ordering and formatting rules
+      // Use instance activity properties as a fallback when the fetched activity lacks game_type/time_winner
       const instances = [];
       allSessions.forEach(sess => {
         (sess.activities || []).forEach(a => {
-          if (String(a.name) === String(activityName)) instances.push({ activity: a, sessionId: sess.id });
+          if (String(a.name) === String(activity.name)) instances.push({ activity: a, sessionId: sess.id });
         });
       });
 
+      // If no instances found, we will still fall back to the fetched activity
       if (instances.length === 0) {
-        // fallback to the current activity instance
         instances.push({ activity, sessionId: activity.session_id || null });
       }
+
+      // Build an effective activity object combining fetched activity with the first instance as a hint
+      const effectiveActivity = Object.assign({}, activity, instances[0] && instances[0].activity ? {
+        game_type: activity.game_type || instances[0].activity.game_type,
+        time_winner: activity.time_winner || instances[0].activity.time_winner,
+      } : {});
+
+      const lowerIsBetter = SharedUtils.isLowerBetter(effectiveActivity);
+      const isTimeMode = !!(effectiveActivity && String(effectiveActivity.game_type) === 'team_vs_time');
+
+      // Aggregate scores across ALL instances of this activity name (so highscores show every team's best)
+      const activityName = activity.name;
+      // `instances` was built above (and guaranteed to contain at least one entry), reuse it here.
 
       const scoringMode = activity.scoring_mode || 'team';
       let leaderboard = [];
@@ -1031,6 +1104,9 @@ class Homepage {
             const lbResp = await this.api.getActivityLeaderboard(inst.activity.id);
             const lb = lbResp.leaderboard || [];
             console.debug(`Instance ${inst.activity.id} leaderboard:`, lb.slice(0,10));
+
+            // Determine whether this instance uses lower-is-better (may differ by instance)
+            const instLowerIsBetter = SharedUtils.isLowerBetter(inst.activity);
 
             // Detect whether leaderboard contains team totals (entries with team_id or team_name)
             const hasTeamEntries = lb.some(entry => entry.team_id || entry.team_name);
@@ -1046,18 +1122,18 @@ class Homepage {
                 else if (entry.team_name) tidKey = `name:${entry.team_name}`;
                 else return;
 
-                const teamObj = (entry.team_id !== undefined && entry.team_id !== null) ? (teamMap.get(entry.team_id) || teamMap.get(parseInt(tidKey))) : null;
+                const teamObj = (entry.team_id !== undefined && entry.team_id !== null) ? getTeam(entry.team_id) : null;
                 const tname = teamObj?.name || entry.team_name || `Team ${tidKey}`;
-                if (!teamScoresMap[tidKey]) teamScoresMap[tidKey] = { team_name: tname, total_score: 0 };
-                teamScoresMap[tidKey].total_score = Math.max(teamScoresMap[tidKey].total_score, score);
+                if (!teamScoresMap[tidKey]) teamScoresMap[tidKey] = { team_name: tname, total_score: (instLowerIsBetter ? Infinity : 0) };
+                teamScoresMap[tidKey].total_score = instLowerIsBetter ? Math.min(teamScoresMap[tidKey].total_score, score) : Math.max(teamScoresMap[tidKey].total_score, score);
               });
             } else {
               // Leaderboard lists players; try to aggregate per-team using player->team mapping first
               const teamAccum = {};
               lb.forEach(entry => {
                 const pid = entry.player_id || entry.id || entry.player_name;
-                const pts = Number(entry.total_score || entry.score || 0);
-                const player = playerMap.get(pid);
+                const pts = Number(entry.total_score || entry.points || entry.score || 0);
+                const player = getPlayer(pid);
                 const teamId = player ? player.team_id : null;
                 if (!teamId) return;
                 const key = String(teamId);
@@ -1071,7 +1147,7 @@ class Homepage {
                   const scoresResp = await this.api.getActivityScores(inst.activity.id);
                   const scores = this.api.extractArray(scoresResp, 'scores');
                   scores.forEach(s => {
-                    const teamId = s.team_id || (s.player_id ? (playerMap.get(s.player_id)?.team_id) : null);
+                    const teamId = s.team_id || (s.player_id ? (getPlayer(s.player_id)?.team_id) : null);
                     if (!teamId) return;
                     const key = String(teamId);
                     const pts = Number(s.points || s.score || 0);
@@ -1085,10 +1161,10 @@ class Homepage {
 
               Object.keys(teamAccum).forEach(key => {
                 const score = teamAccum[key];
-                const teamObj = teamMap.get(parseInt(key)) || teamMap.get(key);
+                const teamObj = getTeam(key);
                 const tname = teamObj?.name || `Team ${key}`;
-                if (!teamScoresMap[key]) teamScoresMap[key] = { team_name: tname, total_score: 0 };
-                teamScoresMap[key].total_score = Math.max(teamScoresMap[key].total_score, score);
+                if (!teamScoresMap[key]) teamScoresMap[key] = { team_name: tname, total_score: (lowerIsBetter ? Infinity : 0) };
+                teamScoresMap[key].total_score = lowerIsBetter ? Math.min(teamScoresMap[key].total_score, score) : Math.max(teamScoresMap[key].total_score, score);
               });
             }
           } catch (e) {
@@ -1096,7 +1172,7 @@ class Homepage {
           }
         }
 
-        leaderboard = Object.values(teamScoresMap).sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+        leaderboard = Object.values(teamScoresMap).filter(v => v.total_score !== Infinity).sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
       } else {
         // For player and team_with_players, compute per-instance totals and keep the MAX per team/player across instances
         if (scoringMode === 'player') {
@@ -1108,20 +1184,23 @@ class Homepage {
               const lbResp = await this.api.getActivityLeaderboard(inst.activity.id);
               const lb = lbResp.leaderboard || [];
               if (lb.length > 0 && (lb[0].hasOwnProperty('player_name') || lb[0].hasOwnProperty('player_id'))) {
-                // Build instance totals
+                // Build instance totals (respecting instance-specific ordering rules)
                 const instanceTotals = {};
+                const instLowerIsBetter2 = SharedUtils.isLowerBetter(inst.activity);
                 lb.forEach(entry => {
                   const pid = entry.player_id || entry.id || entry.player_name;
-                  const name = entry.player_name || entry.name || (playerMap.get(pid)?.name) || `Speler ${pid}`;
-                  const score = Number(entry.total_score || entry.score || 0);
-                  if (!instanceTotals[pid]) instanceTotals[pid] = 0;
-                  instanceTotals[pid] = Math.max(instanceTotals[pid], score);
+                  const pidKey = String(pid);
+                  const name = entry.player_name || entry.name || (getPlayer(pidKey)?.name) || `Speler ${pid}`;
+                  const score = Number(entry.total_score || entry.points || entry.score || 0);
+                  if (instanceTotals[pidKey] === undefined) instanceTotals[pidKey] = (instLowerIsBetter2 ? Infinity : -Infinity);
+                  instanceTotals[pidKey] = instLowerIsBetter2 ? Math.min(instanceTotals[pidKey], score) : Math.max(instanceTotals[pidKey], score);
                 });
-                // Merge into best
-                Object.keys(instanceTotals).forEach(pid => {
-                  const sc = instanceTotals[pid];
-                  if (!playerBest[pid] || playerBest[pid].total_score < sc) {
-                    playerBest[pid] = { player_name: playerMap.get(pid)?.name || String(pid), total_score: sc };
+                // Merge into best using instance rule
+                Object.keys(instanceTotals).forEach(pidKey => {
+                  const sc = instanceTotals[pidKey];
+                  const instLowerIsBetter3 = SharedUtils.isLowerBetter(inst.activity);
+                  if (!playerBest[pidKey] || (instLowerIsBetter3 ? playerBest[pidKey].total_score > sc : playerBest[pidKey].total_score < sc)) {
+                    playerBest[pidKey] = { player_name: getPlayer(pidKey)?.name || String(pidKey), total_score: sc };
                   }
                 });
                 continue;
@@ -1138,10 +1217,12 @@ class Homepage {
                 if (!instanceTotals2[pid]) instanceTotals2[pid] = 0;
                 instanceTotals2[pid] += pts; // accumulate within instance
               });
-              Object.keys(instanceTotals2).forEach(pid => {
-                const sc = instanceTotals2[pid];
-                if (!playerBest[pid] || playerBest[pid].total_score < sc) {
-                  playerBest[pid] = { player_name: playerMap.get(pid)?.name || String(pid), total_score: sc };
+              // Merge instance totals using instance-specific ordering
+              const instLowerIsBetter4 = SharedUtils.isLowerBetter(inst.activity);
+              Object.keys(instanceTotals2).forEach(pidKey => {
+                const sc = instanceTotals2[pidKey];
+                if (!playerBest[pidKey] || (instLowerIsBetter4 ? playerBest[pidKey].total_score > sc : playerBest[pidKey].total_score < sc)) {
+                  playerBest[pidKey] = { player_name: getPlayer(pidKey)?.name || String(pidKey), total_score: sc };
                 }
               });
             } catch (e) {
@@ -1149,7 +1230,7 @@ class Homepage {
             }
           }
 
-          leaderboard = Object.values(playerBest).sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+          leaderboard = Object.values(playerBest).sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
         } else if (scoringMode === 'team_with_players') {
           const teamBest = {}; // teamKey -> { name, score, players }
 
@@ -1164,7 +1245,7 @@ class Homepage {
                   // Determine team id
                   let teamId = s.team_id;
                   if (!teamId && s.player_id) {
-                    const player = playerMap.get(s.player_id);
+                    const player = getPlayer(s.player_id);
                     teamId = player ? player.team_id : null;
                   }
                   if (!teamId) return;
@@ -1174,15 +1255,17 @@ class Homepage {
                   const pts = Number(s.points || s.score || 0);
                   teamsInstance[tid].score += pts;
                   if (pid) {
-                    teamsInstance[tid].players[pid] = { name: playerMap.get(pid)?.name || `Speler ${pid}`, score: (teamsInstance[tid].players[pid]?.score || 0) + pts };
+                    const pidKey = String(pid);
+                    teamsInstance[tid].players[pidKey] = { name: getPlayer(pidKey)?.name || `Speler ${pid}`, score: (teamsInstance[tid].players[pidKey]?.score || 0) + pts };
                   }
                 });
 
-                // Merge into best
+                // Merge into best (respect instance-specific ordering)
+                const instLowerIsBetter5 = SharedUtils.isLowerBetter(inst.activity);
                 Object.keys(teamsInstance).forEach(tid => {
                   const instData = teamsInstance[tid];
-                  if (!teamBest[tid] || (teamBest[tid].score < instData.score)) {
-                    const teamObj = teamMap.get(parseInt(tid)) || teamMap.get(tid);
+                  if (!teamBest[tid] || (instLowerIsBetter5 ? teamBest[tid].score > instData.score : teamBest[tid].score < instData.score)) {
+                    const teamObj = getTeam(tid);
                     teamBest[tid] = { name: teamObj?.name || `Team ${tid}`, score: instData.score, players: instData.players };
                   }
                 });
@@ -1197,27 +1280,29 @@ class Homepage {
               lb.forEach(entry => {
                 if (entry.team_id || entry.team_name) {
                   const key = entry.team_id ? String(entry.team_id) : `name:${entry.team_name}`;
-                  const sc = Number(entry.total_score || entry.score || 0);
+                  const sc = Number(entry.total_score || entry.points || entry.score || 0);
                   if (!teamsFromLb[key]) teamsFromLb[key] = { score: 0, players: {} };
                   teamsFromLb[key].score = Math.max(teamsFromLb[key].score, sc);
                 } else if (entry.player_id || entry.player_name) {
                   // assign player's score to their team if possible
                   const pid = entry.player_id || entry.id || entry.player_name;
-                  const sc = Number(entry.total_score || entry.score || 0);
-                  const player = playerMap.get(pid);
+                  const pidKey = String(pid);
+                  const sc = Number(entry.total_score || entry.points || entry.score || 0);
+                  const player = getPlayer(pidKey);
                   const tid = player?.team_id ? String(player.team_id) : null;
                   if (!tid) return;
                   if (!teamsFromLb[tid]) teamsFromLb[tid] = { score: 0, players: {} };
-                  teamsFromLb[tid].players[pid] = { name: entry.player_name || player?.name || String(pid), score: sc };
+                  teamsFromLb[tid].players[pidKey] = { name: entry.player_name || player?.name || String(pidKey), score: sc };
                   // total will be sum of player contributions later, so accumulate
                   teamsFromLb[tid].score += sc;
                 }
               });
 
+              const instLowerIsBetter6 = SharedUtils.isLowerBetter(inst.activity);
               Object.keys(teamsFromLb).forEach(tk => {
                 const instData = teamsFromLb[tk];
-                if (!teamBest[tk] || teamBest[tk].score < instData.score) {
-                  const teamObj = teamMap.get(parseInt(tk)) || teamMap.get(tk);
+                if (!teamBest[tk] || (instLowerIsBetter6 ? teamBest[tk].score > instData.score : teamBest[tk].score < instData.score)) {
+                  const teamObj = getTeam(tk);
                   teamBest[tk] = { name: teamObj?.name || `Team ${tk}`, score: instData.score, players: instData.players };
                 }
               });
@@ -1226,7 +1311,7 @@ class Homepage {
             }
           }
 
-          leaderboard = Object.values(teamBest).sort((a, b) => b.score - a.score);
+          leaderboard = Object.values(teamBest).sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
         }
       }
 
@@ -1311,13 +1396,15 @@ class Homepage {
     }
 
     const scoringMode = activity.scoring_mode || 'team';
+    const lowerIsBetter = SharedUtils.isLowerBetter(activity);
+    const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
 
     if (scoringMode === 'player') {
-      const sortedPlayers = leaderboard.filter(p => p.total_score > 0);
+      const sortedPlayers = (leaderboard || []).slice().sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
       container.innerHTML = sortedPlayers.map((player, index) => `
         <div class="score-item">
           <div class="score-item-name">#${index + 1} ${this.escapeHtml(player.player_name || 'Onbekend')}</div>
-          <div class="score-item-value">${player.total_score || 0}</div>
+          <div class="score-item-value">${isTimeMode ? SharedUtils.formatMs(player.total_score) : (player.total_score || 0)}</div>
         </div>
       `).join('');
     } else if (scoringMode === 'team') {
@@ -1330,22 +1417,22 @@ class Homepage {
       // Debug: log what we will render
       console.debug('Rendering team highscores', normalized);
 
-      const sortedTeams = normalized.sort((a, b) => b.total_score - a.total_score);
+      const sortedTeams = normalized.slice().sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
       container.innerHTML = sortedTeams.map((team, index) => `
         <div class="score-item">
           <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.team_name || 'Onbekend')}</div>
-          <div class="score-item-value">${team.total_score}</div>
+          <div class="score-item-value">${isTimeMode ? SharedUtils.formatMs(team.total_score) : (team.total_score || 0)}</div>
         </div>
       `).join('');
     } else if (scoringMode === 'team_with_players') {
-      const sortedTeams = leaderboard.filter(t => t.score > 0);
+      const sortedTeams = (leaderboard || []).slice().sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
       container.innerHTML = sortedTeams.map((team, index) => {
-        const playersList = Object.values(team.players || {}).filter(p => p.score > 0);
+        const playersList = Object.values(team.players || {});
         return `
           <div class="score-item">
-            <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.name || 'Onbekend')} (${team.score})</div>
+            <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.name || 'Onbekend')} (${isTimeMode ? SharedUtils.formatMs(team.score) : team.score})</div>
             <div class="score-item-value">
-              ${playersList.map(p => `${this.escapeHtml(p.name)}: ${p.score}`).join(', ')}
+              ${playersList.map(p => `${this.escapeHtml(p.name)}: ${isTimeMode ? SharedUtils.formatMs(p.score) : p.score}`).join(', ')}
             </div>
           </div>
         `;
@@ -1902,5 +1989,10 @@ class Homepage {
 
 // Initialize homepage when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  window.homepage = new Homepage();
+  try {
+    window.homepage = new Homepage();
+  } catch (e) {
+    console.error('Failed to initialize Homepage', e);
+    window.showGlobalFatalError && window.showGlobalFatalError('Fout bij initialisatie Homepage: ' + (e && e.message ? e.message : String(e)));
+  }
 });
