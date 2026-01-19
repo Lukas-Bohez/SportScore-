@@ -760,7 +760,7 @@
             font-size: 0.85em;
             font-weight: 600;
         }
-        
+
         .session-status.completed {
             background: #6c757d;
         }
@@ -896,7 +896,7 @@
             font-size: 0.9em;
             color: var(--text-secondary, #666);
         }
-        
+
         .history-session-sport {
             margin-top: 8px;
             font-size: 0.9em;
@@ -914,7 +914,7 @@
             padding: 40px 20px;
             color: var(--text-secondary, #666);
         }
-        
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -928,13 +928,13 @@
             background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
         }
-        
+
         .modal.show {
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        
+
         .modal-content {
             background-color: var(--background-color, #fff);
             margin: 20px;
@@ -948,18 +948,19 @@
             position: relative;
             animation: modalSlideIn 0.3s ease;
         }
-        
+
         @keyframes modalSlideIn {
             from {
                 transform: translateY(-50px);
                 opacity: 0;
             }
+
             to {
                 transform: translateY(0);
                 opacity: 1;
             }
         }
-        
+
         .modal-close {
             position: sticky;
             top: 0;
@@ -974,12 +975,12 @@
             background: var(--background-color, #fff);
             border-radius: 0 12px 0 0;
         }
-        
+
         .modal-close:hover,
         .modal-close:focus {
             color: var(--text-color, #000);
         }
-        
+
         #history-modal-body {
             padding: 0 24px 24px 24px;
         }
@@ -1174,39 +1175,18 @@
                                         <!-- Team-vs-Time settings moved below for improved layout -->
                                     </div>
 
-                                    <!-- Team-vs-Time settings (improved layout) -->
+                                    <!-- Team-vs-Time settings (improved layout) - removed, using defaults -->
                                     <div class="form-row">
                                         <div class="form-group full-width">
-                                            <div id="team-vs-time-settings" class="tvt-settings hidden">
-                                                <div class="tvt-title-row">
-                                                    <span class="tvt-title">Team vs Tijd instellingen</span>
-                                                </div>
-
-                                                <div class="tvt-row">
-                                                    <label for="activity-time-winner" class="tvt-row-label">Wie wint?</label>
-                                                    <select id="activity-time-winner" name="activity-time-winner" class="tvt-select full-width-xs">
-                                                        <option value="lower">Laagste tijd wint (aanbevolen)</option>
-                                                        <option value="higher">Hoogste tijd wint</option>
-                                                    </select>
-                                                </div>
-
-                                                <div class="tvt-row">
-                                                    <label for="activity-aggregate-times" class="tvt-row-label">Tel speler tijden op voor team totaal</label>
-                                                    <div class="tvt-control">
-                                                        <label class="switch" aria-label="Tel speler tijden op voor team totaal">
-                                                          <input type="checkbox" id="activity-aggregate-times" name="activity-aggregate-times">
-                                                          <span class="slider"></span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <!-- Team vs Time settings removed - defaults to lower time wins, no aggregation -->
                                         </div>
                                     </div>
 
                                     <div class="form-row" style="display:none;" data-removed-for-now="true">
                                         <div class="form-group">
                                             <label for="activity-rounds">Aantal Rondes:</label>
-                                            <input type="number" id="activity-rounds" name="activity-rounds" value="1" min="1" max="10">
+                                            <input type="number" id="activity-rounds" name="activity-rounds" value="1"
+                                                min="1" max="10">
                                         </div>
                                         <div class="form-group">
                                             <label for="activity-time">Tijdslimiet (min):</label>
@@ -1283,7 +1263,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- History Session Modal -->
             <div id="history-modal" class="modal">
                 <div class="modal-content">
@@ -1291,7 +1271,7 @@
                     <div id="history-modal-body"></div>
                 </div>
             </div>
-            
+
             <!-- Highscores Section (embedded) -->
             <div id="highscores-section" class="content-section">
                 <div class="highscores-container">

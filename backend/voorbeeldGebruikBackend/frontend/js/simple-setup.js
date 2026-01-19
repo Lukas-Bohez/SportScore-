@@ -122,10 +122,10 @@ class SimpleSetup {
     this.activitiesList = document.getElementById('activities-list');
     this.existingActivitySelect = document.getElementById('existing-activity-select');
     this.addExistingActivityBtn = document.getElementById('add-existing-activity-btn');
-    // Team vs Time elements
-    this.teamVsTimeSettings = document.getElementById('team-vs-time-settings');
-    this.activityTimeWinnerSelect = document.getElementById('activity-time-winner');
-    this.activityAggregateTimesCheckbox = document.getElementById('activity-aggregate-times');
+    // Team vs Time elements - removed, using defaults
+    // this.teamVsTimeSettings = document.getElementById('team-vs-time-settings');
+    // this.activityTimeWinnerSelect = document.getElementById('activity-time-winner');
+    // this.activityAggregateTimesCheckbox = document.getElementById('activity-aggregate-times');
 
     // Team management elements
     this.addTeamBtn = document.getElementById('add-team-btn');
@@ -203,13 +203,18 @@ class SimpleSetup {
     }
     if (this.activityGameTypeSelect) {
       this.activityGameTypeSelect.addEventListener('change', this.handleActivityGameTypeChange.bind(this));
-      // Set initial visibility based on selected value
-      if (this.activityGameTypeSelect.value === 'team_vs_time') {
-        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.remove('hidden');
-      } else {
-        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
-      }
     }
+    if (this.activityScoringSelect) {
+      this.activityScoringSelect.addEventListener('change', (ev) => {
+        this.updateTeamVsTimeUI(this.activityGameTypeSelect?.value, ev.target.value);
+      });
+    }
+
+    // Initial visibility
+    this.updateTeamVsTimeUI(
+      this.activityGameTypeSelect ? this.activityGameTypeSelect.value : null,
+      this.activityScoringSelect ? this.activityScoringSelect.value : null
+    );
 
     // Team management
     if (this.addTeamBtn) {
@@ -319,12 +324,26 @@ class SimpleSetup {
 
   handleActivityGameTypeChange(e) {
     const value = e.target.value;
-    if (value === 'team_vs_time') {
-      if (this.teamVsTimeSettings) this.teamVsTimeSettings.classList.remove('hidden');
-    } else {
-      if (this.teamVsTimeSettings) this.teamVsTimeSettings.classList.add('hidden');
-      if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
-      if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
+    this.updateTeamVsTimeUI(value, this.activityScoringSelect ? this.activityScoringSelect.value : null);
+  }
+
+  updateTeamVsTimeUI(gameType, scoringMode) {
+    const isTeamVsTime = String(gameType || '').toLowerCase() === 'team_vs_time';
+    const isTeamWithPlayers = String(scoringMode || '').toLowerCase() === 'team_with_players';
+    const aggregateRow = this.activityAggregateTimesCheckbox ? this.activityAggregateTimesCheckbox.closest('.tvt-row') : null;
+
+    if (this.teamVsTimeSettings) {
+      if (isTeamVsTime) this.teamVsTimeSettings.classList.remove('hidden');
+      else {
+        this.teamVsTimeSettings.classList.add('hidden');
+        if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
+      }
+    }
+
+    if (aggregateRow) {
+      const showAggregate = isTeamVsTime && isTeamWithPlayers;
+      aggregateRow.classList.toggle('hidden', !showAggregate);
+      if (!showAggregate && this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
     }
   }
 
@@ -479,15 +498,9 @@ class SimpleSetup {
       this.editingActivityIndex = this.activities.indexOf(activity);
 
       // Populate Team vs Time settings if applicable
-      if (activity.game_type === 'team_vs_time') {
-        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.remove('hidden');
-        if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = activity.time_winner || 'lower';
-        if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = !!activity.aggregate_player_times;
-      } else {
-        this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
-        if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
-        if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
-      }
+      this.updateTeamVsTimeUI(activity.game_type, activity.scoring_mode);
+      if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = activity.time_winner || 'lower';
+      if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = !!activity.aggregate_player_times;
     } else {
       this.activityNameInput.value = '';
       this.activitySportSelect.value = 'custom';
@@ -499,7 +512,7 @@ class SimpleSetup {
       this.editingActivityIndex = null;
 
       // Reset Team vs Time settings
-      this.teamVsTimeSettings && this.teamVsTimeSettings.classList.add('hidden');
+      this.updateTeamVsTimeUI(this.activityGameTypeSelect ? this.activityGameTypeSelect.value : null, this.activityScoringSelect ? this.activityScoringSelect.value : null);
       if (this.activityTimeWinnerSelect) this.activityTimeWinnerSelect.value = 'lower';
       if (this.activityAggregateTimesCheckbox) this.activityAggregateTimesCheckbox.checked = false;
     }
@@ -527,14 +540,17 @@ class SimpleSetup {
       return;
     }
 
+    const isTeamVsTime = gameType === 'team_vs_time';
+    const isTeamWithPlayers = scoring === 'team_with_players';
+
     const activityData = {
       name,
       sport_type: sport,
       scoring_mode: scoring,
       game_type: gameType,
       // team_vs_time specific options
-      time_winner: (gameType === 'team_vs_time') ? (this.activityForm ? (this.activityForm.querySelector('#activity-time-winner')?.value || 'lower') : 'lower') : 'lower',
-      aggregate_player_times: (gameType === 'team_vs_time') ? !!(this.activityForm && this.activityForm.querySelector('#activity-aggregate-times')?.checked) : false,
+      time_winner: 'lower', // Always use lower time wins
+      aggregate_player_times: false, // Never aggregate player times
       total_rounds: rounds,
       time_limit: time,
       description: desc || null
@@ -667,10 +683,10 @@ class SimpleSetup {
       let resp;
       if (this.editingTeamIndex != null && this.editingTeamIndex >= 0) {
         const existingTeam = this.teams[this.editingTeamIndex];
-        resp = await this.api.updateStandaloneTeam(existingTeam.id, teamData);
+        resp = await this.api.updateTeam(existingTeam.id, teamData);
         this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
       } else {
-        resp = await this.api.createStandaloneTeam(teamData);
+        resp = await this.api.createTeam(teamData);
         this.showSuccessMessage(`Team "${teamData.name}" succesvol aangemaakt!`);
       }
       
@@ -923,7 +939,7 @@ class SimpleSetup {
     }
 
     try {
-      await this.api.deleteStandaloneTeam(teamId);
+      await this.api.deleteTeam(teamId);
       this.teams = this.teams.filter((t) => t.id !== teamId);
       this.updateTeamsListStep3();
       alert(`Team "${teamName}" succesvol verwijderd!`);
@@ -1141,7 +1157,7 @@ class SimpleSetup {
 
   async loadTeamsFromAPI() {
     try {
-      const response = await this.api.getAllStandaloneTeams();
+      const response = await this.api.getTeams();
       const teams = this.api.extractArray(response, 'teams');
 
       // Map API teams to internal format

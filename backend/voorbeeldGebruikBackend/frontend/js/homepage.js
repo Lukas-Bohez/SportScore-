@@ -1961,10 +1961,10 @@ class Homepage {
     try {
       let response;
       if (this.editingTeamId) {
-        response = await this.api.updateStandaloneTeam(this.editingTeamId, teamData);
+        response = await this.api.updateTeam(this.editingTeamId, teamData);
         this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
       } else {
-        response = await this.api.createStandaloneTeam(teamData);
+        response = await this.api.createTeam(teamData);
         this.showSuccessMessage(`Team "${teamData.name}" toegevoegd!`);
       }
 

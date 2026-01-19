@@ -84,6 +84,20 @@ def _jsonable(value):
         return [_jsonable(v) for v in value]
     return value
 
+def _normalize_activity(activity: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Normalize activity row values for consistent API output."""
+    if not activity:
+        return activity
+    # Ensure time_winner always has a default
+    activity['time_winner'] = activity.get('time_winner') or 'lower'
+    # Convert SQLite 0/1 into Python bool for JSON clients
+    try:
+        raw_agg = activity.get('aggregate_player_times')
+        activity['aggregate_player_times'] = bool(int(raw_agg)) if raw_agg is not None else False
+    except Exception:
+        activity['aggregate_player_times'] = bool(activity.get('aggregate_player_times'))
+    return activity
+
 # CORS middleware - allow all origins for development
 ALLOWED_ORIGINS = ["*"]
 
@@ -887,7 +901,8 @@ async def delete_session_team(session_id: int, team_id: int):
 )
 async def get_global_activities():
     activities = ActivityRepository.get_activities_by_session(None)
-    return ActivityListResponse(activities=[ActivityResponse(**a) for a in activities])
+    normalized = [_normalize_activity(a) for a in activities]
+    return ActivityListResponse(activities=[ActivityResponse(**a) for a in normalized])
 
 @app.post(
     f"{ENDPOINT}/activities",
@@ -921,7 +936,8 @@ async def create_global_activity(activity: ActivityCreate):
 )
 async def get_session_activities(session_id: int):
     activities = ActivityRepository.get_activities_by_session(session_id)
-    return ActivityListResponse(activities=[ActivityResponse(**a) for a in activities])
+    normalized = [_normalize_activity(a) for a in activities]
+    return ActivityListResponse(activities=[ActivityResponse(**a) for a in normalized])
 
 @app.post(
     f"{ENDPOINT}/sessions/{{session_id}}/activities",
@@ -945,6 +961,16 @@ async def create_activity_in_session(session_id: int, activity: ActivityCreate):
         description=activity.description
     )
     created = ActivityRepository.get_activity_by_id(activity_id)
+
+    # Emit real-time update for activity creation
+    try:
+        await sio.emit('activity_created', _jsonable({
+            'activity': created,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+    except Exception:
+        logger.exception("Failed to emit activity_created event")
+
     return ActivityResponse(**created)
 
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Get activity by id")
@@ -952,18 +978,45 @@ async def get_activity(activity_id: int):
     activity = ActivityRepository.get_activity_by_id(activity_id)
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    return ActivityResponse(**activity)
+    return ActivityResponse(**_normalize_activity(activity))
 
 @app.put(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Update activity")
-async def update_activity(activity_id: int, activity_update: ActivityUpdate):
+async def update_activity(activity_id: int, activity_update: ActivityUpdate, request: Request):
+    # Debug: log incoming activity update fields
+    try:
+        print(f"Activity update received for id={activity_id}")
+        print(f"  time_winner={activity_update.time_winner} (type: {type(activity_update.time_winner)})")
+        print(f"  aggregate_player_times={activity_update.aggregate_player_times} (type: {type(activity_update.aggregate_player_times)})")
+    except Exception as e:
+        print(f"Failed to log activity update: {e}")
+
+    # Log raw request body
+    try:
+        raw = await request.json()
+        print(f"Activity update raw body: {raw}")
+    except Exception as e:
+        print(f"Failed to parse raw request body: {e}")
+
+    # CRITICAL FIX: Explicitly convert aggregate_player_times to integer for SQLite
+    # Keep None if not provided
+    if activity_update.aggregate_player_times is not None:
+        aggregate_as_int = 1 if activity_update.aggregate_player_times else 0
+    else:
+        aggregate_as_int = None
+
+    # CRITICAL FIX: Ensure time_winner is passed through only when provided
+    time_winner_value = activity_update.time_winner if activity_update.time_winner is not None else None
+
+    print(f"  Converted values: aggregate_player_times={aggregate_as_int}, time_winner={time_winner_value}")
+
     success = ActivityRepository.update_activity(
         activity_id,
         name=activity_update.name,
         sport_type=activity_update.sport_type,
         game_type=activity_update.game_type,
         scoring_mode=activity_update.scoring_mode,
-        time_winner=activity_update.time_winner,
-        aggregate_player_times=activity_update.aggregate_player_times,
+        time_winner=time_winner_value,
+        aggregate_player_times=aggregate_as_int,
         status=activity_update.status,
         current_round=activity_update.current_round,
         total_rounds=activity_update.total_rounds,
@@ -972,7 +1025,38 @@ async def update_activity(activity_id: int, activity_update: ActivityUpdate):
     )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update activity")
+
     updated = ActivityRepository.get_activity_by_id(activity_id)
+
+    # Normalize values for JSON and client consumers
+    try:
+        # Ensure time_winner defaults to 'lower' if missing
+        updated['time_winner'] = updated.get('time_winner') or 'lower'
+        # Convert numeric sqlite stored 0/1 to boolean for JSON
+        updated['aggregate_player_times'] = bool(int(updated.get('aggregate_player_times') or 0))
+    except Exception as e:
+        print(f"Failed to normalize updated activity values: {e}")
+
+    print(f"Activity after update: time_winner={updated.get('time_winner')}, aggregate_player_times={updated.get('aggregate_player_times')}")
+
+    # Emit real-time update for activity change
+    try:
+        await sio.emit('activity_update', _jsonable({
+            'activity': updated,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+    except Exception:
+        logger.exception("Failed to emit activity_update event")
+
+    return ActivityResponse(**updated)
+    try:
+        await sio.emit('activity_update', _jsonable({
+            'activity': updated,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+    except Exception:
+        logger.exception("Failed to emit activity_update event")
+
     return ActivityResponse(**updated)
 
 @app.delete(f"{ENDPOINT}/activities/{{activity_id}}", tags=["Activities"], summary="Delete activity")
@@ -980,7 +1064,22 @@ async def delete_activity(activity_id: int):
     success = ActivityRepository.delete_activity(activity_id)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete activity")
+
+    # Emit deletion event so clients can refresh
+    try:
+        await sio.emit('activity_deleted', {'activity_id': activity_id, 'timestamp': datetime.now(CET).isoformat()})
+    except Exception:
+        logger.exception("Failed to emit activity_deleted event")
+
     return {"message": "Activity deleted successfully"}
+
+# Temporary debug endpoint to inspect raw DB values for an activity
+@app.get(f"{ENDPOINT}/debug/activity/{{activity_id}}")
+async def debug_activity(activity_id: int):
+    from database.database import Database
+    sql = "SELECT * FROM activities WHERE id = ?"
+    row = Database.get_one_row(sql, [activity_id])
+    return {"raw_db_row": row}
 
 # Activity Teams (opt-in)
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamListResponse, tags=["Activity Teams"], summary="List teams for activity")
@@ -1059,6 +1158,7 @@ async def remove_player_from_activity(activity_id: int, player_id: int):
 # Activity Scores and Leaderboard
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/scores", response_model=ActivityScoreListResponse, tags=["Activity Scores"], summary="List scores for activity")
 async def get_activity_scores(activity_id: int):
+    # Always return activity-scoped scores from the activity_scores table; this is the authoritative source
     scores = ActivityScoreRepository.get_scores_by_activity(activity_id)
     return ActivityScoreListResponse(scores=[ActivityScoreResponse(**s) for s in scores])
 
@@ -1080,26 +1180,115 @@ async def create_activity_score(activity_id: int, score: ActivityScoreCreate):
     response = ActivityScoreResponse(**created) if created else ActivityScoreResponse(activity_id=activity_id, team_id=score.team_id, player_id=score.player_id, points=score.points, reason=score.reason, round_number=score.round_number, id=score_id, score_type='point', timestamp=datetime.now(CET))
     
     # Broadcast score update to all connected clients (BigScreen, etc.)
-    await sio.emit('session_score_update', {
-        'session_id': score.activity_id,  # Use activity_id as identifier for activity scores
+    # Include both activity_id and session_id when available so clients can filter correctly
+    try:
+        activity_obj = ActivityRepository.get_activity_by_id(activity_id)
+        session_for_activity = activity_obj.get('session_id') if activity_obj else None
+    except Exception:
+        session_for_activity = None
+
+    await sio.emit('session_score_update', _jsonable({
+        'activity_id': activity_id,
+        'session_id': session_for_activity,
         'team_id': score.team_id,
         'player_id': score.player_id,
         'points': score.points,
         'reason': score.reason,
         'timestamp': datetime.now(CET).isoformat()
-    })
+    }))
     
     return response
 
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/leaderboard", tags=["Activities"], summary="Get activity leaderboard")
 async def get_activity_leaderboard(activity_id: int):
-    leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
     # Get activity to find session_id
     activity = ActivityRepository.get_activity_by_id(activity_id)
     session = None
     if activity and activity.get('session_id'):
         session = SessionRepository.get_session_by_id(activity['session_id'])
-    return {"leaderboard": leaderboard, "session": session}
+        # For session activities, compute leaderboard from activity_scores and respect activity.time_winner and aggregate_player_times
+        scores = ActivityScoreRepository.get_scores_by_activity(activity_id) or []
+
+        # Build per-team and per-player totals from activity_scores
+        team_level_totals = {}  # team_id -> sum of team-level points (player_id is null)
+        player_totals = {}  # player_id -> { team_id, total }
+        for s in scores:
+            tid = s.get('team_id')
+            pid = s.get('player_id')
+            pts = s.get('points') or 0
+            if pid is None or pid == 0:
+                if tid is not None:
+                    team_level_totals[tid] = team_level_totals.get(tid, 0) + pts
+            else:
+                entry = player_totals.get(pid, {'team_id': tid, 'total': 0})
+                entry['total'] = entry.get('total', 0) + pts
+                entry['team_id'] = tid
+                player_totals[pid] = entry
+
+        # Prepare a lookup of players per team (to include players without scores)
+        teams = SessionTeamRepository.get_teams_by_session(activity['session_id'])
+        players_by_team = {}
+        for team in teams:
+            tid = team['id']
+            players_by_team[tid] = []
+            try:
+                resp = SessionTeamRepository.get_team_players(team_id=tid, session_id=activity['session_id'])
+                # If repository method not available, fallback to API endpoints (frontend will fetch players anyway)
+            except Exception:
+                resp = None
+
+        # Compute leaderboard entries respecting time aggregation rules when relevant
+        leaderboard = []
+        is_time = (activity and activity.get('game_type') == 'team_vs_time')
+        aggregate_player_times = bool(activity.get('aggregate_player_times'))
+        time_winner = (activity.get('time_winner') or 'lower').lower()
+
+        # Map players to teams using player_totals entries or session players if available
+        team_player_values = {}  # team_id -> list of player totals
+        for pid, info in player_totals.items():
+            t = info.get('team_id')
+            if t is None:
+                continue
+            team_player_values.setdefault(t, []).append({'player_id': pid, 'total': info.get('total', 0)})
+
+        for team in teams:
+            tid = team['id']
+            name = team['name']
+            icon = team.get('icon')
+            # Compute team score
+            if is_time:
+                pvals = [p['total'] for p in team_player_values.get(tid, [])]
+                if pvals and len(pvals) > 0:
+                    if aggregate_player_times:
+                        score_val = sum(pvals)
+                    else:
+                        if time_winner == 'higher':
+                            score_val = max(pvals)
+                        else:
+                            score_val = min(pvals)
+                else:
+                    # Fallback to team-level totals
+                    score_val = team_level_totals.get(tid, 0)
+            else:
+                # Non-time activities: sum team-level and player-level points
+                score_val = team_level_totals.get(tid, 0)
+                # include player totals for completeness
+                score_val += sum([p['total'] for p in team_player_values.get(tid, [])])
+
+            leaderboard.append({
+                'team_id': tid,
+                'name': name,
+                'icon': icon,
+                'score': score_val,
+                'team_color': team.get('color'),
+                'players': [],
+                'playerScores': { str(p['player_id']): p['total'] for p in team_player_values.get(tid, []) }
+            })
+        return {"leaderboard": leaderboard, "session": session}
+    else:
+        # Global activity
+        leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
+        return {"leaderboard": leaderboard, "session": session}
 
 # Session Scores Endpoints
 @app.get(
@@ -1188,7 +1377,7 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
 @app.get(f"{ENDPOINT}/sessions/{{session_id}}/participant-leaderboard", tags=["Sessions"], summary="Get session participant leaderboard")
 async def get_session_participant_leaderboard(session_id: int):
     # Get all activities for the session
-    activities = ActivityRepository.get_activities_by_session(session_id)
+    activities = [_normalize_activity(a) for a in ActivityRepository.get_activities_by_session(session_id)]
     activity_ids = [a['id'] for a in activities]
     
     if not activity_ids:
@@ -1242,10 +1431,13 @@ async def get_live_leaderboard():
     
     # For participant-based scoring, return participant leaderboard
     # Check if session has activities (indicating station-based scoring)
-    activities = ActivityRepository.get_activities_by_session(session['id'])
+    activities = [_normalize_activity(a) for a in ActivityRepository.get_activities_by_session(session['id'])]
+    # Ensure activities are attached to the session object for clients that expect session.activities
+    session['activities'] = activities
     if activities:
         # Participant-based leaderboard
         leaderboard_data = await get_session_participant_leaderboard(session['id'])
+        # Keep backwards-compatible top-level activities but also include in session
         return {"leaderboard": leaderboard_data["leaderboard"], "session": session, "activities": leaderboard_data["activities"]}
     else:
         # Fallback to team-based leaderboard
@@ -1488,6 +1680,40 @@ async def delete_session_template(template_id: int):
 @app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
 async def health():
     return {"status": "ok", "time": datetime.now(CET).isoformat()}
+
+# Live Leaderboard
+@app.get(f"{ENDPOINT}/live-leaderboard", tags=["Live"])
+async def get_live_leaderboard():
+    active_session = SessionRepository.get_active_session()
+    if not active_session:
+        raise HTTPException(status_code=404, detail="No active session")
+    
+    # Get teams for the session
+    teams = SessionTeamRepository.get_teams_by_session(active_session['id'])
+    
+    # Get scores for the session
+    scores = SessionScoreRepository.get_scores_by_session(active_session['id'])
+    
+    # Sum scores per team
+    team_scores = {}
+    for score in scores:
+        tid = score['team_id']
+        if tid not in team_scores:
+            team_scores[tid] = 0
+        team_scores[tid] += score.get('points', 0) or 0
+    
+    leaderboard = []
+    for team in teams:
+        leaderboard.append({
+            'team_id': team['id'],
+            'name': team['name'],
+            'icon': team.get('icon'),
+            'score': team_scores.get(team['id'], 0),
+            'players': [],  # Will be loaded by frontend
+            'playerScores': {}
+        })
+    
+    return {'session': active_session, 'leaderboard': leaderboard}
 
 # Explicit CORS preflight handler (helps when running behind the Socket.IO ASGI wrapper)
 @app.options("/{full_path:path}")

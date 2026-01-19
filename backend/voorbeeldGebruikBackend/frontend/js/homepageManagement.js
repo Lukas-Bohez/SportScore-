@@ -116,17 +116,16 @@ export class HomepageManagement {
 				e.preventDefault();
 				this.handleActivitySubmit(e);
 			});
-			// Show/hide team_vs_time settings based on game type selection
+			// Show/hide team_vs_time settings based on game type + scoring mode
 			try {
 				const gameTypeEl = this.activityForm.querySelector('#activity-game-type');
-				if (gameTypeEl) {
-					gameTypeEl.addEventListener('change', (ev) => {
-						const tvtSettings = document.getElementById('team-vs-time-settings');
-						if (!tvtSettings) return;
-						if (ev.target.value === 'team_vs_time') tvtSettings.classList.remove('hidden');
-						else tvtSettings.classList.add('hidden');
-					});
-				}
+				const scoringEl = this.activityForm.querySelector('#activity-scoring');
+				const updateUI = () => this.updateTeamVsTimeUI(
+					gameTypeEl ? gameTypeEl.value : null,
+					scoringEl ? scoringEl.value : null
+				);
+				if (gameTypeEl) gameTypeEl.addEventListener('change', updateUI);
+				if (scoringEl) scoringEl.addEventListener('change', updateUI);
 			} catch (_) {}
 			this.activityForm.dataset.handlerAttached = 'true';
 		}
@@ -146,6 +145,29 @@ export class HomepageManagement {
 		if (this.addPlayerBtn) this.addPlayerBtn.addEventListener('click', () => this.addPlayerToTeam());
 		if (this.playerSearchInput) this.playerSearchInput.addEventListener('input', (e) => this.updatePlayerSearch(e.target.value));
 		if (this.addPlayerGlobalBtn) this.addPlayerGlobalBtn.addEventListener('click', () => this.createPlayerGlobal());
+	}
+
+	updateTeamVsTimeUI(gameType, scoringMode) {
+		// Team vs Time settings removed - always use defaults
+		// const isTeamVsTime = String(gameType || '').toLowerCase() === 'team_vs_time';
+		// const isTeamWithPlayers = String(scoringMode || '').toLowerCase() === 'team_with_players';
+		// const tvtSettings = document.getElementById('team-vs-time-settings');
+		// const aggregateRow = document.querySelector('#activity-aggregate-times')?.closest('.tvt-row');
+		// const aggregateCheckbox = document.getElementById('activity-aggregate-times');
+
+		// if (tvtSettings) {
+		// 	if (isTeamVsTime) tvtSettings.classList.remove('hidden');
+		// 	else {
+		// 		tvtSettings.classList.add('hidden');
+		// 		if (aggregateCheckbox) aggregateCheckbox.checked = false;
+		// 	}
+		// }
+
+		// if (aggregateRow) {
+		// 	const showAggregate = isTeamVsTime && isTeamWithPlayers;
+		// 	aggregateRow.classList.toggle('hidden', !showAggregate);
+		// 	if (!showAggregate && aggregateCheckbox) aggregateCheckbox.checked = false;
+		// }
 	}
 
 	// ---------------------- Activities ----------------------
@@ -221,17 +243,22 @@ export class HomepageManagement {
 			name: formData.get('activity-name'),
 			sport_type: formData.get('activity-sport'),
 			game_type: formData.get('activity-game-type'),
-			scoring_mode: formData.get('activity-scoring'),
+				scoring_mode: formData.get('activity-scoring'),
 			// Rounds/time are hidden and defaulted for now
 			total_rounds: 1,
 			time_limit: null,
 			description: formData.get('activity-desc')
 		};
-		// Include team_vs_time specific settings if selected
-		if (String(activityData.game_type) === 'team_vs_time') {
-			activityData.time_winner = formData.get('activity-time-winner') || 'lower';
-			activityData.aggregate_player_times = !!formData.get('activity-aggregate-times');
-		}
+		// Include team_vs_time specific settings if selected - always use defaults now
+			const isTeamVsTime = String(activityData.game_type) === 'team_vs_time';
+			const isTeamWithPlayers = String(activityData.scoring_mode) === 'team_with_players';
+			if (isTeamVsTime) {
+				activityData.time_winner = 'lower'; // Always lower
+				activityData.aggregate_player_times = false; // Never aggregate
+			} else {
+				activityData.time_winner = 'lower';
+				activityData.aggregate_player_times = false;
+			}
 		this.processingActivity = true;
 		const done = async () => {
 			this.processingActivity = false;
@@ -262,17 +289,10 @@ export class HomepageManagement {
 			form['activity-rounds'].value = activity.total_rounds || 1;
 			form['activity-time'].value = activity.time_limit || '';
 			form['activity-desc'].value = activity.description || '';
-			// Team vs Time settings handling
-			const tvtSettings = document.getElementById('team-vs-time-settings');
-			if (tvtSettings) {
-				if (activity.game_type === 'team_vs_time') {
-					tvtSettings.classList.remove('hidden');
-					try { form['activity-time-winner'].value = activity.time_winner || 'lower'; } catch(_) {}
-					try { form['activity-aggregate-times'].checked = !!activity.aggregate_player_times; } catch(_) {}
-				} else {
-					tvtSettings.classList.add('hidden');
-				}
-			}
+			// Team vs Time settings handling - removed, using defaults
+			// this.updateTeamVsTimeUI(activity.game_type, activity.scoring_mode);
+			// try { form['activity-time-winner'].value = activity.time_winner || 'lower'; } catch(_) {}
+			// try { form['activity-aggregate-times'].checked = !!activity.aggregate_player_times; } catch(_) {}
 			const submitBtn = form.querySelector('button[type="submit"]'); if (submitBtn) submitBtn.textContent = 'Bijwerken';
 			try { form['activity-name'].focus(); } catch (_) {}
 		} else {
@@ -280,6 +300,8 @@ export class HomepageManagement {
 			try { form.reset(); } catch (_) {}
 			const submitBtn = form.querySelector('button[type="submit"]'); if (submitBtn) submitBtn.textContent = 'Activiteit Opslaan';
 			try { form['activity-name'].focus(); } catch (_) {}
+			// Team vs Time settings removed - using defaults
+			// this.updateTeamVsTimeUI(form['activity-game-type']?.value, form['activity-scoring']?.value);
 		}
 	}
 
@@ -627,10 +649,10 @@ export class HomepageManagement {
 		try {
 			let resp;
 			if (this.editingTeamId) {
-				resp = await this.api.updateStandaloneTeam(this.editingTeamId, teamData);
+				resp = await this.api.updateTeam(this.editingTeamId, teamData);
 				this.showSuccessMessage(`Team "${teamData.name}" succesvol bijgewerkt!`);
 			} else {
-				resp = await this.api.createStandaloneTeam(teamData);
+				resp = await this.api.createTeam(teamData);
 				this.showSuccessMessage(`Team "${teamData.name}" succesvol aangemaakt!`);
 			}
 			this.hideTeamForm();

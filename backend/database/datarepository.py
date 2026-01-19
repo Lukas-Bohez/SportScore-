@@ -706,7 +706,9 @@ class SessionTeamRepository:
     @staticmethod
     def get_teams_by_session(session_id: int) -> List[Dict[str, Any]]:
         """Haal alle teams op die deelnemen aan een specifieke sessie."""
-        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, COALESCE(NULLIF(t.color, ''), '#333333') as color, COALESCE(NULLIF(t.icon, ''), 'team') as icon, 
+        sql = """SELECT t.id, ? as session_id, COALESCE(t.name, '') as name, 
+                        CASE WHEN t.color IN ('', '#000000') OR t.color IS NULL THEN '#333333' ELSE t.color END as color, 
+                        CASE WHEN t.icon IN ('', '#000000') OR t.icon IS NULL THEN 'team' ELSE t.icon END as icon, 
                         gt.is_eliminated, t.created_at, t.updated_at,
                         COALESCE(SUM(s.points), 0) as score
                  FROM game_teams gt
@@ -1032,9 +1034,11 @@ class ActivityRepository:
         if time_winner is not None:
             updates.append("time_winner = ?")
             params.append(time_winner)
+            print(f"Repository: Adding time_winner={time_winner} to update")
         if aggregate_player_times is not None:
             updates.append("aggregate_player_times = ?")
             params.append(1 if aggregate_player_times else 0)
+            print(f"Repository: Adding aggregate_player_times={aggregate_player_times} (as int: {1 if aggregate_player_times else 0}) to update")
         if status is not None:
             updates.append("status = ?")
             params.append(status)
