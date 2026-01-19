@@ -246,6 +246,37 @@ class ScoreInput {
       await this.loadTeams();
       await this.loadActivities();
       this.loadRecentScores();
+
+      // Announce admin presence so the BigScreen can hide the join QR 🍫
+      try {
+        if (api?.socket && api.socket.connected) {
+          console.debug('ScoreInput: emitting admin_connected');
+          api.socket.emit('admin_connected');
+        } else {
+          // If not yet connected, emit once when connected
+          api.once('connected', () => {
+            try { api.socket && api.socket.connected && api.socket.emit('admin_connected'); } catch (_) {}
+          });
+        }
+
+        // Heartbeat while page is visible to avoid racey disconnects
+        this._adminHeartbeat = setInterval(() => {
+          try { api.socket && api.socket.connected && api.socket.emit('admin_connected'); } catch (_) {}
+        }, 20000);
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            try { api.socket && api.socket.connected && api.socket.emit('admin_connected'); } catch (_) {}
+          }
+        });
+
+        // Try to inform server we're leaving when unloading
+        window.addEventListener('beforeunload', () => {
+          try { api.socket && api.socket.connected && api.socket.emit('admin_disconnected'); } catch (_) {}
+        });
+      } catch (e) {
+        console.warn('Failed to announce admin presence:', e);
+      }
     } catch (error) {
       console.error('ScoreInput init failed:', error);
       this.showFatalError('Fout bij initialisatie. Controleer de console voor details.');
@@ -258,7 +289,7 @@ class ScoreInput {
       'session-name', 'round-info', 'timer',
       // Round controls
       'round-controls', 'start-round-btn', 'pause-round-btn', 'resume-round-btn',
-      'end-round-btn',
+      'end-round-btn', 'next-round-btn',
       // Main sections
       'leaderboard', 'team-select', 'player-select', 'points-input', 
       'reason-input', 'submit-score-btn', 'recent-scores',
@@ -321,6 +352,7 @@ class ScoreInput {
     this.elements.pauseRoundBtn?.addEventListener('click', () => this.pauseRound());
     this.elements.resumeRoundBtn?.addEventListener('click', () => this.resumeRound());
     this.elements.endRoundBtn?.addEventListener('click', () => this.endRound());
+    this.elements.nextRoundBtn?.addEventListener('click', () => this.nextActivityRound());
     
     // Session controls
     this.elements.pauseSessionBtn?.addEventListener('click', () => this.togglePause());
@@ -1347,6 +1379,8 @@ class ScoreInput {
     const activityId = this.selectedActivityId || this.activeActivityId;
     if (!activityId) return;
     try {
+      const activity = this.getCurrentActivity();
+      console.log('Starting round for activity, time_limit_per_round:', activity?.time_limit_per_round);
       await api.startActivityRound(activityId);
       console.log('Round started');
     } catch (error) {
@@ -1402,6 +1436,9 @@ class ScoreInput {
     try {
       await api.nextActivityRound(activityId);
       console.log('Advanced to next round');
+      // Refresh status and leaderboard for the new round
+      this.loadRoundStatus();
+      this.loadLeaderboard();
     } catch (error) {
       console.error('Failed to advance round:', error);
       alert('Fout bij het doorgaan naar de volgende ronde');
@@ -1412,6 +1449,7 @@ class ScoreInput {
     if (!this.selectedActivityId) return;
     try {
       const status = await api.getRoundStatus(this.selectedActivityId);
+      console.debug('Round status loaded:', status);
       this.updateRoundDisplay(status);
       // If the round is active and the server returned remaining time, sync the timer immediately
       if (status?.round_status === 'active' && status.time_remaining != null) {
@@ -1436,8 +1474,10 @@ class ScoreInput {
       this.elements.roundInfo.textContent = `Ronde ${this.currentRound}/${this.totalRounds}`;
     }
     
-    // Update timer display and start countdown if active
+    // Update timer display - either round timer or session timer
     if (roundStatus.time_remaining !== null && roundStatus.time_remaining !== undefined) {
+      // Round timer takes priority
+      this.roundTimeRemaining = roundStatus.time_remaining;
       this.updateRoundTimerDisplay(roundStatus.time_remaining);
       // Start client-side timer if round is active
       if (this.roundStatus === 'active' && roundStatus.time_remaining > 0) {
@@ -1446,8 +1486,10 @@ class ScoreInput {
         // Stop timer if round is not active
         this.stopRoundTimer();
       }
-    } else if (this.elements.timer) {
-      this.elements.timer.textContent = '--:--';
+    } else {
+      // No round timer - fall back to session timer
+      this.stopRoundTimer();
+      this.updateTimerDisplay();
     }
     
     // Show/hide round controls based on configuration
@@ -1487,22 +1529,40 @@ class ScoreInput {
         break;
       
       case 'completed':
-        // No additional controls in completed state
+        // When a round has completed and there are more rounds, allow advancing to the next round
+        if (this.currentRound < this.totalRounds) {
+          if (startRoundBtn) startRoundBtn.style.display = 'inline-block';
+          if (this.elements.nextRoundBtn) this.elements.nextRoundBtn.style.display = 'inline-block';
+        }
         break;
     }
   }
 
   updateRoundTimerDisplay(seconds) {
     if (!this.elements.timer) return;
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+
+    // Guard against invalid / missing values
+    if (seconds == null || seconds === '' || isNaN(Number(seconds))) {
+      this.elements.timer.textContent = '--:--';
+      this.elements.timer.style.color = '#6c757d';
+      return;
+    }
+
+    let s = Number(seconds);
+    // Detect milliseconds (common mistake) and convert to seconds if looks like ms
+    if (s > 10000) { // > 10 seconds in milliseconds
+      s = Math.floor(s / 1000);
+    }
+
+    s = Math.max(0, Math.floor(s));
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
     this.elements.timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    
+
     // Color code based on time remaining
-    if (seconds < 30) {
+    if (s < 30) {
       this.elements.timer.style.color = '#ef4444'; // Red
-    } else if (seconds < 60) {
+    } else if (s < 60) {
       this.elements.timer.style.color = '#f59e0b'; // Orange
     } else {
       this.elements.timer.style.color = '#10b981'; // Green
@@ -1515,18 +1575,30 @@ class ScoreInput {
 
   startRoundTimer(initialSeconds) {
     this.stopRoundTimer(); // Clear any existing timer
-    this.roundTimeRemaining = Math.max(0, Math.floor(initialSeconds));
+
+    if (initialSeconds == null || initialSeconds === '' || isNaN(Number(initialSeconds))) {
+      // Nothing to start, show placeholder
+      this.roundTimeRemaining = 0;
+      this.updateRoundTimerDisplay(null);
+      return;
+    }
+
+    let s = Number(initialSeconds);
+    // Convert ms to seconds if needed
+    if (s > 10000) s = Math.floor(s / 1000);
+
+    this.roundTimeRemaining = Math.max(0, Math.floor(s));
     // Update display immediately even when zero
     this.updateRoundTimerDisplay(this.roundTimeRemaining);
-    
+
     if (this.roundTimeRemaining <= 0) return;
-    
+
     // Decrement every second
     this.roundTimerInterval = setInterval(() => {
       if (this.roundStatus === 'active' && this.roundTimeRemaining > 0) {
         this.roundTimeRemaining--;
         this.updateRoundTimerDisplay(this.roundTimeRemaining);
-        
+
         // When time runs out, stop the timer
         if (this.roundTimeRemaining <= 0) {
           this.stopRoundTimer();
@@ -1549,11 +1621,14 @@ class ScoreInput {
   handleRoundStarted(data) {
     const relevantActivityId = this.selectedActivityId || this.activeActivityId;
     if (data.activity_id !== relevantActivityId) return;
-    console.log('Round started event:', data);
+    console.log('Round started event payload:', data);
+    // Load authoritative status from server, and start timer immediately if payload provides it
     this.loadRoundStatus();
-    // Start client-side timer countdown
+    // Start client-side timer countdown when server included either a remaining time or a time limit
     if (data.time_remaining != null) {
       this.startRoundTimer(data.time_remaining);
+    } else if (data.time_limit_per_round != null) {
+      this.startRoundTimer(data.time_limit_per_round);
     }
   }
 
@@ -2132,24 +2207,36 @@ class ScoreInput {
 
   updateTimerDisplay() {
     if (!this.elements.timer) return;
-    
-    if (!this.session?.time_limit || this.session.time_limit === 0) {
+
+    // Prefer the activity's per-round time limit when present
+    const activityLimit = (this.timeLimitPerRound && this.timeLimitPerRound > 0) ? this.timeLimitPerRound : null;
+
+    // If round is active use remaining seconds, otherwise prefer activityLimit, then fall back to session time_limit
+    let displayTime = null;
+    if (this.roundStatus === 'active' && typeof this.roundTimeRemaining === 'number') {
+      displayTime = this.roundTimeRemaining;
+    } else if (activityLimit != null) {
+      displayTime = activityLimit;
+    } else if (this.session && this.session.time_limit && this.session.time_limit > 0) {
+      displayTime = this.session.time_limit;
+    }
+
+    if (!displayTime || displayTime === 0) {
       this.elements.timer.textContent = 'Geen tijdslimiet';
       this.elements.timer.style.color = '#6c757d';
       this.elements.timer.style.fontSize = '0.9em';
       return;
     }
-    
-    const minutes = Math.floor(this.timeRemaining / 60);
-    const seconds = this.timeRemaining % 60;
-    this.elements.timer.textContent = 
-      `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    const minutes = Math.floor(displayTime / 60);
+    const seconds = displayTime % 60;
+    this.elements.timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     this.elements.timer.style.fontSize = '1em';
-    
+
     // Color coding
-    if (this.timeRemaining < 60) {
+    if (displayTime < 60) {
       this.elements.timer.style.color = '#dc3545'; // Red
-    } else if (this.timeRemaining < 300) {
+    } else if (displayTime < 300) {
       this.elements.timer.style.color = '#ffc107'; // Yellow
     } else {
       this.elements.timer.style.color = '#28a745'; // Green

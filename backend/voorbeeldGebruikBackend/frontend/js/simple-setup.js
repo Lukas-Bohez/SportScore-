@@ -1373,7 +1373,8 @@ class SimpleSetup {
       scoring_mode: apiActivity.scoring_mode || 'team',
       game_type: apiActivity.game_type || 'custom',
       total_rounds: apiActivity.total_rounds || apiActivity.rounds || 1,
-      time_limit: apiActivity.time_limit || null,
+      // Use modern field name and prefer backend-provided per-round limit
+      time_limit_per_round: (apiActivity.time_limit_per_round != null) ? apiActivity.time_limit_per_round : (apiActivity.time_limit || null),
       description: apiActivity.description || null,
     });
 
@@ -1643,7 +1644,8 @@ class SimpleSetup {
           scoring_mode: act.scoring_mode,
           game_type: act.game_type,
           total_rounds: act.total_rounds,
-          time_limit: act.time_limit,
+          // Prefer new name 'time_limit_per_round' for API compatibility
+          time_limit_per_round: (act.time_limit_per_round != null) ? act.time_limit_per_round : (act.time_limit || null),
           description: act.description,
         };
         const created = await this.api.createSessionActivity(sessionId, payload);

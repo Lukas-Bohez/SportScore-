@@ -130,7 +130,15 @@ class ScoreboardAPI {
         ScoreboardAPI.SOCKET_EVENTS.forEach(eventName => {
             this.socket.on(eventName, (data) => {
                 console.log(`API: Received ${eventName}:`, data);
-                this.emit(eventName, data);
+                // Ensure listeners can see the originating event type
+                let payload;
+                if (data && typeof data === 'object') {
+                    payload = { ...data };
+                    if (!payload.event_type) payload.event_type = eventName;
+                } else {
+                    payload = { data, event_type: eventName };
+                }
+                this.emit(eventName, payload);
             });
         });
 

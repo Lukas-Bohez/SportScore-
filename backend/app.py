@@ -1024,6 +1024,27 @@ async def get_session_activities(session_id: int):
 async def create_activity_in_session(session_id: int, activity: ActivityCreate):
     if activity.session_id != session_id:
         raise HTTPException(status_code=400, detail="Session ID mismatch")
+
+    # Debug log incoming payload
+    try:
+        logger.info(f"Creating session activity for session={session_id}: name={activity.name}, time_limit_per_round={activity.time_limit_per_round}")
+    except Exception:
+        logger.exception("Failed to log incoming activity payload")
+
+    # If caller did not provide a time_limit_per_round, try to copy from a global activity template with the same name
+    time_limit = activity.time_limit_per_round
+    if time_limit is None and activity.name:
+        try:
+            # Prefer a direct lookup for global activity by name for reliability
+            match = ActivityRepository.get_global_activity_by_name(activity.name)
+            if match and match.get('time_limit_per_round') is not None:
+                time_limit = match.get('time_limit_per_round')
+                logger.info(f"Copied time_limit_per_round={time_limit} from global activity template '{match.get('name')}'")
+            else:
+                logger.info(f"No global template match with time_limit found for activity name='{activity.name}'")
+        except Exception as e:
+            logger.exception(f"Failed to lookup global activity for copying time limit: {e}")
+
     activity_id = ActivityRepository.create_activity(
         session_id=activity.session_id,
         name=activity.name,
@@ -1033,10 +1054,21 @@ async def create_activity_in_session(session_id: int, activity: ActivityCreate):
         time_winner=(activity.time_winner or 'lower'),
         aggregate_player_times=1 if activity.aggregate_player_times else 0,
         total_rounds=activity.total_rounds,
-        time_limit_per_round=activity.time_limit_per_round,
+        time_limit_per_round=time_limit,
         description=activity.description
     )
     created = ActivityRepository.get_activity_by_id(activity_id)
+
+    # If we still don't have a time_limit_per_round on the created session activity, try to copy from a global template and update
+    try:
+        if created and created.get('time_limit_per_round') is None and activity.name:
+            template = ActivityRepository.get_global_activity_by_name(activity.name)
+            if template and template.get('time_limit_per_round') is not None:
+                ActivityRepository.update_activity(activity_id, time_limit_per_round=template.get('time_limit_per_round'))
+                created = ActivityRepository.get_activity_by_id(activity_id)
+                logger.info(f"Post-created: copied time_limit_per_round={template.get('time_limit_per_round')} into session activity id={activity_id}")
+    except Exception:
+        logger.exception("Failed to copy time_limit into newly created session activity")
 
     # Emit real-time update for activity creation
     try:
@@ -1063,6 +1095,7 @@ async def update_activity(activity_id: int, activity_update: ActivityUpdate, req
         print(f"Activity update received for id={activity_id}")
         print(f"  time_winner={activity_update.time_winner} (type: {type(activity_update.time_winner)})")
         print(f"  aggregate_player_times={activity_update.aggregate_player_times} (type: {type(activity_update.aggregate_player_times)})")
+        print(f"  time_limit_per_round={activity_update.time_limit_per_round} (type: {type(activity_update.time_limit_per_round)})")
     except Exception as e:
         print(f"Failed to log activity update: {e}")
 
@@ -1096,7 +1129,8 @@ async def update_activity(activity_id: int, activity_update: ActivityUpdate, req
         status=activity_update.status,
         current_round=activity_update.current_round,
         total_rounds=activity_update.total_rounds,
-        time_limit=activity_update.time_limit,
+        time_limit_per_round=activity_update.time_limit_per_round,
+        round_status=activity_update.round_status,
         description=activity_update.description
     )
     if not success:
@@ -1116,15 +1150,6 @@ async def update_activity(activity_id: int, activity_update: ActivityUpdate, req
     print(f"Activity after update: time_winner={updated.get('time_winner')}, aggregate_player_times={updated.get('aggregate_player_times')}")
 
     # Emit real-time update for activity change
-    try:
-        await sio.emit('activity_update', _jsonable({
-            'activity': updated,
-            'timestamp': datetime.now(CET).isoformat()
-        }))
-    except Exception:
-        logger.exception("Failed to emit activity_update event")
-
-    return ActivityResponse(**updated)
     try:
         await sio.emit('activity_update', _jsonable({
             'activity': updated,
@@ -1180,13 +1205,18 @@ async def start_activity_round(activity_id: int):
     
     updated = ActivityRepository.get_activity_by_id(activity_id)
     
-    # Emit real-time event
+    # Emit real-time event (include time_remaining for immediate client start)
     try:
+        time_limit = updated.get('time_limit_per_round')
+        # For a newly started round the remaining time equals the full time limit (if present)
+        time_remaining = int(time_limit) if time_limit is not None else None
         await sio.emit('round_started', _jsonable({
             'activity_id': activity_id,
             'current_round': updated.get('current_round', 1),
             'round_start_time': now,
-            'time_limit_per_round': updated.get('time_limit_per_round'),
+            'round_status': 'active',
+            'time_limit_per_round': time_limit,
+            'time_remaining': time_remaining,
             'timestamp': now
         }))
     except Exception:
@@ -1201,35 +1231,78 @@ async def start_activity_round(activity_id: int):
     summary="End the current round"
 )
 async def end_activity_round(activity_id: int):
-    """End the current round of an activity"""
+    """End the current round of an activity and auto-advance if more rounds remain"""
     activity = ActivityRepository.get_activity_by_id(activity_id)
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    
+
     if activity.get('round_status') != 'active':
         raise HTTPException(status_code=400, detail="No active round to end")
-    
-    now = datetime.now(CET).isoformat()
-    ActivityRepository.update_activity(
-        activity_id,
-        round_status='completed',
-        round_end_time=now
-    )
-    
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-    
-    # Emit real-time event
-    try:
-        await sio.emit('round_ended', _jsonable({
-            'activity_id': activity_id,
-            'current_round': updated.get('current_round', 1),
-            'round_end_time': now,
-            'timestamp': now
-        }))
-    except Exception:
-        logger.exception("Failed to emit round_ended event")
-    
-    return ActivityResponse(**_normalize_activity(updated))
+
+    now = datetime.now(CET)
+    now_iso = now.isoformat()
+
+    current_round = activity.get('current_round', 1)
+    total_rounds = activity.get('total_rounds', 1)
+
+    if current_round < total_rounds:
+        # End current round and advance to next
+        ActivityRepository.update_activity(
+            activity_id,
+            current_round=current_round + 1,
+            round_status='not_started',
+            round_start_time=None,
+            round_end_time=now_iso
+        )
+        updated = ActivityRepository.get_activity_by_id(activity_id)
+
+        # Emit both round_ended and round_changed events (clients can handle either)
+        try:
+            await sio.emit('round_ended', _jsonable({
+                'activity_id': activity_id,
+                'current_round': current_round,
+                'round_end_time': now_iso,
+                'timestamp': now_iso
+            }))
+            await sio.emit('round_changed', _jsonable({
+                'activity_id': activity_id,
+                'previous_round': current_round,
+                'current_round': current_round + 1,
+                'total_rounds': total_rounds,
+                'timestamp': now_iso
+            }))
+        except Exception:
+            logger.exception("Failed to emit round change events")
+
+        return ActivityResponse(**_normalize_activity(updated))
+    else:
+        # Last round - mark completed
+        ActivityRepository.update_activity(
+            activity_id,
+            round_status='completed',
+            status='completed',
+            round_end_time=now_iso
+        )
+        updated = ActivityRepository.get_activity_by_id(activity_id)
+
+        # Emit real-time event
+        try:
+            await sio.emit('round_ended', _jsonable({
+                'activity_id': activity_id,
+                'current_round': current_round,
+                'round_end_time': now_iso,
+                'timestamp': now_iso
+            }))
+            await sio.emit('activity_completed', _jsonable({
+                'activity_id': activity_id,
+                'total_rounds': total_rounds,
+                'reason': 'manual_end',
+                'timestamp': now_iso
+            }))
+        except Exception:
+            logger.exception("Failed to emit round_ended/activity_completed event")
+
+        return ActivityResponse(**_normalize_activity(updated))
 
 @app.post(
     f"{ENDPOINT}/activities/{{activity_id}}/rounds/next",
@@ -1326,9 +1399,22 @@ async def resume_activity_round(activity_id: int):
     
     # Emit real-time event
     try:
+        # Compute time_remaining on resume if possible
+        time_limit = updated.get('time_limit_per_round')
+        time_remaining = None
+        if time_limit and updated.get('round_start_time'):
+            try:
+                start_dt = datetime.fromisoformat(updated.get('round_start_time').replace('Z', '+00:00'))
+                elapsed_seconds = (datetime.now(CET) - start_dt).total_seconds()
+                time_remaining = max(0, int(time_limit - elapsed_seconds))
+            except Exception:
+                time_remaining = int(time_limit)
         await sio.emit('round_resumed', _jsonable({
             'activity_id': activity_id,
             'current_round': updated.get('current_round', 1),
+            'round_status': 'active',
+            'time_limit_per_round': time_limit,
+            'time_remaining': time_remaining,
             'timestamp': datetime.now(CET).isoformat()
         }))
     except Exception:
