@@ -11,7 +11,7 @@
   --blue-40: #a3d6f6;
   --blue-30: #bae0f8;
   --blue-20: #d1eafb;
-  --blue-10: #fbfbfb;
+  --blue-10: #e8f5fd;
 
   /* Red */
   --red-100: #ee1313;
@@ -77,6 +77,13 @@
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  height: 95vh;
+  justify-content: space-between;
 }
 
 /* -------------------Utility Classes---------------------- */
@@ -201,17 +208,75 @@ strong {
   position: absolute;
   width: 30rem;
   height: 30rem;
-  background: var(--blue-20);
+  background: var(--blue-10);
   border-radius: 50%;
   z-index: -1;
 }
 
 .background-effect::before {
+  top: -9.375rem;
+  left: -9.375rem;
+}
+
+.background-effect::after {
+  bottom: -9.375rem;
+  right: -9.375rem;
+}
+
+/* .background-effect-admin {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.background-effect-admin::before,
+.background-effect-admin::after {
+  content: "";
+  position: absolute;
+  width: 30rem;
+  height: 30rem;
+  background: var(--blue-20);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+.background-effect-admin::before {
   top: -150px;
   left: -150px;
 }
 
-.background-effect::after {
+.background-effect-admin::after {
   bottom: -150px;
   right: -150px;
+} */
+
+/* ------------- Ipad Screens (768px - 1024px) ------------- */
+
+@media (width <= 64rem) {
+  .background-effect::before,
+  .background-effect::after {
+    width: 20rem;
+    height: 20rem;
+  }
+
+  .background-effect::before {
+    top: -6.25rem;
+    left: -6.25rem;
+  }
+
+  .background-effect::after {
+    bottom: -6.25rem;
+    right: -6.25rem;
+  }
 }
+
+/* @media (orientation: landscape) and (min-width: 48rem) and (max-width: 64rem) {
+  
+  .admin-form {
+    flex-direction: row; 
+    align-items: flex-start;
+    justify-content: space-between; 
+  }
+} */

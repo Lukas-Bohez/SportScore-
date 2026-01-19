@@ -1,6 +1,7 @@
 <script>
 import { House, MonitorCheck, Swords, List, Plus } from "lucide-vue-next";
 import GenericButton from "./GenericButton.vue";
+import { RouterLink } from "vue-router";
 
 export default {
   name: "GenericNav",
@@ -12,71 +13,44 @@ export default {
     Plus,
     GenericButton,
   },
-  data() {
-    return {
-      activeItem: "home",
-    };
-  },
-  methods: {
-    setActive(item) {
-      this.activeItem = item;
-    },
-  },
 };
 </script>
 
 <template>
   <nav class="generic-nav">
-    <div
-      class="generic-nav-item"
-      :class="{ 'generic-nav-item--active': activeItem === 'home' }"
-      @click="setActive('home')"
-    >
+    <RouterLink to="/" class="generic-nav-item">
       <House :size="22" class="icon" />
       <span class="caption">Home</span>
-    </div>
+    </RouterLink>
 
-    <div
-      class="generic-nav-item"
-      :class="{ 'generic-nav-item--active': activeItem === 'templates' }"
-      @click="setActive('templates')"
-    >
+    <RouterLink to="/templates" class="generic-nav-item">
       <List :size="22" class="icon" />
       <span class="caption">Templates</span>
-    </div>
+    </RouterLink>
 
     <!-- Midden knop -->
-    <GenericButton
+    <!-- <GenericButton
       class="generic-nav-item--addButton"
       variant="primary"
-      @click="setActive('add')"
     >
       <Plus :size="24" />
-    </GenericButton>
+    </GenericButton> -->
 
-    <div
-      class="generic-nav-item"
-      :class="{ 'generic-nav-item--active': activeItem === 'geschiedenis' }"
-      @click="setActive('geschiedenis')"
-    >
+    <RouterLink to="/geschiedenis" class="generic-nav-item">
       <Swords :size="22" class="icon" />
       <span class="caption">Geschiedenis</span>
-    </div>
+    </RouterLink>
 
-    <div
-      class="generic-nav-item"
-      :class="{ 'generic-nav-item--active': activeItem === 'actief' }"
-      @click="setActive('actief')"
-    >
+    <RouterLink to="/actief" class="generic-nav-item">
       <MonitorCheck :size="22" class="icon" />
       <span class="caption">Actief</span>
-    </div>
+    </RouterLink>
   </nav>
 </template>
 
 <style scoped>
 .generic-nav {
-  position: relative;
+  align-self: end;
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -90,11 +64,14 @@ export default {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  padding: var(--space-4) 0;
+  /* padding: var(--space-4) 0; */
   cursor: pointer;
   transition: color 0.3s ease;
+  text-decoration: none;
+  color: var(--black-100);
 }
-.generic-nav-item--active,
+/* Use router-link-active for active state */
+.router-link-active,
 .generic-nav-item:hover {
   color: var(--blue-100);
 }
