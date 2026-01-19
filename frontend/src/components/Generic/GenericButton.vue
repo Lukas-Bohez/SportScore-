@@ -24,7 +24,7 @@ export default {
       type: String,
       default: "primary",
       validator: (value) =>
-        ["primary", "secondary", "tertiary"].includes(value),
+        ["primary", "secondary", "tertiary", "quaternary"].includes(value),
     },
   },
   emits: ["click"],
@@ -41,7 +41,7 @@ export default {
   padding: var(--space-5) var(--space-6);
   font-family: var(--font-family);
   cursor: pointer;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition: all 0.3s ease;
   border: none;
   gap: var(--space-4);
 }
@@ -82,5 +82,25 @@ export default {
 
 .generic-button--tertiary :deep(svg) {
   color: var(--black-100);
+}
+
+.generic-button--quaternary {
+  padding: 0 0;
+  color: var(--black-100);
+  background-color: transparent;
+  /* background-color: var(--black-10); */
+}
+
+.generic-button--quaternary:hover {
+  color: var(--black-50);
+  background-color: transparent;
+}
+.generic-button--quaternary:hover :deep(svg) {
+  color: var(--black-50);
+}
+
+.generic-button--quaternary:deep(svg) {
+  color: var(--black-100);
+  transition: all 0.3s ease;
 }
 </style>

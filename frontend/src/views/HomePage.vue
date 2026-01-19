@@ -1,11 +1,12 @@
 <script setup>
 import GenericNav from "@/components/Generic/GenericNav.vue";
 import GenericButton from "@/components/Generic/GenericButton.vue";
+import { RouterLink } from "vue-router";
 import { Plus } from "lucide-vue-next";
 </script>
 
 <template>
-  <main class="main-container">
+  <div class="layout-page-container">
     <div class="home-content">
       <h1>Welkom bij</h1>
       <h3>SportScore!</h3>
@@ -13,14 +14,22 @@ import { Plus } from "lucide-vue-next";
         <img src="/homevector.svg" alt="home vector" class="home-vector" />
       </div>
       <p>Scoreboard voor team building activiteiten</p>
-      <GenericButton><Plus /> Nieuwe sessie</GenericButton>
+      <GenericButton variant="primary">
+        <RouterLink class="router-link" to="/nieuwesessie">
+          <Plus />
+          Nieuwe sessie
+        </RouterLink>
+      </GenericButton>
     </div>
-    <GenericNav />
-  </main>
+    <div class="nav-container">
+      <GenericNav />
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .home-content {
+  margin: auto 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -39,7 +48,7 @@ import { Plus } from "lucide-vue-next";
   }
 
   & p {
-    margin-bottom: var(--space-9);
+    margin-bottom: var(--space-7);
     color: var(--black-100);
     text-align: center;
   }

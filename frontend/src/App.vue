@@ -5,11 +5,11 @@ import Home from "@/views/HomePage.vue";
 </script>
 
 <template>
-  <div class="background-effect">
+  <main class="background-effect">
     <div class="app-container">
       <RouterView />
     </div>
-  </div>
+  </main>
 </template>
 
 <style scoped>

@@ -24,6 +24,11 @@ const router = createRouter({
       name: "actief",
       component: () => import("../views/Active.vue"),
     },
+    {
+      path: "/nieuwesessie",
+      name: "nieuwesessie",
+      component: () => import("../views/NewSession.vue"),
+    },
   ],
 });
 
