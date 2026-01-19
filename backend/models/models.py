@@ -64,7 +64,7 @@ class ActivityBase(BaseModel):
     # If true, aggregate individual player times to produce a team total
     aggregate_player_times: bool = False
     total_rounds: int = 1
-    time_limit: Optional[int] = None
+    time_limit_per_round: Optional[int] = None  # Time limit per round in seconds
     description: Optional[str] = None
 
 class ActivityCreate(ActivityBase):
@@ -80,7 +80,8 @@ class ActivityUpdate(BaseModel):
     status: Optional[str] = None
     current_round: Optional[int] = None
     total_rounds: Optional[int] = None
-    time_limit: Optional[int] = None
+    time_limit_per_round: Optional[int] = None
+    round_status: Optional[str] = None
     description: Optional[str] = None
 
 class ActivityResponse(ActivityBase):
@@ -88,6 +89,9 @@ class ActivityResponse(ActivityBase):
     session_id: Optional[int] = None
     status: str = "setup"
     current_round: int = 1
+    round_status: str = "not_started"
+    round_start_time: Optional[datetime] = None
+    round_end_time: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

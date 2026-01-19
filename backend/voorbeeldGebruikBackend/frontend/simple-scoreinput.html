@@ -269,8 +269,20 @@
             <h1>SportScore - Score Invoer</h1>
             <div class="session-info">
                 <span id="session-name">Sessie laden...</span>
-                <span id="round-info">Ronde 1/1</span>
-                <span id="timer">--:--</span>
+                <span id="round-info" style="font-weight: 600;">Ronde 1/1</span>
+                <span id="timer" style="font-size: 1.2em; font-weight: 700;">--:--</span>
+            </div>
+            <!-- Round Controls -->
+            <div id="round-controls" style="margin-top: 10px; display: none; gap: 8px; flex-wrap: wrap;">
+                <button id="start-round-btn" class="control-btn" style="background: #10b981;">▶ Start Ronde</button>
+                <button id="pause-round-btn" class="control-btn" style="background: #f59e0b; display: none;">⏸
+                    Pauzeer</button>
+                <button id="resume-round-btn" class="control-btn" style="background: #10b981; display: none;">▶
+                    Hervatten</button>
+                <button id="end-round-btn" class="control-btn" style="background: #ef4444; display: none;">⏹ Einde
+                    Ronde</button>
+                <button id="next-round-btn" class="control-btn" style="background: #3b82f6; display: none;">⏭ Volgende
+                    Ronde</button>
             </div>
         </header>
 
@@ -318,7 +330,8 @@
                             <div style="font-weight:600; margin-bottom:6px; width:100%;">Tijd</div>
                             <input type="number" id="set-minutes" placeholder="min" min="0" style="width:68px;" />
                             <span>:</span>
-                            <input type="number" id="set-seconds" placeholder="sec" min="0" max="59" style="width:68px;" />
+                            <input type="number" id="set-seconds" placeholder="sec" min="0" max="59"
+                                style="width:68px;" />
                             <span>.</span>
                             <input type="number" id="set-ms" placeholder="ms" min="0" max="999" style="width:90px;" />
                             <button id="set-time-btn" class="control-btn" type="button">Set</button>
@@ -327,7 +340,9 @@
 
                         <!-- removed redundant record button - Set/Add will submit immediately -->
                     </div>
-                    <div style="margin-top:8px;color:var(--text-secondary);font-size:0.9em;">Tip: vul minuten, seconden of milliseconden in en klik op <strong>Set</strong> of <strong>Add</strong> — de waarde wordt direct geregistreerd.</div>
+                    <div style="margin-top:8px;color:var(--text-secondary);font-size:0.9em;">Tip: vul minuten, seconden
+                        of milliseconden in en klik op <strong>Set</strong> of <strong>Add</strong> — de waarde wordt
+                        direct geregistreerd.</div>
                 </div>
 
                 <!-- Reason Input (visible except in team_vs_time) -->

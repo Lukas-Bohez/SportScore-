@@ -14,7 +14,9 @@ class ScoreboardAPI {
         'session_score_update', 'session_status_update', 'team_update',
         'session_update', 'session_created', 'welcome', 'test_event',
         'game_update', 'score_update', 'game_status_change',
-        'show-qr', 'set-qr', 'toggle-qr'
+        'show-qr', 'set-qr', 'toggle-qr',
+        'round_started', 'round_ended', 'round_changed', 'round_paused', 
+        'round_resumed', 'round_time_update', 'round_auto_advanced', 'activity_completed'
     ];
 
     constructor(baseURL = null) {
@@ -431,6 +433,14 @@ class ScoreboardAPI {
     getActivityScores(activityId) { return this.get(`/api/v1/activities/${activityId}/scores`); }
     createActivityScore(activityId, data) { return this.post(`/api/v1/activities/${activityId}/scores`, data); }
     getActivityLeaderboard(activityId) { return this.get(`/api/v1/activities/${activityId}/leaderboard`); }
+
+    // Round Control
+    startActivityRound(activityId) { return this.post(`/api/v1/activities/${activityId}/rounds/start`, {}); }
+    endActivityRound(activityId) { return this.post(`/api/v1/activities/${activityId}/rounds/end`, {}); }
+    nextActivityRound(activityId) { return this.post(`/api/v1/activities/${activityId}/rounds/next`, {}); }
+    pauseActivityRound(activityId) { return this.post(`/api/v1/activities/${activityId}/rounds/pause`, {}); }
+    resumeActivityRound(activityId) { return this.post(`/api/v1/activities/${activityId}/rounds/resume`, {}); }
+    getRoundStatus(activityId) { return this.get(`/api/v1/activities/${activityId}/rounds/status`); }
 
     // Session Teams/Scores
     getSessionTeams(sessionId) { return this.get(`/api/v1/sessions/${sessionId}/teams`); }

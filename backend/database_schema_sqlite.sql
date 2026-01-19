@@ -74,8 +74,11 @@ CREATE TABLE IF NOT EXISTS activities (
     aggregate_player_times INTEGER DEFAULT 0,
     status TEXT CHECK(status IN ('setup', 'active', 'paused', 'completed', 'cancelled')) DEFAULT 'setup',
     total_rounds INTEGER DEFAULT 1,
-    time_limit INTEGER NULL,
+    time_limit_per_round INTEGER NULL, -- Time limit per round in seconds
     current_round INTEGER DEFAULT 1,
+    round_status TEXT CHECK(round_status IN ('not_started', 'active', 'paused', 'completed')) DEFAULT 'not_started',
+    round_start_time TIMESTAMP NULL, -- When the current round started
+    round_end_time TIMESTAMP NULL, -- When the current round ended
     description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

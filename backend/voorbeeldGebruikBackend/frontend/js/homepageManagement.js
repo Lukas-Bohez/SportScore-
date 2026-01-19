@@ -239,26 +239,32 @@ export class HomepageManagement {
 		if (!this.activityForm) return;
 		const form = this.activityForm;
 		const formData = new FormData(form);
+		
+		// Parse form values
+		const totalRounds = parseInt(formData.get('activity-rounds')) || 1;
+		const timeLimitPerRound = parseInt(formData.get('activity-time')) || null;
+		
 		const activityData = {
 			name: formData.get('activity-name'),
 			sport_type: formData.get('activity-sport'),
 			game_type: formData.get('activity-game-type'),
-				scoring_mode: formData.get('activity-scoring'),
-			// Rounds/time are hidden and defaulted for now
-			total_rounds: 1,
-			time_limit: null,
+			scoring_mode: formData.get('activity-scoring'),
+			total_rounds: totalRounds,
+			time_limit_per_round: timeLimitPerRound,
 			description: formData.get('activity-desc')
 		};
+		
 		// Include team_vs_time specific settings if selected - always use defaults now
-			const isTeamVsTime = String(activityData.game_type) === 'team_vs_time';
-			const isTeamWithPlayers = String(activityData.scoring_mode) === 'team_with_players';
-			if (isTeamVsTime) {
-				activityData.time_winner = 'lower'; // Always lower
-				activityData.aggregate_player_times = false; // Never aggregate
-			} else {
-				activityData.time_winner = 'lower';
-				activityData.aggregate_player_times = false;
-			}
+		const isTeamVsTime = String(activityData.game_type) === 'team_vs_time';
+		const isTeamWithPlayers = String(activityData.scoring_mode) === 'team_with_players';
+		if (isTeamVsTime) {
+			activityData.time_winner = 'lower'; // Always lower
+			activityData.aggregate_player_times = false; // Never aggregate
+		} else {
+			activityData.time_winner = 'lower';
+			activityData.aggregate_player_times = false;
+		}
+		
 		this.processingActivity = true;
 		const done = async () => {
 			this.processingActivity = false;
@@ -287,7 +293,7 @@ export class HomepageManagement {
 			form['activity-game-type'].value = activity.game_type || 'custom';
 			form['activity-scoring'].value = activity.scoring_mode || 'team';
 			form['activity-rounds'].value = activity.total_rounds || 1;
-			form['activity-time'].value = activity.time_limit || '';
+			form['activity-time'].value = activity.time_limit_per_round || '';
 			form['activity-desc'].value = activity.description || '';
 			// Team vs Time settings handling - removed, using defaults
 			// this.updateTeamVsTimeUI(activity.game_type, activity.scoring_mode);

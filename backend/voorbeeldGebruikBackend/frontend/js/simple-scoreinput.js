@@ -179,9 +179,17 @@ class ScoreInput {
     this.customQuickActions = [];
     this.isSubmitting = false;
     
-    // Timer State
+    // Timer State (for countdown)
     this.timeRemaining = 0;
     this.timerInterval = null;
+    
+    // Round State
+    this.currentActivity = null;
+    this.roundStatus = 'not_started';
+    this.currentRound = 1;
+    this.totalRounds = 1;
+    this.roundStartTime = null;
+    this.timeLimitPerRound = null;
     
     // Utilities
     this.sharedUtils = new SharedUtils(api);
@@ -246,13 +254,16 @@ class ScoreInput {
     const ids = [
       // Header
       'session-name', 'round-info', 'timer',
+      // Round controls
+      'round-controls', 'start-round-btn', 'pause-round-btn', 'resume-round-btn',
+      'end-round-btn', 'next-round-btn',
       // Main sections
       'leaderboard', 'team-select', 'player-select', 'points-input', 
       'reason-input', 'submit-score-btn', 'recent-scores',
       // Quick actions
       'sport-quick-buttons',
       // Control buttons
-      'subtract-btn', 'add-btn', 'pause-session-btn', 'next-round-btn', 'end-session-btn',
+      'subtract-btn', 'add-btn', 'pause-session-btn', 'end-session-btn',
       // Time controls
       'time-controls', 'set-minutes', 'set-seconds', 'set-ms',
       'set-time-btn', 'add-minutes', 'add-seconds', 'add-ms', 'add-time-btn',
@@ -303,9 +314,15 @@ class ScoreInput {
       if (e.key === 'Enter') this.setTimeFromInputs();
     });
     
+    // Round controls
+    this.elements.startRoundBtn?.addEventListener('click', () => this.startRound());
+    this.elements.pauseRoundBtn?.addEventListener('click', () => this.pauseRound());
+    this.elements.resumeRoundBtn?.addEventListener('click', () => this.resumeRound());
+    this.elements.endRoundBtn?.addEventListener('click', () => this.endRound());
+    this.elements.nextRoundBtn?.addEventListener('click', () => this.nextRound());
+    
     // Session controls
     this.elements.pauseSessionBtn?.addEventListener('click', () => this.togglePause());
-    this.elements.nextRoundBtn?.addEventListener('click', () => this.nextRound());
     this.elements.endSessionBtn?.addEventListener('click', () => this.endSession());
     
     // Custom quick actions
@@ -314,6 +331,16 @@ class ScoreInput {
     // Real-time updates
     api.on('session_score_update', (data) => this.handleScoreUpdate(data));
     api.on('session_status_update', (data) => this.handleStatusUpdate(data));
+    
+    // Round real-time events
+    api.on('round_started', (data) => this.handleRoundStarted(data));
+    api.on('round_ended', (data) => this.handleRoundEnded(data));
+    api.on('round_changed', (data) => this.handleRoundChanged(data));
+    api.on('round_paused', (data) => this.handleRoundPaused(data));
+    api.on('round_resumed', (data) => this.handleRoundResumed(data));
+    api.on('round_time_update', (data) => this.handleRoundTimeUpdate(data));
+    api.on('round_auto_advanced', (data) => this.handleRoundAutoAdvanced(data));
+    api.on('activity_completed', (data) => this.handleActivityCompleted(data));
     
     // Keyboard shortcuts
     this.setupKeyboardShortcuts();
@@ -1311,6 +1338,222 @@ class ScoreInput {
     setTimeout(() => errorDiv.remove(), 4000);
   }
 
+  // ==========================================================================
+  // Round Control Methods
+  // ==========================================================================
+
+  async startRound() {
+    if (!this.activeActivityId) return;
+    try {
+      await api.startActivityRound(this.activeActivityId);
+      console.log('Round started');
+    } catch (error) {
+      console.error('Failed to start round:', error);
+      alert('Fout bij het starten van de ronde');
+    }
+  }
+
+  async pauseRound() {
+    if (!this.activeActivityId) return;
+    try {
+      await api.pauseActivityRound(this.activeActivityId);
+      console.log('Round paused');
+    } catch (error) {
+      console.error('Failed to pause round:', error);
+      alert('Fout bij het pauzeren van de ronde');
+    }
+  }
+
+  async resumeRound() {
+    if (!this.activeActivityId) return;
+    try {
+      await api.resumeActivityRound(this.activeActivityId);
+      console.log('Round resumed');
+    } catch (error) {
+      console.error('Failed to resume round:', error);
+      alert('Fout bij het hervatten van de ronde');
+    }
+  }
+
+  async endRound() {
+    if (!this.activeActivityId) return;
+    try {
+      await api.endActivityRound(this.activeActivityId);
+      console.log('Round ended');
+    } catch (error) {
+      console.error('Failed to end round:', error);
+      alert('Fout bij het beëindigen van de ronde');
+    }
+  }
+
+  async nextRound() {
+    if (!this.activeActivityId) return;
+    try {
+      await api.nextActivityRound(this.activeActivityId);
+      console.log('Advanced to next round');
+    } catch (error) {
+      console.error('Failed to advance round:', error);
+      alert('Fout bij het doorgaan naar de volgende ronde');
+    }
+  }
+
+  async loadRoundStatus() {
+    if (!this.activeActivityId) return;
+    try {
+      const status = await api.getRoundStatus(this.activeActivityId);
+      this.updateRoundDisplay(status);
+    } catch (error) {
+      console.error('Failed to load round status:', error);
+    }
+  }
+
+  updateRoundDisplay(roundStatus) {
+    if (!roundStatus) return;
+    
+    this.currentRound = roundStatus.current_round || 1;
+    this.totalRounds = roundStatus.total_rounds || 1;
+    this.roundStatus = roundStatus.round_status || 'not_started';
+    this.roundStartTime = roundStatus.round_start_time;
+    this.timeLimitPerRound = roundStatus.time_limit_per_round;
+    
+    // Update round info text
+    if (this.elements.roundInfo) {
+      this.elements.roundInfo.textContent = `Ronde ${this.currentRound}/${this.totalRounds}`;
+    }
+    
+    // Update timer display
+    if (roundStatus.time_remaining !== null && roundStatus.time_remaining !== undefined) {
+      this.updateTimerDisplay(roundStatus.time_remaining);
+    } else if (this.elements.timer) {
+      this.elements.timer.textContent = '--:--';
+    }
+    
+    // Show/hide round controls based on configuration
+    const hasRounds = this.totalRounds > 1 || this.timeLimitPerRound;
+    if (this.elements.roundControls) {
+      this.elements.roundControls.style.display = hasRounds ? 'flex' : 'none';
+    }
+    
+    // Update button visibility based on status
+    this.updateRoundControlButtons();
+  }
+
+  updateRoundControlButtons() {
+    const {
+      startRoundBtn, pauseRoundBtn, resumeRoundBtn, 
+      endRoundBtn, nextRoundBtn
+    } = this.elements;
+    
+    // Hide all first
+    [startRoundBtn, pauseRoundBtn, resumeRoundBtn, endRoundBtn, nextRoundBtn].forEach(btn => {
+      if (btn) btn.style.display = 'none';
+    });
+    
+    // Show appropriate buttons based on round status
+    switch (this.roundStatus) {
+      case 'not_started':
+        if (startRoundBtn) startRoundBtn.style.display = 'inline-block';
+        break;
+      
+      case 'active':
+        if (pauseRoundBtn) pauseRoundBtn.style.display = 'inline-block';
+        if (endRoundBtn) endRoundBtn.style.display = 'inline-block';
+        if (nextRoundBtn && this.currentRound < this.totalRounds) {
+          nextRoundBtn.style.display = 'inline-block';
+        }
+        break;
+      
+      case 'paused':
+        if (resumeRoundBtn) resumeRoundBtn.style.display = 'inline-block';
+        if (endRoundBtn) endRoundBtn.style.display = 'inline-block';
+        break;
+      
+      case 'completed':
+        if (nextRoundBtn && this.currentRound < this.totalRounds) {
+          nextRoundBtn.style.display = 'inline-block';
+        }
+        break;
+    }
+  }
+
+  updateTimerDisplay(seconds) {
+    if (!this.elements.timer) return;
+    
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    this.elements.timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    
+    // Color code based on time remaining
+    if (seconds < 30) {
+      this.elements.timer.style.color = '#ef4444'; // Red
+    } else if (seconds < 60) {
+      this.elements.timer.style.color = '#f59e0b'; // Orange
+    } else {
+      this.elements.timer.style.color = '#10b981'; // Green
+    }
+  }
+
+  // ==========================================================================
+  // Round Event Handlers
+  // ==========================================================================
+
+  handleRoundStarted(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round started event:', data);
+    this.loadRoundStatus();
+  }
+
+  handleRoundEnded(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round ended event:', data);
+    this.loadRoundStatus();
+  }
+
+  handleRoundChanged(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round changed event:', data);
+    this.loadRoundStatus();
+    this.loadLeaderboard(); // Refresh scores for new round
+  }
+
+  handleRoundPaused(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round paused event:', data);
+    this.loadRoundStatus();
+  }
+
+  handleRoundResumed(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round resumed event:', data);
+    this.loadRoundStatus();
+  }
+
+  handleRoundTimeUpdate(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    if (data.time_remaining !== null && data.time_remaining !== undefined) {
+      this.updateTimerDisplay(data.time_remaining);
+    }
+  }
+
+  handleRoundAutoAdvanced(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Round auto-advanced:', data);
+    alert(`Ronde ${data.previous_round} voltooid! Nu ronde ${data.current_round}.`);
+    this.loadRoundStatus();
+    this.loadLeaderboard();
+  }
+
+  handleActivityCompleted(data) {
+    if (data.activity_id !== this.activeActivityId) return;
+    console.log('Activity completed:', data);
+    alert('Alle rondes zijn voltooid!');
+    this.loadRoundStatus();
+  }
+
+  // ==========================================================================
+  // Utilities
+  // ==========================================================================
+
   showFatalError(message) {
     this.clearFatalError();
     
@@ -1398,6 +1641,7 @@ class ScoreInput {
     this.updateSessionDisplay();
     await this.loadTeams();
     this.loadLeaderboard();
+    this.loadRoundStatus(); // Load round status when activity is selected
     
     if (!silent) {
       const activity = this.activities.find(a => a.id == activityId);
@@ -1417,6 +1661,7 @@ class ScoreInput {
       }
       
       this.renderActivities();
+      this.loadRoundStatus(); // Load round status when setting active activity
       
       const activity = this.activities.find(a => a.id == activityId);
       this.showScoreFeedback(`Activiteit ingesteld als actief op scherm: ${activity?.name}`, 'success');

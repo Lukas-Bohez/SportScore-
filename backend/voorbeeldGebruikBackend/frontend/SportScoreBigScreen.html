@@ -16,6 +16,11 @@
     <div class="container">
         <header class="header">
             <h1 id="sport-name">SportScore</h1>
+            <div class="session-info"
+                style="display: flex; gap: 20px; justify-content: center; align-items: center; margin-top: 10px;">
+                <span id="round-info" style="font-size: 1.3em; font-weight: 600; display: none;">Ronde 1/1</span>
+                <span id="timer" style="font-size: 1.5em; font-weight: 700; color: #10b981; display: none;">--:--</span>
+            </div>
         </header>
 
         <main class="main-content">
@@ -100,7 +105,8 @@
             border-radius: 10px;
             text-align: center;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            max-width: 92vw; /* ensure it never extends beyond viewport width */
+            max-width: 92vw;
+            /* ensure it never extends beyond viewport width */
             box-sizing: border-box;
             overflow: hidden;
         }

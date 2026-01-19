@@ -200,6 +200,119 @@ async def set_active_activity(sid, data=None):
     await sio.emit('set_active_activity', data)
 
 # ----------------------------------------------------
+# Background Task: Round Timer Monitor
+# ----------------------------------------------------
+
+async def round_timer_monitor():
+    """
+    Background task that monitors active rounds with time limits
+    and automatically advances them when time expires.
+    """
+    logger.info("Round timer monitor started")
+    
+    while True:
+        try:
+            # Check every 1 second
+            await asyncio.sleep(1)
+            
+            # Get all active rounds with time limits
+            from database.database import Database
+            sql = """
+            SELECT id, current_round, total_rounds, round_start_time, time_limit_per_round, session_id
+            FROM activities
+            WHERE round_status = 'active' 
+            AND time_limit_per_round IS NOT NULL 
+            AND round_start_time IS NOT NULL
+            """
+            active_rounds = Database.get_rows(sql)
+            
+            if not active_rounds:
+                continue
+            
+            now = datetime.now(CET)
+            
+            for activity in active_rounds:
+                activity_id = activity['id']
+                round_start_time = activity['round_start_time']
+                time_limit = activity['time_limit_per_round']
+                current_round = activity['current_round']
+                total_rounds = activity['total_rounds']
+                
+                try:
+                    # Parse start time
+                    start_dt = datetime.fromisoformat(round_start_time.replace('Z', '+00:00'))
+                    if start_dt.tzinfo is None:
+                        start_dt = CET.localize(start_dt)
+                    
+                    # Calculate elapsed time
+                    elapsed_seconds = (now - start_dt).total_seconds()
+                    remaining_seconds = time_limit - elapsed_seconds
+                    
+                    # Emit periodic time updates (every 5 seconds for efficiency)
+                    if int(elapsed_seconds) % 5 == 0 and remaining_seconds > 0:
+                        await sio.emit('round_time_update', _jsonable({
+                            'activity_id': activity_id,
+                            'current_round': current_round,
+                            'time_remaining': int(remaining_seconds),
+                            'time_elapsed': int(elapsed_seconds),
+                            'timestamp': now.isoformat()
+                        }))
+                    
+                    # Time's up - advance or complete the activity
+                    if elapsed_seconds >= time_limit:
+                        logger.info(f"Activity {activity_id} round {current_round} time limit reached")
+                        
+                        if current_round < total_rounds:
+                            # Advance to next round
+                            logger.info(f"Advancing activity {activity_id} to round {current_round + 1}")
+                            ActivityRepository.update_activity(
+                                activity_id,
+                                current_round=current_round + 1,
+                                round_status='not_started',
+                                round_start_time=None,
+                                round_end_time=now.isoformat()
+                            )
+                            
+                            await sio.emit('round_auto_advanced', _jsonable({
+                                'activity_id': activity_id,
+                                'previous_round': current_round,
+                                'current_round': current_round + 1,
+                                'total_rounds': total_rounds,
+                                'reason': 'time_limit_reached',
+                                'timestamp': now.isoformat()
+                            }))
+                        else:
+                            # Last round complete - mark activity as completed
+                            logger.info(f"Activity {activity_id} all rounds completed")
+                            ActivityRepository.update_activity(
+                                activity_id,
+                                round_status='completed',
+                                status='completed',
+                                round_end_time=now.isoformat()
+                            )
+                            
+                            await sio.emit('activity_completed', _jsonable({
+                                'activity_id': activity_id,
+                                'total_rounds': total_rounds,
+                                'reason': 'all_rounds_completed',
+                                'timestamp': now.isoformat()
+                            }))
+                
+                except Exception as e:
+                    logger.error(f"Error processing round timer for activity {activity_id}: {e}")
+                    continue
+        
+        except Exception as e:
+            logger.error(f"Error in round_timer_monitor: {e}")
+            await asyncio.sleep(5)  # Wait before retrying
+
+# Start background task when app starts
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(round_timer_monitor())
+    logger.info("Application startup complete")
+
+# ----------------------------------------------------
 # API Routes
 # ----------------------------------------------------
 
@@ -1072,6 +1185,241 @@ async def delete_activity(activity_id: int):
         logger.exception("Failed to emit activity_deleted event")
 
     return {"message": "Activity deleted successfully"}
+
+# ============================================================================
+# Round Control Endpoints
+# ============================================================================
+
+@app.post(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/start",
+    response_model=ActivityResponse,
+    tags=["Activities", "Rounds"],
+    summary="Start the current round"
+)
+async def start_activity_round(activity_id: int):
+    """Start the current round of an activity"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    if activity.get('round_status') == 'active':
+        raise HTTPException(status_code=400, detail="Round is already active")
+    
+    # Start the round
+    now = datetime.now(CET).isoformat()
+    ActivityRepository.update_activity(
+        activity_id,
+        round_status='active',
+        round_start_time=now,
+        round_end_time=None,
+        status='active'  # Also set activity status to active
+    )
+    
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    
+    # Emit real-time event
+    try:
+        await sio.emit('round_started', _jsonable({
+            'activity_id': activity_id,
+            'current_round': updated.get('current_round', 1),
+            'round_start_time': now,
+            'time_limit_per_round': updated.get('time_limit_per_round'),
+            'timestamp': now
+        }))
+    except Exception:
+        logger.exception("Failed to emit round_started event")
+    
+    return ActivityResponse(**_normalize_activity(updated))
+
+@app.post(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/end",
+    response_model=ActivityResponse,
+    tags=["Activities", "Rounds"],
+    summary="End the current round"
+)
+async def end_activity_round(activity_id: int):
+    """End the current round of an activity"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    if activity.get('round_status') != 'active':
+        raise HTTPException(status_code=400, detail="No active round to end")
+    
+    now = datetime.now(CET).isoformat()
+    ActivityRepository.update_activity(
+        activity_id,
+        round_status='completed',
+        round_end_time=now
+    )
+    
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    
+    # Emit real-time event
+    try:
+        await sio.emit('round_ended', _jsonable({
+            'activity_id': activity_id,
+            'current_round': updated.get('current_round', 1),
+            'round_end_time': now,
+            'timestamp': now
+        }))
+    except Exception:
+        logger.exception("Failed to emit round_ended event")
+    
+    return ActivityResponse(**_normalize_activity(updated))
+
+@app.post(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/next",
+    response_model=ActivityResponse,
+    tags=["Activities", "Rounds"],
+    summary="Advance to the next round"
+)
+async def next_activity_round(activity_id: int):
+    """End current round and advance to the next one"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    current_round = activity.get('current_round', 1)
+    total_rounds = activity.get('total_rounds', 1)
+    
+    if current_round >= total_rounds:
+        raise HTTPException(status_code=400, detail="Already at the last round")
+    
+    now = datetime.now(CET).isoformat()
+    
+    # End current round and move to next
+    ActivityRepository.update_activity(
+        activity_id,
+        current_round=current_round + 1,
+        round_status='not_started',
+        round_start_time=None,
+        round_end_time=now
+    )
+    
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    
+    # Emit real-time event
+    try:
+        await sio.emit('round_changed', _jsonable({
+            'activity_id': activity_id,
+            'previous_round': current_round,
+            'current_round': current_round + 1,
+            'total_rounds': total_rounds,
+            'timestamp': now
+        }))
+    except Exception:
+        logger.exception("Failed to emit round_changed event")
+    
+    return ActivityResponse(**_normalize_activity(updated))
+
+@app.post(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/pause",
+    response_model=ActivityResponse,
+    tags=["Activities", "Rounds"],
+    summary="Pause the current round"
+)
+async def pause_activity_round(activity_id: int):
+    """Pause the current round"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    if activity.get('round_status') != 'active':
+        raise HTTPException(status_code=400, detail="No active round to pause")
+    
+    ActivityRepository.update_activity(activity_id, round_status='paused')
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    
+    # Emit real-time event
+    try:
+        await sio.emit('round_paused', _jsonable({
+            'activity_id': activity_id,
+            'current_round': updated.get('current_round', 1),
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+    except Exception:
+        logger.exception("Failed to emit round_paused event")
+    
+    return ActivityResponse(**_normalize_activity(updated))
+
+@app.post(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/resume",
+    response_model=ActivityResponse,
+    tags=["Activities", "Rounds"],
+    summary="Resume a paused round"
+)
+async def resume_activity_round(activity_id: int):
+    """Resume a paused round"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    if activity.get('round_status') != 'paused':
+        raise HTTPException(status_code=400, detail="Round is not paused")
+    
+    ActivityRepository.update_activity(activity_id, round_status='active')
+    updated = ActivityRepository.get_activity_by_id(activity_id)
+    
+    # Emit real-time event
+    try:
+        await sio.emit('round_resumed', _jsonable({
+            'activity_id': activity_id,
+            'current_round': updated.get('current_round', 1),
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+    except Exception:
+        logger.exception("Failed to emit round_resumed event")
+    
+    return ActivityResponse(**_normalize_activity(updated))
+
+@app.get(
+    f"{ENDPOINT}/activities/{{activity_id}}/rounds/status",
+    tags=["Activities", "Rounds"],
+    summary="Get current round status and time remaining"
+)
+async def get_round_status(activity_id: int):
+    """Get detailed status of the current round including time remaining"""
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    current_round = activity.get('current_round', 1)
+    total_rounds = activity.get('total_rounds', 1)
+    round_status = activity.get('round_status', 'not_started')
+    round_start_time = activity.get('round_start_time')
+    time_limit_per_round = activity.get('time_limit_per_round')
+    
+    response = {
+        'activity_id': activity_id,
+        'current_round': current_round,
+        'total_rounds': total_rounds,
+        'round_status': round_status,
+        'round_start_time': round_start_time,
+        'time_limit_per_round': time_limit_per_round,
+        'time_remaining': None,
+        'time_elapsed': None
+    }
+    
+    # Calculate time remaining if round is active and has a time limit
+    if round_status == 'active' and round_start_time and time_limit_per_round:
+        try:
+            start_dt = datetime.fromisoformat(round_start_time.replace('Z', '+00:00'))
+            now = datetime.now(CET)
+            elapsed_seconds = (now - start_dt).total_seconds()
+            remaining_seconds = max(0, time_limit_per_round - elapsed_seconds)
+            
+            response['time_elapsed'] = int(elapsed_seconds)
+            response['time_remaining'] = int(remaining_seconds)
+            response['is_overtime'] = elapsed_seconds > time_limit_per_round
+        except Exception as e:
+            logger.error(f"Error calculating time remaining: {e}")
+    
+    return response
+
+# ============================================================================
+# End Round Control Endpoints
+# ============================================================================
 
 # Temporary debug endpoint to inspect raw DB values for an activity
 @app.get(f"{ENDPOINT}/debug/activity/{{activity_id}}")

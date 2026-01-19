@@ -188,11 +188,19 @@ class BigScreenDisplay {
     // Timers
     this.updateInterval = null;
     
+    // Round State
+    this.currentRound = 1;
+    this.totalRounds = 1;
+    this.roundStatus = 'not_started';
+    this.timeLimitPerRound = null;
+    
     // DOM Elements (bound in bindElements)
     this.sessionTitle = null;
     this.sessionStatus = null;
     this.teamsContainer = null;
     this.lastUpdateTime = null;
+    this.roundInfo = null;
+    this.timer = null;
     
     this.initialize();
   }
@@ -215,6 +223,8 @@ class BigScreenDisplay {
     this.sessionStatus = document.getElementById('game-status');
     this.teamsContainer = document.getElementById('teams-container');
     this.lastUpdateTime = document.getElementById('last-update');
+    this.roundInfo = document.getElementById('round-info');
+    this.timer = document.getElementById('timer');
   }
 
   restoreActiveActivity() {
@@ -265,7 +275,16 @@ class BigScreenDisplay {
       'show-qr': () => this.setQRVisibility(true),
       'set-qr': this.setQRVisibility.bind(this),
       'connected': this.handleConnected.bind(this),
-      'disconnected': this.handleDisconnected.bind(this)
+      'disconnected': this.handleDisconnected.bind(this),
+      // Round events
+      'round_started': this.handleRoundEvent.bind(this),
+      'round_ended': this.handleRoundEvent.bind(this),
+      'round_changed': this.handleRoundEvent.bind(this),
+      'round_paused': this.handleRoundEvent.bind(this),
+      'round_resumed': this.handleRoundEvent.bind(this),
+      'round_time_update': this.handleRoundTimeUpdate.bind(this),
+      'round_auto_advanced': this.handleRoundEvent.bind(this),
+      'activity_completed': this.handleRoundEvent.bind(this)
     };
 
     Object.entries(events).forEach(([event, handler]) => {
@@ -412,6 +431,7 @@ class BigScreenDisplay {
     try {
       let fetched = await api.getActivity(activityId);
       this.activeActivity = fetched?.activity || fetched;
+      this.updateRoundDisplay(this.activeActivity); // Update round display
     } catch (error) {
       console.warn('BigScreen: Unable to load active activity details:', error);
       this.activeActivity = null;
@@ -1392,6 +1412,75 @@ class BigScreenDisplay {
       `;
     }
   }
+
+  // ==========================================================================
+  // Round Event Handlers & Display
+  // ==========================================================================
+
+  handleRoundEvent(data) {
+    if (!data || data.activity_id !== this.activeActivityId) return;
+    console.log('Round event received:', data);
+    this.loadInitialData(); // Refresh leaderboard
+  }
+
+  handleRoundTimeUpdate(data) {
+    if (!data || data.activity_id !== this.activeActivityId) return;
+    if (data.time_remaining !== null && data.time_remaining !== undefined) {
+      this.updateTimerDisplay(data.time_remaining);
+    }
+  }
+
+  updateRoundDisplay(activity) {
+    if (!activity) return;
+    
+    this.currentRound = activity.current_round || 1;
+    this.totalRounds = activity.total_rounds || 1;
+    this.roundStatus = activity.round_status || 'not_started';
+    this.timeLimitPerRound = activity.time_limit_per_round;
+    
+    // Show round info if multiple rounds or time limit
+    const hasRounds = this.totalRounds > 1 || this.timeLimitPerRound;
+    
+    if (this.roundInfo) {
+      if (hasRounds) {
+        this.roundInfo.textContent = `Ronde ${this.currentRound}/${this.totalRounds}`;
+        this.roundInfo.style.display = 'block';
+      } else {
+        this.roundInfo.style.display = 'none';
+      }
+    }
+    
+    // Show timer if there's a time limit
+    if (this.timer) {
+      if (this.timeLimitPerRound && this.roundStatus === 'active') {
+        this.timer.style.display = 'block';
+        // Timer will be updated by round_time_update events
+      } else {
+        this.timer.style.display = 'none';
+      }
+    }
+  }
+
+  updateTimerDisplay(seconds) {
+    if (!this.timer) return;
+    
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    this.timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    
+    // Color code based on time remaining
+    if (seconds < 30) {
+      this.timer.style.color = '#ef4444'; // Red
+    } else if (seconds < 60) {
+      this.timer.style.color = '#f59e0b'; // Orange
+    } else {
+      this.timer.style.color = '#10b981'; // Green
+    }
+  }
+
+  // ==========================================================================
+  // Utilities
+  // ==========================================================================
 
   showConnectionStatus(status, type) {
     console.log(`Connection: ${status}`);
