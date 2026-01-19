@@ -1018,6 +1018,23 @@ class ActivityRepository:
         return Database.get_one_row(sql, [activity_id])
 
     @staticmethod
+    def get_global_activity_by_name(name: str) -> Optional[Dict[str, Any]]:
+        """Return a global (sessionless) activity matching `name` case-insensitively.
+
+        Prefer templates that have an explicit time_limit_per_round set so that
+        session activities created from templates inherit timing when available.
+        """
+        sql = (
+            "SELECT id, session_id, name, sport_type, game_type, scoring_mode, time_winner, "
+            "aggregate_player_times, status, total_rounds, time_limit_per_round, current_round, "
+            "round_status, round_start_time, round_end_time, description, created_at, updated_at "
+            "FROM activities WHERE session_id IS NULL AND lower(name) = ? "
+            "ORDER BY (time_limit_per_round IS NOT NULL) DESC, time_limit_per_round DESC LIMIT 1"
+        )
+        params = [name.strip().lower() if name else '']
+        return Database.get_one_row(sql, params)
+
+    @staticmethod
     def update_activity(activity_id: int, name: Optional[str] = None, sport_type: Optional[str] = None,
                         game_type: Optional[str] = None, scoring_mode: Optional[str] = None, 
                         time_winner: Optional[str] = None, aggregate_player_times: Optional[bool] = None, 

@@ -271,7 +271,18 @@ class BigScreenDisplay {
       this.stopRoundTimer(); // Clear any existing timer (safety)
     }
 
-    this.roundTimeRemaining = Math.max(0, Math.floor(initialSeconds));
+    if (initialSeconds == null || initialSeconds === '' || isNaN(Number(initialSeconds))) {
+      // Nothing sensible to start - show placeholder and bail out
+      this.roundTimeRemaining = 0;
+      this.updateRoundTimerDisplay(null);
+      return;
+    }
+
+    let s = Number(initialSeconds);
+    // Convert ms to seconds when appropriate
+    if (s > 10000) s = Math.floor(s / 1000);
+
+    this.roundTimeRemaining = Math.max(0, Math.floor(s));
     // Update display immediately even when zero
     this.updateRoundTimerDisplay(this.roundTimeRemaining);
     
@@ -319,12 +330,12 @@ class BigScreenDisplay {
       'set-qr': this.setQRVisibility.bind(this),
       'connected': this.handleConnected.bind(this),
       'disconnected': this.handleDisconnected.bind(this),
-      // Round events
-      'round_started': this.handleRoundEvent.bind(this),
-      'round_ended': this.handleRoundEvent.bind(this),
-      'round_changed': this.handleRoundEvent.bind(this),
-      'round_paused': this.handleRoundEvent.bind(this),
-      'round_resumed': this.handleRoundEvent.bind(this),
+      // Round events - explicit handlers so we can start/stop timers reliably
+      'round_started': this.handleRoundStarted.bind(this),
+      'round_ended': this.handleRoundEnded.bind(this),
+      'round_changed': this.handleRoundChanged.bind(this),
+      'round_paused': this.handleRoundPaused.bind(this),
+      'round_resumed': this.handleRoundResumed.bind(this),
       'round_time_update': this.handleRoundTimeUpdate.bind(this),
       'round_auto_advanced': this.handleRoundEvent.bind(this),
       'activity_completed': this.handleRoundEvent.bind(this)
@@ -429,9 +440,23 @@ class BigScreenDisplay {
   }
 
   setQRVisibility(visible) {
-    console.log('BigScreen: Setting QR visibility to:', visible);
-    visible ? this.showQR() : this.hideQR();
-    api.socket?.emit('qr-state', visible);
+    // Accept either a boolean or the API-wrapped payload object ({ data: boolean, event_type: 'set-qr' })
+    let isVisible = false;
+    try {
+      if (visible && typeof visible === 'object' && 'data' in visible) {
+        isVisible = Boolean(visible.data);
+      } else {
+        isVisible = Boolean(visible);
+      }
+    } catch (e) {
+      console.warn('BigScreen: Failed to parse set-qr payload, defaulting to show:', e);
+      isVisible = true;
+    }
+
+    console.log('BigScreen: Setting QR visibility to (normalized):', isVisible, 'raw:', visible);
+    isVisible ? this.showQR() : this.hideQR();
+
+    try { api.socket?.emit('qr-state', isVisible); } catch (e) { console.warn('Failed to emit qr-state:', e); }
   }
 
   toggleQR() {
@@ -1460,32 +1485,141 @@ class BigScreenDisplay {
   // Round Event Handlers & Display
   // ==========================================================================
 
-  handleRoundEvent(data) {
+  handleRoundStarted(data) {
+    if (!data || !data.activity_id) return;
+    console.log('Round started event:', data);
+
+    // If the event is for a different activity, attempt to switch to it (only if it belongs to our current session)
+    if (String(data.activity_id) !== String(this.activeActivityId)) {
+      try {
+        // Set activeActivityId locally and try to fetch details (this will be a no-op if unrelated)
+        this.activeActivityId = parseInt(data.activity_id);
+        localStorage?.setItem('activeActivityId', String(this.activeActivityId));
+        this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to switch active activity on round_started:', e);
+      }
+    }
+
+    // Mark round active and update start time if provided
+    this.roundStatus = 'active';
+    if (data.round_start_time) this.roundStartTime = data.round_start_time;
+
+    // Prefer an explicit remaining time, otherwise fall back to time limit
+    const t = (data.time_remaining != null) ? data.time_remaining : data.time_limit_per_round;
+    if (t != null) {
+      console.debug('Starting timer from round_started payload:', t);
+      this.startRoundTimer(t);
+    } else {
+      // No timing info in payload - refresh authoritative status from server
+      this.loadRoundStatus();
+    }
+
+    // Refresh activity details for display
+    if (this.activeActivityId) this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+  }
+
+  handleRoundEnded(data) {
+    if (!data || !data.activity_id) return;
+
+    if (String(data.activity_id) !== String(this.activeActivityId)) {
+      try {
+        this.activeActivityId = parseInt(data.activity_id);
+        localStorage?.setItem('activeActivityId', String(this.activeActivityId));
+        this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to switch active activity on round_ended:', e);
+      }
+    }
+
+    console.log('Round ended event:', data);
+
+    this.roundStatus = 'completed';
+    this.stopRoundTimer();
+    this.loadRoundStatus();
+    this.loadInitialData();
+  }
+
+  handleRoundChanged(data) {
+    if (!data || !data.activity_id) return;
+
+    if (String(data.activity_id) !== String(this.activeActivityId)) {
+      try {
+        this.activeActivityId = parseInt(data.activity_id);
+        localStorage?.setItem('activeActivityId', String(this.activeActivityId));
+        this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to switch active activity on round_changed:', e);
+      }
+    }
+
+    console.log('Round changed event:', data);
+
+    // Refresh status and leaderboard for the new round
+    this.loadRoundStatus();
+    this.loadInitialData();
+  }
+
+  handleRoundPaused(data) {
+    if (!data || !data.activity_id) return;
+
+    if (String(data.activity_id) !== String(this.activeActivityId)) {
+      try {
+        this.activeActivityId = parseInt(data.activity_id);
+        localStorage?.setItem('activeActivityId', String(this.activeActivityId));
+        this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to switch active activity on round_paused:', e);
+      }
+    }
+
+    console.log('Round paused event:', data);
+
+    this.roundStatus = 'paused';
+    this.stopRoundTimer();
+    this.loadRoundStatus();
+  }
+
+  handleRoundResumed(data) {
     const relevantActivityId = this.activeActivityId || this.selectedActivityId;
     if (!data || data.activity_id !== relevantActivityId) return;
-    console.log('Round event received:', data);
-    
-    // Manage timer based on round state
-    if (data.event_type === 'round_started') {
-      if (data.time_remaining != null) {
-        this.startRoundTimer(data.time_remaining);
-      }
-    } else if (data.event_type === 'round_paused') {
-      this.stopRoundTimer();
-    } else if (data.event_type === 'round_resumed') {
-      if (data.time_remaining != null) {
-        this.startRoundTimer(data.time_remaining);
-      }
-    } else if (data.event_type === 'round_ended') {
-      this.stopRoundTimer();
+    console.log('Round resumed event:', data);
+
+    this.roundStatus = 'active';
+    const t = (data.time_remaining != null) ? data.time_remaining : data.time_limit_per_round;
+    if (t != null) {
+      console.debug('Resuming timer from round_resumed payload:', t);
+      this.startRoundTimer(t);
+    } else {
+      this.loadRoundStatus();
     }
-    
+
+    this.loadInitialData();
+  }
+
+  handleRoundEvent(data) {
+    // Generic fallback for any round-related event we didn't explicitly handle
+    const relevantActivityId = this.activeActivityId || this.selectedActivityId;
+    if (!data || data.activity_id !== relevantActivityId) return;
+    console.log('Round event received (fallback):', data);
+    this.loadRoundStatus();
     this.loadInitialData(); // Refresh leaderboard
   }
 
   handleRoundTimeUpdate(data) {
-    const relevantActivityId = this.activeActivityId || this.selectedActivityId;
-    if (!data || data.activity_id !== relevantActivityId) return;
+    if (!data || !data.activity_id) return;
+
+    // If the event is for another activity, switch active activity so we display the timer
+    if (String(data.activity_id) !== String(this.activeActivityId)) {
+      try {
+        this.activeActivityId = parseInt(data.activity_id);
+        localStorage?.setItem('activeActivityId', String(this.activeActivityId));
+        this.loadActiveActivityDetails(this.activeActivityId).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to switch active activity on round_time_update:', e);
+      }
+    }
+
     if (data.time_remaining !== null && data.time_remaining !== undefined) {
       // Resync the timer smoothly: update remaining seconds and display; start interval if none
       this.roundTimeRemaining = Math.max(0, Math.floor(data.time_remaining));
@@ -1524,8 +1658,35 @@ class BigScreenDisplay {
       } else if (this.roundStatus !== 'active') {
         this.stopRoundTimer();
       }
+    } else {
+      // No explicit remaining time; if activity has a time limit show that as the default
+      if (this.timeLimitPerRound) {
+        // If round is active and we have a start timestamp, attempt to compute remaining time
+        let secondsToShow = this.timeLimitPerRound;
+        if (this.roundStatus === 'active' && activity.round_start_time) {
+          try {
+            const start = new Date(activity.round_start_time);
+            if (!isNaN(start.getTime())) {
+              const elapsed = Math.floor((Date.now() - start.getTime()) / 1000);
+              secondsToShow = Math.max(0, Math.floor(this.timeLimitPerRound - elapsed));
+            }
+          } catch (e) {
+            console.warn('Failed to compute elapsed time from round_start_time:', e);
+          }
+        }
+
+        this.updateRoundTimerDisplay(secondsToShow);
+
+        // If round is active, start a client-side countdown if one isn't already running
+        if (this.roundStatus === 'active' && secondsToShow > 0 && !this.roundTimerInterval) {
+          this.startRoundTimer(secondsToShow);
+        }
+      } else if (this.timer) {
+        // Clear/hide timer text when there is truly no limit
+        this.updateRoundTimerDisplay(null);
+      }
     }
-    
+
     // Show timer if there's a time limit
     if (this.timer) {
       if (this.timeLimitPerRound) {
@@ -1538,15 +1699,25 @@ class BigScreenDisplay {
 
   updateRoundTimerDisplay(seconds) {
     if (!this.timer) return;
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+
+    if (seconds == null || seconds === '' || isNaN(Number(seconds))) {
+      this.timer.textContent = '--:--';
+      this.timer.style.color = '#6c757d';
+      return;
+    }
+
+    let s = Number(seconds);
+    if (s > 10000) s = Math.floor(s / 1000); // ms -> s
+    s = Math.max(0, Math.floor(s));
+
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
     this.timer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     
     // Color code based on time remaining
-    if (seconds < 30) {
+    if (s < 30) {
       this.timer.style.color = '#ef4444'; // Red
-    } else if (seconds < 60) {
+    } else if (s < 60) {
       this.timer.style.color = '#f59e0b'; // Orange
     } else {
       this.timer.style.color = '#10b981'; // Green
