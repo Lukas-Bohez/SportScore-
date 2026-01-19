@@ -190,6 +190,8 @@ class ScoreInput {
     this.totalRounds = 1;
     this.roundStartTime = null;
     this.timeLimitPerRound = null;
+    this.roundTimeRemaining = 0;
+    this.roundTimerInterval = null;
     
     // Utilities
     this.sharedUtils = new SharedUtils(api);
@@ -256,7 +258,7 @@ class ScoreInput {
       'session-name', 'round-info', 'timer',
       // Round controls
       'round-controls', 'start-round-btn', 'pause-round-btn', 'resume-round-btn',
-      'end-round-btn', 'next-round-btn',
+      'end-round-btn',
       // Main sections
       'leaderboard', 'team-select', 'player-select', 'points-input', 
       'reason-input', 'submit-score-btn', 'recent-scores',
@@ -319,7 +321,6 @@ class ScoreInput {
     this.elements.pauseRoundBtn?.addEventListener('click', () => this.pauseRound());
     this.elements.resumeRoundBtn?.addEventListener('click', () => this.resumeRound());
     this.elements.endRoundBtn?.addEventListener('click', () => this.endRound());
-    this.elements.nextRoundBtn?.addEventListener('click', () => this.nextRound());
     
     // Session controls
     this.elements.pauseSessionBtn?.addEventListener('click', () => this.togglePause());
@@ -524,7 +525,7 @@ class ScoreInput {
       return response.scores || [];
     }
     
-    const response = await api.get(`/api/v1/sessions/${this.sessionId}/scores`);
+    const response = await api.get(`/api/v1/scores?game_id=${this.sessionId}`);
     return response.scores || [];
   }
 
@@ -1027,7 +1028,7 @@ class ScoreInput {
       if (this.selectedActivityId) {
         await api.createActivityScore(this.selectedActivityId, scoreData);
       } else {
-        await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+        await api.postSilent(`/api/v1/scores`, scoreData);
       }
       
       this.onScoreSubmitSuccess(teamId, points);
@@ -1213,7 +1214,7 @@ class ScoreInput {
       if (this.selectedActivityId) {
         await api.createActivityScore(this.selectedActivityId, scoreData);
       } else {
-        await api.postSilent(`/api/v1/sessions/${this.sessionId}/scores`, scoreData);
+        await api.postSilent(`/api/v1/scores`, scoreData);
       }
       
       this.onScoreSubmitSuccess(teamId, deltaMs);
@@ -1343,9 +1344,10 @@ class ScoreInput {
   // ==========================================================================
 
   async startRound() {
-    if (!this.activeActivityId) return;
+    const activityId = this.selectedActivityId || this.activeActivityId;
+    if (!activityId) return;
     try {
-      await api.startActivityRound(this.activeActivityId);
+      await api.startActivityRound(activityId);
       console.log('Round started');
     } catch (error) {
       console.error('Failed to start round:', error);
@@ -1354,9 +1356,10 @@ class ScoreInput {
   }
 
   async pauseRound() {
-    if (!this.activeActivityId) return;
+    const activityId = this.selectedActivityId || this.activeActivityId;
+    if (!activityId) return;
     try {
-      await api.pauseActivityRound(this.activeActivityId);
+      await api.pauseActivityRound(activityId);
       console.log('Round paused');
     } catch (error) {
       console.error('Failed to pause round:', error);
@@ -1365,9 +1368,10 @@ class ScoreInput {
   }
 
   async resumeRound() {
-    if (!this.activeActivityId) return;
+    const activityId = this.selectedActivityId || this.activeActivityId;
+    if (!activityId) return;
     try {
-      await api.resumeActivityRound(this.activeActivityId);
+      await api.resumeActivityRound(activityId);
       console.log('Round resumed');
     } catch (error) {
       console.error('Failed to resume round:', error);
@@ -1376,9 +1380,10 @@ class ScoreInput {
   }
 
   async endRound() {
-    if (!this.activeActivityId) return;
+    const activityId = this.selectedActivityId || this.activeActivityId;
+    if (!activityId) return;
     try {
-      await api.endActivityRound(this.activeActivityId);
+      await api.endActivityRound(activityId);
       console.log('Round ended');
     } catch (error) {
       console.error('Failed to end round:', error);
@@ -1386,10 +1391,16 @@ class ScoreInput {
     }
   }
 
-  async nextRound() {
-    if (!this.activeActivityId) return;
+  async nextActivityRound() {
+    const activityId = this.selectedActivityId || this.activeActivityId;
+    if (!activityId) return;
+    // Prevent calling backend when already at last round
+    if (this.currentRound >= this.totalRounds) {
+      alert('Dit is de laatste ronde.');
+      return;
+    }
     try {
-      await api.nextActivityRound(this.activeActivityId);
+      await api.nextActivityRound(activityId);
       console.log('Advanced to next round');
     } catch (error) {
       console.error('Failed to advance round:', error);
@@ -1398,10 +1409,14 @@ class ScoreInput {
   }
 
   async loadRoundStatus() {
-    if (!this.activeActivityId) return;
+    if (!this.selectedActivityId) return;
     try {
-      const status = await api.getRoundStatus(this.activeActivityId);
+      const status = await api.getRoundStatus(this.selectedActivityId);
       this.updateRoundDisplay(status);
+      // If the round is active and the server returned remaining time, sync the timer immediately
+      if (status?.round_status === 'active' && status.time_remaining != null) {
+        this.startRoundTimer(status.time_remaining);
+      }
     } catch (error) {
       console.error('Failed to load round status:', error);
     }
@@ -1421,9 +1436,16 @@ class ScoreInput {
       this.elements.roundInfo.textContent = `Ronde ${this.currentRound}/${this.totalRounds}`;
     }
     
-    // Update timer display
+    // Update timer display and start countdown if active
     if (roundStatus.time_remaining !== null && roundStatus.time_remaining !== undefined) {
-      this.updateTimerDisplay(roundStatus.time_remaining);
+      this.updateRoundTimerDisplay(roundStatus.time_remaining);
+      // Start client-side timer if round is active
+      if (this.roundStatus === 'active' && roundStatus.time_remaining > 0) {
+        this.startRoundTimer(roundStatus.time_remaining);
+      } else if (this.roundStatus !== 'active') {
+        // Stop timer if round is not active
+        this.stopRoundTimer();
+      }
     } else if (this.elements.timer) {
       this.elements.timer.textContent = '--:--';
     }
@@ -1440,12 +1462,11 @@ class ScoreInput {
 
   updateRoundControlButtons() {
     const {
-      startRoundBtn, pauseRoundBtn, resumeRoundBtn, 
-      endRoundBtn, nextRoundBtn
+      startRoundBtn, pauseRoundBtn, resumeRoundBtn, endRoundBtn
     } = this.elements;
     
     // Hide all first
-    [startRoundBtn, pauseRoundBtn, resumeRoundBtn, endRoundBtn, nextRoundBtn].forEach(btn => {
+    [startRoundBtn, pauseRoundBtn, resumeRoundBtn, endRoundBtn].forEach(btn => {
       if (btn) btn.style.display = 'none';
     });
     
@@ -1458,9 +1479,6 @@ class ScoreInput {
       case 'active':
         if (pauseRoundBtn) pauseRoundBtn.style.display = 'inline-block';
         if (endRoundBtn) endRoundBtn.style.display = 'inline-block';
-        if (nextRoundBtn && this.currentRound < this.totalRounds) {
-          nextRoundBtn.style.display = 'inline-block';
-        }
         break;
       
       case 'paused':
@@ -1469,14 +1487,12 @@ class ScoreInput {
         break;
       
       case 'completed':
-        if (nextRoundBtn && this.currentRound < this.totalRounds) {
-          nextRoundBtn.style.display = 'inline-block';
-        }
+        // No additional controls in completed state
         break;
     }
   }
 
-  updateTimerDisplay(seconds) {
+  updateRoundTimerDisplay(seconds) {
     if (!this.elements.timer) return;
     
     const mins = Math.floor(seconds / 60);
@@ -1494,49 +1510,104 @@ class ScoreInput {
   }
 
   // ==========================================================================
+  // Round Timer Management
+  // ==========================================================================
+
+  startRoundTimer(initialSeconds) {
+    this.stopRoundTimer(); // Clear any existing timer
+    this.roundTimeRemaining = Math.max(0, Math.floor(initialSeconds));
+    // Update display immediately even when zero
+    this.updateRoundTimerDisplay(this.roundTimeRemaining);
+    
+    if (this.roundTimeRemaining <= 0) return;
+    
+    // Decrement every second
+    this.roundTimerInterval = setInterval(() => {
+      if (this.roundStatus === 'active' && this.roundTimeRemaining > 0) {
+        this.roundTimeRemaining--;
+        this.updateRoundTimerDisplay(this.roundTimeRemaining);
+        
+        // When time runs out, stop the timer
+        if (this.roundTimeRemaining <= 0) {
+          this.stopRoundTimer();
+        }
+      }
+    }, 1000);
+  }
+
+  stopRoundTimer() {
+    if (this.roundTimerInterval) {
+      clearInterval(this.roundTimerInterval);
+      this.roundTimerInterval = null;
+    }
+  }
+
+  // ==========================================================================
   // Round Event Handlers
   // ==========================================================================
 
   handleRoundStarted(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round started event:', data);
     this.loadRoundStatus();
+    // Start client-side timer countdown
+    if (data.time_remaining != null) {
+      this.startRoundTimer(data.time_remaining);
+    }
   }
 
   handleRoundEnded(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round ended event:', data);
+    this.stopRoundTimer();
     this.loadRoundStatus();
   }
 
   handleRoundChanged(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round changed event:', data);
     this.loadRoundStatus();
     this.loadLeaderboard(); // Refresh scores for new round
   }
 
   handleRoundPaused(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round paused event:', data);
+    this.stopRoundTimer();
     this.loadRoundStatus();
   }
 
   handleRoundResumed(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round resumed event:', data);
     this.loadRoundStatus();
+    // Resume client-side timer countdown
+    if (data.time_remaining != null) {
+      this.startRoundTimer(data.time_remaining);
+    }
   }
 
   handleRoundTimeUpdate(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     if (data.time_remaining !== null && data.time_remaining !== undefined) {
-      this.updateTimerDisplay(data.time_remaining);
+      // Resync the timer every 5 seconds from server
+      this.roundTimeRemaining = data.time_remaining;
+      this.updateRoundTimerDisplay(data.time_remaining);
+      if (!this.roundTimerInterval && this.roundStatus === 'active' && this.roundTimeRemaining > 0) {
+        this.startRoundTimer(this.roundTimeRemaining);
+      }
     }
   }
 
   handleRoundAutoAdvanced(data) {
-    if (data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.selectedActivityId || this.activeActivityId;
+    if (data.activity_id !== relevantActivityId) return;
     console.log('Round auto-advanced:', data);
     alert(`Ronde ${data.previous_round} voltooid! Nu ronde ${data.current_round}.`);
     this.loadRoundStatus();
@@ -2007,7 +2078,7 @@ class ScoreInput {
     }
   }
 
-  async nextRound() {
+  async nextSessionRound() {
     try {
       const nextRound = this.session.current_round + 1;
       if (nextRound > this.session.total_rounds) {

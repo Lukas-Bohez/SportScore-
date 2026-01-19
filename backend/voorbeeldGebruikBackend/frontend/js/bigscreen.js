@@ -193,6 +193,8 @@ class BigScreenDisplay {
     this.totalRounds = 1;
     this.roundStatus = 'not_started';
     this.timeLimitPerRound = null;
+    this.roundTimeRemaining = 0;
+    this.roundTimerInterval = null;
     
     // DOM Elements (bound in bindElements)
     this.sessionTitle = null;
@@ -254,6 +256,47 @@ class BigScreenDisplay {
     if (api?.socket?.connected) {
       console.log('BigScreen: Emitting initial qr-state:', this.isQRVisible());
       api.socket.emit('qr-state', this.isQRVisible());
+    }
+  }
+
+  // ==========================================================================
+  // Round Timer Management
+  // ==========================================================================
+
+  startRoundTimer(initialSeconds) {
+    // If a timer is already running, just resync the remaining time without recreating the interval
+    const hadInterval = Boolean(this.roundTimerInterval);
+
+    if (!hadInterval) {
+      this.stopRoundTimer(); // Clear any existing timer (safety)
+    }
+
+    this.roundTimeRemaining = Math.max(0, Math.floor(initialSeconds));
+    // Update display immediately even when zero
+    this.updateRoundTimerDisplay(this.roundTimeRemaining);
+    
+    if (this.roundTimeRemaining <= 0) return;
+    
+    if (!hadInterval) {
+      // Decrement every second
+      this.roundTimerInterval = setInterval(() => {
+        if (this.roundStatus === 'active' && this.roundTimeRemaining > 0) {
+          this.roundTimeRemaining--;
+          this.updateRoundTimerDisplay(this.roundTimeRemaining);
+          
+          // When time runs out, stop the timer
+          if (this.roundTimeRemaining <= 0) {
+            this.stopRoundTimer();
+          }
+        }
+      }, 1000);
+    }
+  }
+
+  stopRoundTimer() {
+    if (this.roundTimerInterval) {
+      clearInterval(this.roundTimerInterval);
+      this.roundTimerInterval = null;
     }
   }
 
@@ -1418,15 +1461,38 @@ class BigScreenDisplay {
   // ==========================================================================
 
   handleRoundEvent(data) {
-    if (!data || data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.activeActivityId || this.selectedActivityId;
+    if (!data || data.activity_id !== relevantActivityId) return;
     console.log('Round event received:', data);
+    
+    // Manage timer based on round state
+    if (data.event_type === 'round_started') {
+      if (data.time_remaining != null) {
+        this.startRoundTimer(data.time_remaining);
+      }
+    } else if (data.event_type === 'round_paused') {
+      this.stopRoundTimer();
+    } else if (data.event_type === 'round_resumed') {
+      if (data.time_remaining != null) {
+        this.startRoundTimer(data.time_remaining);
+      }
+    } else if (data.event_type === 'round_ended') {
+      this.stopRoundTimer();
+    }
+    
     this.loadInitialData(); // Refresh leaderboard
   }
 
   handleRoundTimeUpdate(data) {
-    if (!data || data.activity_id !== this.activeActivityId) return;
+    const relevantActivityId = this.activeActivityId || this.selectedActivityId;
+    if (!data || data.activity_id !== relevantActivityId) return;
     if (data.time_remaining !== null && data.time_remaining !== undefined) {
-      this.updateTimerDisplay(data.time_remaining);
+      // Resync the timer smoothly: update remaining seconds and display; start interval if none
+      this.roundTimeRemaining = Math.max(0, Math.floor(data.time_remaining));
+      this.updateRoundTimerDisplay(this.roundTimeRemaining);
+      if (!this.roundTimerInterval && this.roundStatus === 'active' && this.roundTimeRemaining > 0) {
+        this.startRoundTimer(this.roundTimeRemaining);
+      }
     }
   }
 
@@ -1450,18 +1516,27 @@ class BigScreenDisplay {
       }
     }
     
+    // Start or stop timer based on round state
+    if (activity.time_remaining !== null && activity.time_remaining !== undefined) {
+      this.updateRoundTimerDisplay(activity.time_remaining);
+      if (this.roundStatus === 'active' && activity.time_remaining > 0) {
+        this.startRoundTimer(activity.time_remaining);
+      } else if (this.roundStatus !== 'active') {
+        this.stopRoundTimer();
+      }
+    }
+    
     // Show timer if there's a time limit
     if (this.timer) {
-      if (this.timeLimitPerRound && this.roundStatus === 'active') {
+      if (this.timeLimitPerRound) {
         this.timer.style.display = 'block';
-        // Timer will be updated by round_time_update events
       } else {
         this.timer.style.display = 'none';
       }
     }
   }
 
-  updateTimerDisplay(seconds) {
+  updateRoundTimerDisplay(seconds) {
     if (!this.timer) return;
     
     const mins = Math.floor(seconds / 60);

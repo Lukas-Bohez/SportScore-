@@ -244,6 +244,14 @@ export class HomepageManagement {
 		const totalRounds = parseInt(formData.get('activity-rounds')) || 1;
 		const timeLimitPerRound = parseInt(formData.get('activity-time')) || null;
 		
+		// Validate: require time limit when multiple rounds
+		if (totalRounds > 1 && !timeLimitPerRound) {
+			alert('Voer een tijdslimiet per ronde in wanneer er meerdere rondes zijn.');
+			const timeInput = document.getElementById('activity-time');
+			if (timeInput) timeInput.focus();
+			return;
+		}
+		
 		const activityData = {
 			name: formData.get('activity-name'),
 			sport_type: formData.get('activity-sport'),

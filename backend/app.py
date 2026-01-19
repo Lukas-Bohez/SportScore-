@@ -460,43 +460,6 @@ async def delete_player(player_id: int):
     return {"message": "Player deleted successfully"}
 
 
-# Teams endpoints
-@app.get(f"{ENDPOINT}/teams", response_model=TeamListResponse)
-async def get_teams():
-    teams = TeamRepository.get_all_teams()
-    return {"teams": [TeamResponse(**team) for team in teams]}
-
-@app.post(f"{ENDPOINT}/teams", response_model=TeamResponse)
-async def create_team(team: TeamCreate):
-    team_id = TeamRepository.create_team(team.name, team.color, team.icon, team.description)
-    if not team_id:
-        raise HTTPException(status_code=400, detail="Failed to create team")
-    created_team = TeamRepository.get_team_by_id(team_id)
-    return TeamResponse(**created_team)
-
-@app.get(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
-async def get_team(team_id: int):
-    team = TeamRepository.get_team_by_id(team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return TeamResponse(**team)
-
-@app.put(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
-async def update_team(team_id: int, team_update: TeamUpdate):
-    success = TeamRepository.update_team(team_id, team_update.name, team_update.color, team_update.icon, team_update.description)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update team")
-    updated_team = TeamRepository.get_team_by_id(team_id)
-    return TeamResponse(**updated_team)
-
-@app.delete(f"{ENDPOINT}/teams/{{team_id}}")
-async def delete_team(team_id: int):
-    success = TeamRepository.delete_team(team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete team")
-    return {"message": "Team deleted successfully"}
-
-
 # Session player assignments endpoints
 @app.post(f"{ENDPOINT}/sessions/{{session_id}}/assign-player", response_model=SessionPlayerResponse)
 async def assign_player(session_id: int, assignment: SessionPlayerCreate):
@@ -1035,7 +998,7 @@ async def create_global_activity(activity: ActivityCreate):
         time_winner=(activity.time_winner or 'lower'),
         aggregate_player_times=1 if activity.aggregate_player_times else 0,
         total_rounds=activity.total_rounds,
-        time_limit=activity.time_limit,
+        time_limit_per_round=activity.time_limit_per_round,
         description=activity.description
     )
     created = ActivityRepository.get_activity_by_id(activity_id)
@@ -1070,7 +1033,7 @@ async def create_activity_in_session(session_id: int, activity: ActivityCreate):
         time_winner=(activity.time_winner or 'lower'),
         aggregate_player_times=1 if activity.aggregate_player_times else 0,
         total_rounds=activity.total_rounds,
-        time_limit=activity.time_limit,
+        time_limit_per_round=activity.time_limit_per_round,
         description=activity.description
     )
     created = ActivityRepository.get_activity_by_id(activity_id)
@@ -1397,7 +1360,7 @@ async def get_round_status(activity_id: int):
         'round_status': round_status,
         'round_start_time': round_start_time,
         'time_limit_per_round': time_limit_per_round,
-        'time_remaining': None,
+        'time_remaining': time_limit_per_round,  # Default to full time limit
         'time_elapsed': None
     }
     
