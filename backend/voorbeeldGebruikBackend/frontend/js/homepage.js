@@ -29,12 +29,10 @@ class Homepage {
     await this.loadActiveSessions();
     await this.loadHistorySessions();
 
-    // Wire export-all buttons (history tab) to show confirm modal
+    // Wire export-all button (history tab) to show confirm modal (XLSX-only)
     try {
-      const exportCsvBtn = document.getElementById('export-all-csv');
-      const exportXlsxBtn = document.getElementById('export-all-xlsx');
-      if (exportCsvBtn) exportCsvBtn.addEventListener('click', () => this.showExportConfirm(null, 'csv'));
-      if (exportXlsxBtn) exportXlsxBtn.addEventListener('click', () => this.showExportConfirm(null, 'xlsx'));
+      const exportAllBtn = document.getElementById('export-all-btn');
+      if (exportAllBtn) exportAllBtn.addEventListener('click', () => this.showExportConfirm(null));
 
       // Wire export confirm modal buttons
       const exportConfirmModal = document.getElementById('export-confirm-modal');
@@ -363,7 +361,7 @@ class Homepage {
   }
 
   // ---------------------- Export (CSV / XLSX) ----------------------
-  async exportSession(sessionId, format = 'csv') {
+  async exportSession(sessionId) {
     try {
       const session = this.historySessions.find(s => s.id == sessionId);
       if (!session) {
@@ -428,7 +426,7 @@ class Homepage {
       const safeName = (session.name || `session-${session.id}`).replace(/[^a-z0-9\-_ ]/ig, '_').substring(0, 80);
       const filenameBase = `${safeName}-${session.id}`;
 
-      if (format === 'xlsx' && window.XLSX) {
+      if (window.XLSX) {
         const wb = window.XLSX.utils.book_new();
         const wsSessions = window.XLSX.utils.json_to_sheet([sessionRow]);
         window.XLSX.utils.book_append_sheet(wb, wsSessions, 'Session');
@@ -439,12 +437,7 @@ class Homepage {
         window.XLSX.writeFile(wb, `${filenameBase}.xlsx`);
         this.showSuccessMessage('Export voltooid.');
       } else {
-        // Fallback to CSV using scores + session context
-        const headers = ['session_id','session_name','activity_id','activity_name','team_id','player_id','points','reason','round_number','timestamp'];
-        const rows = (scoresRows.length ? scoresRows : [{ activity_id: '', activity_name: '', team_id: '', player_id: '', points: '', reason: '', round_number: '', timestamp: '' }]).map(r => ([session.id, session.name, r.activity_id, r.activity_name, r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]));
-        const csv = this._arrayToCsv([headers].concat(rows));
-        this._downloadBlob(csv, `${filenameBase}.csv`, 'text/csv;charset=utf-8;');
-        this.showSuccessMessage('Export voltooid.');
+        this.showErrorMessage('XLSX bibliotheek niet geladen. Alleen XLSX export ondersteund.');
       }
 
     } catch (err) {
@@ -453,7 +446,7 @@ class Homepage {
     }
   }
 
-  async exportAllSessions(format = 'csv') {
+  async exportAllSessionsCsv(format = 'csv') {
     try {
       // Ensure historySessions loaded
       if (!this.historySessions || !this.historySessions.length) {
@@ -591,7 +584,7 @@ class Homepage {
   }
 
   // ---------------------- Export confirm modal flow ----------------------
-  async showExportConfirm(sessionId = null, format = 'csv', preselectedActivities = null) {
+  async showExportConfirm(sessionId = null, preselectedActivities = null) {
     const modal = document.getElementById('export-confirm-modal');
     const listEl = document.getElementById('export-confirm-activity-list');
     const infoEl = document.getElementById('export-confirm-info');
@@ -752,11 +745,11 @@ class Homepage {
   }
 
   // Export a single activity's scores + highscores
-  async exportActivity(sessionId, activityId, format = 'csv') {
+  async exportActivity(sessionId, activityId) {
     const statusEl = document.getElementById('export-status'); if (statusEl) statusEl.textContent = 'Exporteren activiteit...';
     try {
       // show confirm modal for single activity as well
-      await this.showExportConfirm(sessionId, format, [activityId]);
+      await this.showExportConfirm(sessionId, [activityId]);
 
       // load session and activity metadata
       const session = this.historySessions.find(s => s.id == sessionId) || {};
