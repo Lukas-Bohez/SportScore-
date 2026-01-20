@@ -28,6 +28,13 @@ const router = createRouter({
       path: "/nieuwesessie",
       name: "nieuwesessie",
       component: () => import("../views/NewSession.vue"),
+      children: [
+        {
+          path: "nieuwe-activiteit",
+          name: "nieuwe-activiteit",
+          component: () => import("../views/NewActivity.vue"),
+        },
+      ],
     },
   ],
 });

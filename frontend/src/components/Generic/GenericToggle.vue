@@ -10,6 +10,11 @@
       label="Spelers"
       @click="selectButton('players')"
     />
+    <GenericButton
+      :variant="activeButton === 'teams&spelers' ? 'primary' : 'tertiary'"
+      label="Teams&spelers"
+      @click="selectButton('teams&spelers')"
+    />
   </div>
 </template>
 
@@ -43,11 +48,12 @@ export default {
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  gap: var(--space-5);
+  gap: var(--space-4);
   text-align: center;
   color: var(--white);
   margin-top: 2rem;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .generic-toggle :deep(svg) {
