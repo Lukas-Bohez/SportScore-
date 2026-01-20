@@ -36,6 +36,15 @@ export class HomepageManagement {
 		this.playersList = null;
 		this.playersSection = null;
 
+		// Import helpers (CSV / XLSX)
+		this.playerImportFileInput = null;
+		this.playerImportAutoCreateTeams = null;
+		this.playerImportPreviewBtn = null;
+		this.playerImportStartBtn = null;
+		this.playerImportPreviewContainer = null;
+		this._parsedImportRows = null;
+		this._importColumnMap = null;
+
 		this.teams = [];
 		this.activities = [];
 		this.allPlayers = [];
@@ -81,6 +90,25 @@ export class HomepageManagement {
 		this.addPlayerGlobalBtn = document.getElementById('add-player-global-btn');
 		this.pmPlayersList = document.getElementById('pm-players-list');
 
+		// Import elements
+		this.playerImportFileInput = document.getElementById('player-import-file');
+		this.playerImportAutoCreateTeams = document.getElementById('player-import-auto-create-teams');
+		this.playerImportAutoDetectBtn = document.getElementById('player-import-auto-detect-btn');
+		this.playerImportPreviewBtn = document.getElementById('player-import-preview-btn');
+		this.playerImportStartBtn = document.getElementById('player-import-start-btn');
+		this.playerImportPreviewContainer = document.getElementById('player-import-preview');
+		this.playerImportNameMode = document.getElementById('player-import-name-mode');
+		this.playerImportColName = document.getElementById('player-import-col-name');
+		this.playerImportColFirst = document.getElementById('player-import-col-first');
+		this.playerImportColLast = document.getElementById('player-import-col-last');
+		this.playerImportColTeam = document.getElementById('player-import-col-team');
+		this.playerImportProgressBar = document.getElementById('player-import-progress-bar');
+		this.playerImportProgressPercent = document.getElementById('player-import-progress-percent');
+		this.playerImportResult = document.getElementById('player-import-result');
+		// Mapping wrappers for name mode toggling
+		this.playerImportMapNameCol = document.getElementById('map-name-col');
+		this.playerImportMapFirstLast = document.getElementById('map-first-last');
+
 		// Setup color preview if elements exist
 		if (this.teamColorInput) {
 			const preview = document.getElementById('color-preview');
@@ -90,9 +118,31 @@ export class HomepageManagement {
 		}
 	}
 
+	// Toggle mapping UI for name mode (full vs split)
+	toggleImportNameModeUI() {
+		try {
+			const mode = (this.playerImportNameMode && this.playerImportNameMode.value) || 'full';
+			if (mode === 'full') {
+				if (this.playerImportMapNameCol) this.playerImportMapNameCol.style.display = 'flex';
+				if (this.playerImportMapFirstLast) this.playerImportMapFirstLast.style.display = 'none';
+				if (this.playerImportColFirst) this.playerImportColFirst.disabled = true;
+				if (this.playerImportColLast) this.playerImportColLast.disabled = true;
+				if (this.playerImportColName) this.playerImportColName.disabled = false;
+			} else {
+				if (this.playerImportMapNameCol) this.playerImportMapNameCol.style.display = 'none';
+				if (this.playerImportMapFirstLast) this.playerImportMapFirstLast.style.display = 'flex';
+				if (this.playerImportColFirst) this.playerImportColFirst.disabled = false;
+				if (this.playerImportColLast) this.playerImportColLast.disabled = false;
+				if (this.playerImportColName) this.playerImportColName.disabled = true;
+			}
+		} catch (e) { /* ignore */ }
+	}
+
 	async loadBeheerData() {
 		// Bind DOM elements first
 		this.bindElements();
+		// Ensure mapping UI reflects current name mode
+		this.toggleImportNameModeUI();
 
 		await Promise.all([
 			this.loadTeams(),
@@ -145,6 +195,34 @@ export class HomepageManagement {
 		if (this.addPlayerBtn) this.addPlayerBtn.addEventListener('click', () => this.addPlayerToTeam());
 		if (this.playerSearchInput) this.playerSearchInput.addEventListener('input', (e) => this.updatePlayerSearch(e.target.value));
 		if (this.addPlayerGlobalBtn) this.addPlayerGlobalBtn.addEventListener('click', () => this.createPlayerGlobal());
+
+		// Import players
+		// Fallback: ensure the "open import" button always opens the modal and that import elements are bound
+		try {
+			const openImportBtn = document.getElementById('open-player-import-btn');
+			const importModal = document.getElementById('player-import-modal');
+			const importClose = document.querySelector('.import-close');
+			if (openImportBtn && importModal) {
+				openImportBtn.addEventListener('click', () => {
+					importModal.classList.add('show');
+					// re-bind elements in case they weren't present during initial bind
+					this.bindElements();
+					// bind file input handler lazily if present
+					if (this.playerImportFileInput) this.playerImportFileInput.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) this.handleImportFile(f); });
+				});
+			}
+			if (importClose && importModal) importClose.addEventListener('click', () => importModal.classList.remove('show'));
+		} catch (e) { /* ignore modal fallback errors */ }
+
+		if (this.playerImportFileInput) this.playerImportFileInput.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) this.handleImportFile(f); });
+		if (this.playerImportAutoDetectBtn) this.playerImportAutoDetectBtn.addEventListener('click', () => { if (this._parsedImportRows) { this._importColumnMap = this._detectColumns(this._parsedImportRows.rows, this._parsedImportRows.headers); this.populateImportMappingUI(this._parsedImportRows.rows, this._parsedImportRows.headers); this.showImportPreview(); } });
+		if (this.playerImportPreviewBtn) this.playerImportPreviewBtn.addEventListener('click', () => this.showImportPreview());
+		if (this.playerImportStartBtn) this.playerImportStartBtn.addEventListener('click', () => this.startImport());
+		if (this.playerImportNameMode) this.playerImportNameMode.addEventListener('change', () => { this.toggleImportNameModeUI(); this.showImportPreview(); });
+		if (this.playerImportColName) this.playerImportColName.addEventListener('change', () => this.showImportPreview());
+		if (this.playerImportColFirst) this.playerImportColFirst.addEventListener('change', () => this.showImportPreview());
+		if (this.playerImportColLast) this.playerImportColLast.addEventListener('change', () => this.showImportPreview());
+		if (this.playerImportColTeam) this.playerImportColTeam.addEventListener('change', () => this.showImportPreview());
 	}
 
 	updateTeamVsTimeUI(gameType, scoringMode) {
@@ -766,6 +844,273 @@ export class HomepageManagement {
 
 		setTimeout(() => toast.remove(), 3000);
 	}
+
+	// ---------------------- Import Players (CSV / XLSX) ----------------------
+	async handleImportFile(file) {
+		try {
+			if (!file) return;
+			const parsed = await this._parseFile(file);
+			// parsed: { rows: Array<Array>, headers: Array|null }
+			this._parsedImportRows = parsed;
+			this._importColumnMap = this._detectColumns(parsed.rows, parsed.headers);
+			this.populateImportMappingUI(parsed.rows, parsed.headers);
+			this.showImportPreview();
+		} catch (err) {
+			console.error('Error parsing import file:', err);
+			alert('Kon het importbestand niet lezen.');
+		}
+	}
+
+	_parseFile(file) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = (evt) => {
+				try {
+					const data = evt.target.result;
+					// If XLSX available, use it for both xlsx and csv
+					if (window.XLSX && (file.name.match(/\.xlsx?$/i) || file.name.match(/\.csv$/i))) {
+						const workbook = window.XLSX.read(data, { type: 'array' });
+						const firstSheetName = workbook.SheetNames[0];
+						const sheet = workbook.Sheets[firstSheetName];
+						const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+						// Heuristics to determine if first row is header
+						const headers = rows.length > 0 && rows[0].some(c => typeof c === 'string' && /[a-zA-Z]/.test(c)) ? rows[0] : null;
+						const body = headers ? rows.slice(1) : rows;
+						resolve({ rows: body.map(r => r.map(c => (c === undefined ? '' : String(c).trim()))), headers });
+					} else {
+						// Fallback CSV parsing (text)
+						const text = new TextDecoder().decode(data);
+						const lines = text.split(/\r?\n/).filter(Boolean);
+						const rows = lines.map(l => l.split(/,|;/).map(c => c.trim()));
+						const headers = rows.length > 0 && rows[0].some(c => /[a-zA-Z]/.test(c)) ? rows[0] : null;
+						const body = headers ? rows.slice(1) : rows;
+						resolve({ rows: body, headers });
+					}
+				} catch (err) { reject(err); }
+			};
+			reader.onerror = (e) => reject(e);
+			// read as array buffer (good for xlsx and csv)
+			reader.readAsArrayBuffer(file);
+		});
+	}
+
+	_detectColumns(rows, headers) {
+		// rows: array of arrays, headers: array|null
+		const colnames = [];
+		if (headers) {
+			headers.forEach(h => colnames.push(String(h || '').toLowerCase()));
+		} else if (rows && rows.length > 0) {
+			// fallback positional names
+			for (let i = 0; i < rows[0].length; i++) colnames.push(`col${i+1}`);
+		}
+		const map = { nameIdx: null, firstIdx: null, lastIdx: null, teamIdx: null };
+		colnames.forEach((c, i) => {
+			if (c.match(/name|naam|volledige|full/)) map.nameIdx = i;
+			if (c.match(/first|voornaam/)) map.firstIdx = i;
+			if (c.match(/last|achternaam|surname/)) map.lastIdx = i;
+			// include 'groep' as a Dutch synonym for class/team + more tolerant matching
+			if (c.match(/team|klas|groep|class/)) map.teamIdx = i;
+		});
+
+		// Additional heuristics based on the content of columns (first 20 rows)
+		try {
+			const sampleCount = Math.min((rows || []).length, 20);
+			if (rows && rows.length > 0) {
+				const colStats = [];
+				for (let i = 0; i < rows[0].length; i++) {
+					let teamMatches = 0;
+					let nameMatches = 0;
+					for (let r = 0; r < sampleCount; r++) {
+						const v = String((rows[r] || [])[i] || '').trim();
+						if (!v) continue;
+						// team-like: contains keywords or digits (e.g., 'klas 6wiwea', '6A')
+						if (/(klas|groep|class)/i.test(v) || /\d/.test(v)) teamMatches++;
+						// name-like: two or three words, capitalized words (lenient)
+						if (/^[A-ZÀ-Ý][a-zà-ÿ]+\s+[A-ZÀ-Ý][a-zà-ÿ]+(\s+[A-ZÀ-Ý][a-zà-ÿ]+)?$/.test(v)) nameMatches++;
+						if (v.split(' ').length >= 2 && v.split(' ').length <= 4 && /[a-zA-Z]/.test(v)) {
+							// if starts with uppercase or contains typical name characters
+							if (/^[A-ZÀ-Ý]/.test(v) || /[A-Za-z]\./.test(v)) nameMatches++;
+						}
+					}
+					colStats.push({ idx: i, teamMatches, nameMatches });
+				}
+
+				// If team column not found by header, pick best candidate by sample matches
+				if (map.teamIdx === null) {
+					colStats.sort((a, b) => b.teamMatches - a.teamMatches);
+					if (colStats[0] && colStats[0].teamMatches >= Math.max(1, Math.floor(sampleCount * 0.3))) map.teamIdx = colStats[0].idx;
+				}
+
+				// If name column not found by header, pick best candidate by sample matches
+				if (map.nameIdx === null) {
+					colStats.sort((a, b) => b.nameMatches - a.nameMatches);
+					if (colStats[0] && colStats[0].nameMatches >= Math.max(1, Math.floor(sampleCount * 0.2))) map.nameIdx = colStats[0].idx;
+				}
+			}
+		} catch (err) { /* ignore heuristics failure */ }
+
+		// If still not detected, try positional guesses
+		if (map.nameIdx === null) {
+			if (rows[0] && rows[0].length === 1) map.nameIdx = 0;
+			else if (rows[0] && rows[0].length >= 2) { map.firstIdx = 0; map.lastIdx = 1; if (rows[0].length >= 3) map.teamIdx = map.teamIdx === null ? 2 : map.teamIdx; }
+		}
+
+		return map;
+	}
+
+	showImportPreview() {
+		const container = this.playerImportPreviewContainer;
+		if (!container || !this._parsedImportRows) return;
+		const rows = this._parsedImportRows.rows.slice(0, 20);
+		const headers = this._parsedImportRows.headers;
+		let html = '<div><strong>Voorbeeld import (max 20):</strong><table style="width:100%; border-collapse:collapse; margin-top:8px;"><tr>';
+		const cols = headers ? headers : (rows[0] || []).map((_,i)=>`Kolom ${i+1}`);
+		cols.forEach(c => html += `<th style="text-align:left; padding:4px 6px; border-bottom:1px solid #ddd;">${this.escapeHtml(c)}</th>`);
+		html += '</tr>';
+		rows.forEach(r => {
+			html += '<tr>';
+			cols.forEach((_, i) => html += `<td style="padding:4px 6px; border-bottom:1px solid #eee;">${this.escapeHtml(r[i] || '')}</td>`);
+			html += '</tr>';
+		});
+		html += '</table>';
+		// show current mapping selections
+		if (this.playerImportNameMode) {
+			const nm = this.playerImportNameMode.value || 'full';
+			html += `<div style="margin-top:8px;">Huidige mapping: <strong>${nm === 'full' ? 'Volledige naam' : 'Voornaam + Achternaam'}</strong>`;
+			if (this.playerImportColName && this.playerImportColName.value) html += `, Naam kolom: <strong>${this.playerImportColName.options[this.playerImportColName.selectedIndex]?.text || this.playerImportColName.value}</strong>`;
+			if (nm === 'split') {
+				if (this.playerImportColFirst && this.playerImportColFirst.value) html += `, Voornaam kolom: <strong>${this.playerImportColFirst.options[this.playerImportColFirst.selectedIndex]?.text || this.playerImportColFirst.value}</strong>`;
+				if (this.playerImportColLast && this.playerImportColLast.value) html += `, Achternaam kolom: <strong>${this.playerImportColLast.options[this.playerImportColLast.selectedIndex]?.text || this.playerImportColLast.value}</strong>`;
+			}
+			if (this.playerImportColTeam && this.playerImportColTeam.value) html += `, Team kolom: <strong>${this.playerImportColTeam.options[this.playerImportColTeam.selectedIndex]?.text || this.playerImportColTeam.value}</strong>`;
+			html += `</div>`;
+		}
+		container.innerHTML = html;
+	}
+
+	async startImport() {
+		if (!this._parsedImportRows || !this._parsedImportRows.rows.length) { alert('Geen data om te importeren.'); return; }
+		const autoCreateTeams = !!(this.playerImportAutoCreateTeams && this.playerImportAutoCreateTeams.checked);
+		const duplicateMode = document.getElementById('player-import-duplicate-mode')?.value || 'skip';
+		const rows = this._parsedImportRows.rows;
+		// get mapping from selects
+		const nameMode = (this.playerImportNameMode && this.playerImportNameMode.value) || 'full';
+		const nameIdx = this.playerImportColName ? parseInt(this.playerImportColName.value) : null;
+		const firstIdx = this.playerImportColFirst ? parseInt(this.playerImportColFirst.value) : null;
+		const lastIdx = this.playerImportColLast ? parseInt(this.playerImportColLast.value) : null;
+		const teamIdx = this.playerImportColTeam ? parseInt(this.playerImportColTeam.value) : null;
+
+		let created = 0, skipped = 0, errors = 0;
+		const teamsCache = {};
+
+		// fuzzy helper
+		const normalize = (s) => (String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim());
+		const similarity = (a,b) => {
+			if (!a || !b) return 0;
+			a = normalize(a); b = normalize(b); if (a === b) return 1;
+			const lev = (x, y) => { const m = x.length, n = y.length; const dp = Array(m+1).fill(null).map(()=>Array(n+1).fill(0)); for(let i=0;i<=m;i++) dp[i][0]=i; for(let j=0;j<=n;j++) dp[0][j]=j; for(let i=1;i<=m;i++){ for(let j=1;j<=n;j++){ const cost = x[i-1]===y[j-1]?0:1; dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost); }} return dp[m][n]; };
+			const d = lev(a,b); const maxl = Math.max(a.length,b.length); return maxl ? (1 - d/maxl) : 0;
+		};
+		const similarityThreshold = 0.82;
+
+		for (let i = 0; i < rows.length; i++) {
+			const r = rows[i];
+			// build name based on mapping
+			let name = '';
+			if (nameMode === 'full' && nameIdx !== null && r[nameIdx]) name = r[nameIdx];
+			else if (nameMode === 'split') { const first = (firstIdx !== null && r[firstIdx]) ? r[firstIdx] : ''; const last = (lastIdx !== null && r[lastIdx]) ? r[lastIdx] : ''; name = [first,last].filter(Boolean).join(' ').trim(); }
+			else { name = r[0] || ''; }
+			name = (name || '').trim();
+			if (!name) { skipped++; this._setImportProgress(i+1, rows.length); continue; }
+
+			const teamName = (teamIdx !== null && r[teamIdx]) ? r[teamIdx].trim() : null;
+			let teamId = null;
+			try {
+				let existingPlayer = null;
+				for (const p of (this.allPlayers || [])) { const sim = similarity(p.name || '', name); if (sim >= similarityThreshold) { existingPlayer = p; break; } }
+
+				if (existingPlayer) {
+					if (duplicateMode === 'skip') { skipped++; if (teamName) await this._assignTeamToExisting(existingPlayer, teamName, autoCreateTeams, teamsCache); this._setImportProgress(i+1, rows.length); continue; }
+					if (duplicateMode === 'merge') { if (teamName) await this._assignTeamToExisting(existingPlayer, teamName, autoCreateTeams, teamsCache); skipped++; this._setImportProgress(i+1, rows.length); continue; }
+					// else 'create' -> fallthrough and create a new player
+				}
+
+				if (teamName) {
+					const key = teamName.toLowerCase(); if (teamsCache[key]) teamId = teamsCache[key]; else { const existing = (this.teams || []).find(t => String(t.name || '').toLowerCase() === key); if (existing) teamId = existing.id; else if (autoCreateTeams) { const resp = await this.api.createTeam({ name: teamName }); teamId = (resp && resp.team && resp.team.id) || resp.id || resp; await this.loadTeams(); } teamsCache[key] = teamId; }
+				}
+
+				const resp = await this.api.createPlayer({ name });
+				const player = (resp && (resp.player || resp)) || resp; const playerId = player.id || player; if (teamId) { await this.api.put(`/api/v1/players/${playerId}`, { team_id: Number(teamId) }); }
+				created++;
+			} catch (err) { errors++; console.error('Error importing row', i, err); }
+			this._setImportProgress(i+1, rows.length);
+		}
+		await this.loadPlayers();
+		const resultMsg = `Import klaar: ${created} aangemaakt, ${skipped} overgeslagen, ${errors} fouten`;
+		this.showSuccessMessage(resultMsg);
+		if (this.playerImportResult) this.playerImportResult.textContent = resultMsg;
+		this.playerImportPreviewContainer.innerHTML = '';
+		this._parsedImportRows = null;
+	}
+
+	_setImportProgress(done, total) {
+		try {
+			const pct = Math.round((done / Math.max(1, total)) * 100);
+			if (this.playerImportProgressBar) this.playerImportProgressBar.style.width = `${pct}%`;
+			if (this.playerImportProgressPercent) this.playerImportProgressPercent.textContent = `${pct}%`;
+		} catch (e) {}
+	}
+
+	// Assign a team to an existing player, creating the team if allowed
+	async _assignTeamToExisting(player, teamName, autoCreateTeams, teamsCache) {
+		if (!teamName || !player) return;
+		const key = teamName.toLowerCase();
+		let teamId = teamsCache[key];
+		if (!teamId) {
+			const existing = (this.teams || []).find(t => String(t.name || '').toLowerCase() === key);
+			if (existing) teamId = existing.id;
+			else if (autoCreateTeams) {
+				try {
+					const resp = await this.api.createTeam({ name: teamName });
+					teamId = (resp && resp.team && resp.team.id) || resp.id || resp;
+					await this.loadTeams();
+				} catch (e) { console.error('Error creating team during import:', e); }
+			}
+			teamsCache[key] = teamId;
+		}
+		if (teamId) {
+			try {
+				await this.api.put(`/api/v1/players/${player.id}`, { team_id: Number(teamId) });
+			} catch (e) { console.error('Error assigning team to existing player:', e); }
+		}
+	}
+
+	populateImportMappingUI(rows, headers) {
+		// Fill select options based on headers or positional columns
+		const cols = headers ? headers.slice() : (rows && rows.length ? rows[0].map((_,i)=>`Kolom ${i+1}`) : []);
+		const fill = (sel) => {
+			if (!sel) return;
+			sel.innerHTML = '';
+			cols.forEach((c, i) => {
+				const o = document.createElement('option'); o.value = i; o.textContent = c || `Kolom ${i+1}`; sel.appendChild(o);
+			});
+		};
+		fill(this.playerImportColName);
+		fill(this.playerImportColFirst);
+		fill(this.playerImportColLast);
+		fill(this.playerImportColTeam);
+
+		// set defaults from detected map if present
+		const map = this._importColumnMap || this._detectColumns(rows, headers || null);
+		if (map.nameIdx !== null && this.playerImportColName) this.playerImportColName.value = map.nameIdx;
+		if (map.firstIdx !== null && this.playerImportColFirst) this.playerImportColFirst.value = map.firstIdx;
+		if (map.lastIdx !== null && this.playerImportColLast) this.playerImportColLast.value = map.lastIdx;
+		if (map.teamIdx !== null && this.playerImportColTeam) this.playerImportColTeam.value = map.teamIdx;
+		// set name mode
+		if (map.nameIdx !== null && this.playerImportNameMode) this.playerImportNameMode.value = 'full';
+		else if (map.firstIdx !== null && map.lastIdx !== null && this.playerImportNameMode) this.playerImportNameMode.value = 'split';
+	}
+
 
 	escapeHtml(s) {
 		return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');

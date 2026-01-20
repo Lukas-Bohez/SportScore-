@@ -28,6 +28,52 @@ class Homepage {
     await this.loadTemplates();
     await this.loadActiveSessions();
     await this.loadHistorySessions();
+
+    // Wire export-all buttons (history tab) to show confirm modal
+    try {
+      const exportCsvBtn = document.getElementById('export-all-csv');
+      const exportXlsxBtn = document.getElementById('export-all-xlsx');
+      if (exportCsvBtn) exportCsvBtn.addEventListener('click', () => this.showExportConfirm(null, 'csv'));
+      if (exportXlsxBtn) exportXlsxBtn.addEventListener('click', () => this.showExportConfirm(null, 'xlsx'));
+
+      // Wire export confirm modal buttons
+      const exportConfirmModal = document.getElementById('export-confirm-modal');
+      const exportConfirmStart = document.getElementById('export-confirm-start');
+      const exportConfirmCancel = document.getElementById('export-confirm-cancel');
+      const exportConfirmClose = document.querySelector('.export-close');
+      if (exportConfirmStart) exportConfirmStart.addEventListener('click', () => this._exportConfirmProceed());
+      if (exportConfirmCancel && exportConfirmModal) exportConfirmCancel.addEventListener('click', () => exportConfirmModal.classList.remove('show'));
+      if (exportConfirmClose && exportConfirmModal) exportConfirmClose.addEventListener('click', () => exportConfirmModal.classList.remove('show'));
+
+      // Wire player import modal open/close with robust loading of beheer data
+      try {
+        const openImportBtn = document.getElementById('open-player-import-btn');
+        const importModal = document.getElementById('player-import-modal');
+        const importClose = document.querySelector('.import-close');
+        if (openImportBtn && importModal) openImportBtn.addEventListener('click', async (e) => {
+          e && e.preventDefault && e.preventDefault();
+          try {
+            console.debug('open-player-import-btn clicked');
+            // Ensure beheer data and bindings are loaded before showing import modal
+            if (this.management && typeof this.management.loadBeheerData === 'function') {
+              if (!this.management.playerImportFileInput) {
+                await this.management.loadBeheerData();
+              }
+            }
+            // toggle modal
+            importModal.classList.add('show');
+            // update import UI mapping mode if available
+            if (this.management && typeof this.management.toggleImportNameModeUI === 'function') {
+              this.management.toggleImportNameModeUI();
+            }
+          } catch (err) {
+            console.warn('Error opening import modal, showing anyway', err);
+            importModal.classList.add('show');
+          }
+        });
+        if (importClose && importModal) importClose.addEventListener('click', () => importModal.classList.remove('show'));
+      } catch (e) { /* ignore import modal wiring errors */ }
+    } catch (err) { /* ignore wiring errors */ }
   }
 
   async loadTemplates() {
@@ -287,6 +333,11 @@ class Homepage {
             <div class="history-session-date">${this.formatDate(session.created_at)}</div>
             <div class="history-session-sport">📊 ${this.escapeHtml(sportTypes || 'Algemeen')} • ${activityNames}</div>
           </div>
+          <div class="history-session-controls" style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+            <button class="btn btn-sm" onclick="window.homepage.exportSession(${session.id}, 'csv')">Export CSV</button>
+            <button class="btn btn-sm" onclick="window.homepage.exportSession(${session.id}, 'xlsx')">Export XLSX</button>
+            <button class="btn btn-sm" onclick="window.homepage.openHistoryModal(${session.id})">Bekijk</button>
+          </div>
         </div>
       </div>
     `;
@@ -309,6 +360,684 @@ class Homepage {
         }
       };
     }
+  }
+
+  // ---------------------- Export (CSV / XLSX) ----------------------
+  async exportSession(sessionId, format = 'csv') {
+    try {
+      const session = this.historySessions.find(s => s.id == sessionId);
+      if (!session) {
+        this.showErrorMessage('Sessie niet gevonden.');
+        return;
+      }
+
+      // Ensure session has activities/teams/players loaded (load on demand if missing)
+      if (!session.activities || !session.teams || !session.players) {
+        try {
+          const [activitiesResp, teamsResp] = await Promise.all([
+            this.api.getSessionActivities(session.id),
+            this.api.getSessionTeams(session.id)
+          ]);
+          session.activities = this.api.extractArray(activitiesResp, 'activities');
+          session.teams = this.api.extractArray(teamsResp, 'teams');
+          // Attempt to get all players and filter by session (fallback)
+          const playersResp = await this.api.getPlayers();
+          session.players = this.api.extractArray(playersResp, 'players');
+        } catch (err) {
+          console.warn('Could not load session details for export', err);
+        }
+      }
+
+      // Gather scores for each activity
+      const scores = [];
+      for (const activity of (session.activities || [])) {
+        try {
+          const resp = await this.api.getActivityScores(activity.id);
+          const s = this.api.extractArray(resp, 'scores');
+          (s || []).forEach(score => scores.push(Object.assign({ activity_id: activity.id, activity_name: activity.name }, score)));
+        } catch (err) {
+          console.warn('Failed to load scores for activity', activity.id, err);
+        }
+      }
+
+      // Build data sets
+      const sessionRow = {
+        session_id: session.id,
+        session_name: session.name,
+        created_at: session.created_at,
+        status: session.status || session.is_active ? 'active' : 'completed',
+        teams_count: (session.teams || []).length,
+        activities_count: (session.activities || []).length,
+        players_count: (session.players || []).length
+      };
+
+      const teamsRows = (session.teams || []).map(t => ({ team_id: t.id, name: t.name, color: t.color, icon: t.icon, description: t.description }));
+      const playersRows = (session.players || []).map(p => ({ player_id: p.id, name: p.name, team_id: p.team_id }));
+      const activitiesRows = (session.activities || []).map(a => ({ activity_id: a.id, name: a.name, sport_type: a.sport_type, game_type: a.game_type, scoring_mode: a.scoring_mode }));
+      const scoresRows = (scores || []).map(s => ({
+        activity_id: s.activity_id,
+        activity_name: s.activity_name,
+        team_id: s.team_id,
+        player_id: s.player_id,
+        points: s.points,
+        reason: s.reason,
+        round_number: s.round_number,
+        timestamp: s.timestamp
+      }));
+
+      const safeName = (session.name || `session-${session.id}`).replace(/[^a-z0-9\-_ ]/ig, '_').substring(0, 80);
+      const filenameBase = `${safeName}-${session.id}`;
+
+      if (format === 'xlsx' && window.XLSX) {
+        const wb = window.XLSX.utils.book_new();
+        const wsSessions = window.XLSX.utils.json_to_sheet([sessionRow]);
+        window.XLSX.utils.book_append_sheet(wb, wsSessions, 'Session');
+        if (teamsRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(teamsRows), 'Teams');
+        if (playersRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(playersRows), 'Players');
+        if (activitiesRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(activitiesRows), 'Activities');
+        if (scoresRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(scoresRows), 'Scores');
+        window.XLSX.writeFile(wb, `${filenameBase}.xlsx`);
+        this.showSuccessMessage('Export voltooid.');
+      } else {
+        // Fallback to CSV using scores + session context
+        const headers = ['session_id','session_name','activity_id','activity_name','team_id','player_id','points','reason','round_number','timestamp'];
+        const rows = (scoresRows.length ? scoresRows : [{ activity_id: '', activity_name: '', team_id: '', player_id: '', points: '', reason: '', round_number: '', timestamp: '' }]).map(r => ([session.id, session.name, r.activity_id, r.activity_name, r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]));
+        const csv = this._arrayToCsv([headers].concat(rows));
+        this._downloadBlob(csv, `${filenameBase}.csv`, 'text/csv;charset=utf-8;');
+        this.showSuccessMessage('Export voltooid.');
+      }
+
+    } catch (err) {
+      console.error('Error exporting session', err);
+      this.showErrorMessage('Fout bij exporteren sessie.');
+    }
+  }
+
+  async exportAllSessions(format = 'csv') {
+    try {
+      // Ensure historySessions loaded
+      if (!this.historySessions || !this.historySessions.length) {
+        await this.loadHistorySessions();
+      }
+
+      const includeTeams = !!document.getElementById('include-teams')?.checked;
+      const includePlayers = !!document.getElementById('include-players')?.checked;
+      const includeActivities = !!document.getElementById('include-activities')?.checked;
+      const includeScores = !!document.getElementById('include-scores')?.checked;
+      const includeHighscores = !!document.getElementById('include-highscores')?.checked;
+
+      const combinedRows = [];
+      const activitiesMeta = {};
+
+      // compute total activities for progress feedback
+      let totalActivities = 0;
+      for (const session of (this.historySessions || [])) {
+        const acts = session.activities || (await this.api.getSessionActivities(session.id).then(r => this.api.extractArray(r, 'activities')));
+        totalActivities += (acts || []).length;
+      }
+      let processed = 0;
+
+      for (const session of (this.historySessions || [])) {
+        const activities = session.activities || (await this.api.getSessionActivities(session.id).then(r => this.api.extractArray(r, 'activities')));
+        for (const activity of (activities || [])) {
+          activitiesMeta[activity.id] = { name: activity.name, scoring_mode: activity.scoring_mode, game_type: activity.game_type };
+          try {
+            const resp = await this.api.getActivityScores(activity.id);
+            const s = this.api.extractArray(resp, 'scores');
+            (s || []).forEach(score => combinedRows.push(Object.assign({ session_id: session.id, session_name: session.name, activity_id: activity.id, activity_name: activity.name, activity_scoring_mode: activity.scoring_mode, activity_game_type: activity.game_type }, score)));
+          } catch (err) { console.warn('Skipping scores for activity', activity.id, err); }
+          processed++;
+          const pct = totalActivities ? Math.round((processed / totalActivities) * 100) : 0;
+          this._updateExportProgress(pct, `Laden activiteit ${processed}/${totalActivities}`);
+        }
+      }
+
+      const filenameBase = `sportscore_history_${(new Date()).toISOString().slice(0,10)}`;
+
+      if (format === 'xlsx' && window.XLSX) {
+        const wb = window.XLSX.utils.book_new();
+        if (combinedRows.length) {
+          if (includeScores) {
+            const rows = combinedRows.map(s => ({ session_id: s.session_id, session_name: s.session_name, activity_id: s.activity_id, activity_name: s.activity_name, team_id: s.team_id, player_id: s.player_id, points: s.points, reason: s.reason, round_number: s.round_number, timestamp: s.timestamp }));
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(rows), 'Scores');
+          }
+        } else if (includeScores) {
+          window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([]), 'Scores');
+        }
+
+        if (includeHighscores) {
+          const hs = this._computeAggregatedHighscoresFromCombinedRows(combinedRows, activitiesMeta);
+          if (hs.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(hs), 'Highscores');
+        }
+
+        // Optionally include global lists
+        try {
+          if (includeTeams) {
+            const tResp = await this.api.getTeams();
+            const trows = this.api.extractArray(tResp, 'teams');
+            if (trows && trows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(trows), 'Teams');
+          }
+        } catch (err) { console.warn('Failed to load teams for export', err); }
+        try {
+          if (includePlayers) {
+            const pResp = await this.api.getPlayers();
+            const prows = this.api.extractArray(pResp, 'players');
+            if (prows && prows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(prows), 'Players');
+          }
+        } catch (err) { console.warn('Failed to load players for export', err); }
+        try {
+          if (includeActivities) {
+            const aResp = await this.api.getActivities();
+            const arows = this.api.extractArray(aResp, 'activities');
+            if (arows && arows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(arows), 'Activities');
+          }
+        } catch (err) { console.warn('Failed to load activities for export', err); }
+
+        window.XLSX.writeFile(wb, `${filenameBase}.xlsx`);
+        this.showSuccessMessage('Export voltooid.');
+      } else {
+        if (includeScores) {
+          const headers = ['session_id','session_name','activity_id','activity_name','team_id','player_id','points','reason','round_number','timestamp'];
+          const rows = combinedRows.map(r => ([r.session_id, r.session_name, r.activity_id, r.activity_name, r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]));
+          const csv = this._arrayToCsv([headers].concat(rows));
+          this._downloadBlob(csv, `${filenameBase}.csv`, 'text/csv;charset=utf-8;');
+        }
+
+        if (includeHighscores) {
+          const hs = this._computeAggregatedHighscoresFromCombinedRows(combinedRows, activitiesMeta);
+          if (hs.length) {
+            const hsHeaders = ['activity_id','activity_name','rank','entity_type','entity_id','total_score'];
+            const hsRows = hs.map(h => [h.activity_id, h.activity_name, h.rank, h.entity_type, h.entity_id, h.total_score]);
+            const csv2 = this._arrayToCsv([hsHeaders].concat(hsRows));
+            this._downloadBlob(csv2, `${filenameBase}_highscores.csv`, 'text/csv;charset=utf-8;');
+          }
+        }
+
+        // optionally export teams/players/activities lists as CSV
+        try {
+          if (includeTeams) {
+            const tResp = await this.api.getTeams(); const trows = this.api.extractArray(tResp, 'teams');
+            if (trows && trows.length) this._downloadBlob(this._arrayToCsv([Object.keys(trows[0])].concat(trows.map(r => Object.values(r)))), `${filenameBase}_teams.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load teams for export', err); }
+        try {
+          if (includePlayers) {
+            const pResp = await this.api.getPlayers(); const prows = this.api.extractArray(pResp, 'players');
+            if (prows && prows.length) this._downloadBlob(this._arrayToCsv([Object.keys(prows[0])].concat(prows.map(r => Object.values(r)))), `${filenameBase}_players.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load players for export', err); }
+        try {
+          if (includeActivities) {
+            const aResp = await this.api.getActivities(); const arows = this.api.extractArray(aResp, 'activities');
+            if (arows && arows.length) this._downloadBlob(this._arrayToCsv([Object.keys(arows[0])].concat(arows.map(r => Object.values(r)))), `${filenameBase}_activities.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load activities for export', err); }
+
+        this.showSuccessMessage('Export voltooid.');
+      }
+    } catch (err) {
+      console.error('Error exporting all sessions', err);
+      this.showErrorMessage('Fout bij exporteren geschiedenis.');
+    }
+  }
+
+  _arrayToCsv(rows) {
+    return rows.map(r => r.map(c => {
+      if (c === null || c === undefined) return '';
+      const s = String(c);
+      if (s.includes('"') || s.includes(',') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }).join(',')).join('\n');
+  }
+
+  // ---------------------- Export confirm modal flow ----------------------
+  async showExportConfirm(sessionId = null, format = 'csv', preselectedActivities = null) {
+    const modal = document.getElementById('export-confirm-modal');
+    const listEl = document.getElementById('export-confirm-activity-list');
+    const infoEl = document.getElementById('export-confirm-info');
+    const percentEl = document.getElementById('export-confirm-percent');
+    const prog = document.getElementById('export-confirm-progress');
+    if (!modal || !listEl) { this.showErrorMessage('Export modal niet beschikbaar'); return; }
+
+    // determine activities to show
+    let activities = [];
+    if (sessionId) {
+      const session = this.historySessions.find(s => s.id == sessionId);
+      activities = session ? (session.activities || []) : [];
+      if (!activities.length) {
+        try { activities = await this.api.getSessionActivities(sessionId).then(r => this.api.extractArray(r, 'activities') || []); } catch (e) { /* ignore */ }
+      }
+    } else {
+      // all sessions - aggregate activities across sessions
+      const seen = new Map();
+      for (const s of (this.historySessions || [])) {
+        const acts = s.activities || (await this.api.getSessionActivities(s.id).then(r => this.api.extractArray(r, 'activities') || []));
+        for (const a of acts) { if (!seen.has(a.id)) seen.set(a.id, a); }
+      }
+      activities = Array.from(seen.values());
+    }
+
+    listEl.innerHTML = '';
+    // prefetch score counts for estimate (may be slow) — show live progress
+    let total = activities.length;
+    let fetched = 0;
+    infoEl.textContent = 'Schattingsrijen worden opgehaald...';
+    for (const a of activities) {
+      const row = document.createElement('div');
+      const id = a.id;
+      const chk = document.createElement('input'); chk.type = 'checkbox'; chk.value = id; chk.checked = !preselectedActivities || preselectedActivities.includes(id);
+      const label = document.createElement('label'); label.style.marginLeft = '6px'; label.textContent = `${a.name} (${a.sport_type || ''})`;
+      row.appendChild(chk); row.appendChild(label);
+      listEl.appendChild(row);
+
+      // fetch estimate count
+      try {
+        const resp = await this.api.getActivityScores(id);
+        const s = this.api.extractArray(resp, 'scores') || [];
+        const countLabel = document.createElement('span'); countLabel.style.marginLeft = '8px'; countLabel.style.color = 'var(--text-secondary)'; countLabel.textContent = `Rows: ${s.length}`;
+        row.appendChild(countLabel);
+      } catch (e) { /* ignore */ }
+      fetched++;
+      const pct = Math.round((fetched / Math.max(1, total)) * 100);
+      if (prog) prog.style.width = `${pct}%`;
+      if (percentEl) percentEl.textContent = `${pct}%`;
+    }
+
+    // store state for confirm
+    modal.dataset.format = format;
+    modal.dataset.sessionId = sessionId || '';
+    modal.classList.add('show');
+    // ensure progress reset
+    if (prog) prog.style.width = `0%`;
+    if (percentEl) percentEl.textContent = '0%';
+  }
+
+  async _exportConfirmProceed() {
+    const modal = document.getElementById('export-confirm-modal');
+    if (!modal) return;
+    const format = document.getElementById('export-confirm-format')?.value || 'csv';
+    const listEl = document.getElementById('export-confirm-activity-list');
+    const checkboxes = Array.from(listEl.querySelectorAll('input[type="checkbox"]'));
+    const selected = checkboxes.filter(c => c.checked).map(c => parseInt(c.value));
+    const sessionId = modal.dataset.sessionId ? parseInt(modal.dataset.sessionId) : null;
+    // hide modal and call export
+    modal.classList.remove('show');
+    // call exportAllSessions with filter
+    if (sessionId) await this.exportAllSessions(format, selected, sessionId);
+    else await this.exportAllSessions(format, selected, null);
+    // reset progress UI
+    const prog = document.getElementById('export-confirm-progress'); if (prog) prog.style.width = '0%';
+    const pct = document.getElementById('export-confirm-percent'); if (pct) pct.textContent = '0%';
+  }
+
+  _downloadBlob(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
+  // ---------------------- Export helpers ----------------------
+  _updateExportProgress(percent, text = '') {
+    try {
+      const bar = document.getElementById('export-progress-bar');
+      const pct = document.getElementById('export-progress-percent');
+      const status = document.getElementById('export-status');
+      if (bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+      if (pct) pct.textContent = `${Math.round(Math.max(0, Math.min(100, percent)))}%`;
+      if (status) status.textContent = text || '';
+    } catch (e) { /* ignore */ }
+  }
+  _computeHighscoresForActivity(activity, scoresRows = [], teams = [], players = [], topN = 50) {
+    // activity: object with scoring_mode, game_type
+    // scoresRows: array of { team_id, player_id, points }
+    const byEntity = {}; // key -> { id, name, total }
+    const isPlayerMode = String(activity.scoring_mode || 'team') === 'player';
+    const isTimeMode = String(activity.game_type || '').toLowerCase() === 'team_vs_time';
+
+    scoresRows.forEach(s => {
+      const key = isPlayerMode ? `p:${s.player_id || 'none'}` : `t:${s.team_id || 'none'}`;
+      if (!byEntity[key]) byEntity[key] = { id: isPlayerMode ? s.player_id : s.team_id, total: 0 };
+      const val = Number(s.points || 0);
+      byEntity[key].total = (byEntity[key].total || 0) + val;
+    });
+
+    const rows = Object.keys(byEntity).map(k => {
+      const ent = byEntity[k];
+      const id = ent.id;
+      let name = '';
+      if (k.startsWith('p:')) {
+        const p = (players || []).find(x => x.id == id); name = p ? p.name : (id ? `Player ${id}` : 'Unknown');
+      } else {
+        const t = (teams || []).find(x => x.id == id); name = t ? t.name : (id ? `Team ${id}` : 'Unknown');
+      }
+      return { entity_id: id, entity_name: name, entity_type: (k.startsWith('p:') ? 'player' : 'team'), total_score: ent.total };
+    });
+
+    // sort (time: lower is better => ascending, else descending)
+    rows.sort((a,b) => isTimeMode ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
+
+    return rows.slice(0, topN).map((r, idx) => ({ rank: idx+1, ...r }));
+  }
+
+  _computeAggregatedHighscoresFromCombinedRows(combinedRows = [], activitiesMeta = {}) {
+    // combinedRows: [{ activity_id, activity_name, activity_scoring_mode, activity_game_type, team_id, player_id, points }]
+    const byActivity = {}; // activity_id -> map(key-> total)
+    combinedRows.forEach(r => {
+      const aid = r.activity_id;
+      const meta = activitiesMeta[aid] || {};
+      const isPlayerMode = String(meta.scoring_mode || '').toLowerCase() === 'player';
+      const isTimeMode = String(meta.game_type || '').toLowerCase() === 'team_vs_time';
+      const key = isPlayerMode ? `p:${r.player_id || 'none'}` : `t:${r.team_id || 'none'}`;
+      byActivity[aid] = byActivity[aid] || { meta, map: {} };
+      byActivity[aid].map[key] = (byActivity[aid].map[key] || 0) + Number(r.points || 0);
+    });
+
+    const result = [];
+    Object.keys(byActivity).forEach(aid => {
+      const { meta, map } = byActivity[aid];
+      const rows = Object.keys(map).map(key => {
+        const parts = key.split(':');
+        return { activity_id: aid, activity_name: meta.name || '', entity_type: parts[0] === 'p' ? 'player' : 'team', entity_id: parts[1], total_score: map[key] };
+      });
+      const isTimeMode = String(meta.game_type || '').toLowerCase() === 'team_vs_time';
+      rows.sort((a,b) => isTimeMode ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
+      rows.forEach((r, idx) => { r.rank = idx+1; result.push(r); });
+    });
+    return result;
+  }
+
+  // Export a single activity's scores + highscores
+  async exportActivity(sessionId, activityId, format = 'csv') {
+    const statusEl = document.getElementById('export-status'); if (statusEl) statusEl.textContent = 'Exporteren activiteit...';
+    try {
+      // show confirm modal for single activity as well
+      await this.showExportConfirm(sessionId, format, [activityId]);
+
+      // load session and activity metadata
+      const session = this.historySessions.find(s => s.id == sessionId) || {};
+      let activity = null;
+      if (session && session.activities) activity = (session.activities || []).find(a => a.id == activityId);
+      if (!activity) {
+        try {
+          const actsResp = await this.api.getSessionActivities(sessionId);
+          const acts = this.api.extractArray(actsResp, 'activities') || [];
+          activity = acts.find(a => a.id == activityId) || activity;
+        } catch (e) { /* ignore */ }
+      }
+
+      // fetch scores
+      const scoresResp = await this.api.getActivityScores(activityId);
+      const scores = this.api.extractArray(scoresResp, 'scores') || [];
+
+      // fetch players/teams optionally
+      const includeDetails = !!document.getElementById('include-details')?.checked;
+      let players = session.players || [];
+      let teams = session.teams || [];
+      if (includeDetails) {
+        try { const playersResp = await this.api.getPlayers(); players = this.api.extractArray(playersResp, 'players'); } catch (_) {}
+        try { const teamsResp = await this.api.getTeams(); teams = this.api.extractArray(teamsResp, 'teams'); } catch (_) {}
+      }
+
+      const scoresRows = (scores || []).map(s => ({ team_id: s.team_id, player_id: s.player_id, points: s.points, reason: s.reason, round_number: s.round_number, timestamp: s.timestamp }));
+      const highs = this._computeHighscoresForActivity(activity || {}, scoresRows, teams, players, 200);
+
+      const safeName = ((session.name || 'session') + '-' + ((activity && activity.name) || 'activity')).replace(/[^a-z0-9\-_ ]/ig, '_').substring(0, 80);
+
+      if (format === 'xlsx' && window.XLSX) {
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([ { activity_id: activity && activity.id, name: activity && activity.name, sport_type: activity && activity.sport_type, game_type: activity && activity.game_type, scoring_mode: activity && activity.scoring_mode } ]), 'Activity');
+        if (scoresRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(scoresRows), 'Scores');
+        if (highs.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(highs), 'Highscores');
+        if (includeDetails && teams.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(teams), 'Teams');
+        if (includeDetails && players.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(players), 'Players');
+        window.XLSX.writeFile(wb, `${safeName}.xlsx`);
+        this.showSuccessMessage('Export voltooid.');
+      } else {
+        // CSV: produce scores CSV and highscores CSV (two downloads)
+        const scoreHeaders = ['team_id','player_id','points','reason','round_number','timestamp'];
+        const scoreRows = scoresRows.map(r => [r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]);
+        const scoresCsv = this._arrayToCsv([scoreHeaders].concat(scoreRows));
+        this._downloadBlob(scoresCsv, `${safeName}_scores.csv`, 'text/csv;charset=utf-8;');
+
+        if (highs.length) {
+          const highHeaders = ['activity_id','activity_name','entity_type','entity_id','entity_name','total_score','rank'];
+          const highRows = highs.map(h => [activity && activity.id, activity && activity.name, h.entity_type, h.entity_id, h.entity_name || '', h.total_score, h.rank]);
+          const highsCsv = this._arrayToCsv([highHeaders].concat(highRows));
+          this._downloadBlob(highsCsv, `${safeName}_highscores.csv`, 'text/csv;charset=utf-8;');
+        }
+        this.showSuccessMessage('Export voltooid.');
+      }
+    } catch (err) {
+      console.error('Error exporting activity', err);
+      this.showErrorMessage('Fout bij exporteren activiteit.');
+    } finally { if (statusEl) statusEl.textContent = ''; }
+  }
+
+  // Enhanced exportSession - optionally include highscores and details based on checkboxes
+  async exportSession(sessionId, format = 'csv') {
+    const statusEl = document.getElementById('export-status');
+    if (statusEl) statusEl.textContent = 'Exporteren...';
+    try {
+      const includeSessions = !!document.getElementById('include-sessions')?.checked;
+      const includeTeams = !!document.getElementById('include-teams')?.checked;
+      const includePlayers = !!document.getElementById('include-players')?.checked;
+      const includeActivities = !!document.getElementById('include-activities')?.checked;
+      const includeScores = !!document.getElementById('include-scores')?.checked;
+      const includeHighscores = !!document.getElementById('include-highscores')?.checked;
+
+      const session = this.historySessions.find(s => s.id == sessionId);
+      if (!session) { this.showErrorMessage('Sessie niet gevonden.'); return; }
+
+      if (!session.activities || !session.teams || !session.players) {
+        try {
+          const [activitiesResp, teamsResp] = await Promise.all([this.api.getSessionActivities(session.id), this.api.getSessionTeams(session.id)]);
+          session.activities = this.api.extractArray(activitiesResp, 'activities');
+          session.teams = this.api.extractArray(teamsResp, 'teams');
+          const playersResp = await this.api.getPlayers(); session.players = this.api.extractArray(playersResp, 'players');
+        } catch (err) { console.warn('Could not load session details for export', err); }
+      }
+
+      // Gather scores and optional highscores
+      const scores = [];
+      const activitiesList = (session.activities || []);
+      const totalActivities = Math.max(1, activitiesList.length);
+      for (let ai = 0; ai < activitiesList.length; ai++) {
+        const activity = activitiesList[ai];
+        try {
+          const resp = await this.api.getActivityScores(activity.id);
+          const s = this.api.extractArray(resp, 'scores');
+          (s || []).forEach(score => scores.push(Object.assign({ activity_id: activity.id, activity_name: activity.name, activity_scoring_mode: activity.scoring_mode, activity_game_type: activity.game_type }, score)));
+        } catch (err) { console.warn('Failed to load scores for activity', activity.id, err); }
+        // update progress
+        const pct = Math.round(((ai + 1) / totalActivities) * 100);
+        this._updateExportProgress(pct, `Laden activiteiten ${ai + 1}/${totalActivities}`);
+      }
+
+      // Dataset rows
+      const sessionRow = { session_id: session.id, session_name: session.name, created_at: session.created_at, status: session.status || session.is_active ? 'active' : 'completed', teams_count: (session.teams || []).length, activities_count: (session.activities || []).length, players_count: (session.players || []).length };
+      const teamsRows = (session.teams || []).map(t => ({ team_id: t.id, name: t.name, color: t.color, icon: t.icon, description: t.description }));
+      const playersRows = (session.players || []).map(p => ({ player_id: p.id, name: p.name, team_id: p.team_id }));
+      const activitiesRows = (session.activities || []).map(a => ({ activity_id: a.id, name: a.name, sport_type: a.sport_type, game_type: a.game_type, scoring_mode: a.scoring_mode }));
+      const scoresRows = (scores || []).map(s => ({ activity_id: s.activity_id, activity_name: s.activity_name, team_id: s.team_id, player_id: s.player_id, points: s.points, reason: s.reason, round_number: s.round_number, timestamp: s.timestamp }));
+
+      // Build highscores if requested
+      let highscoresRows = [];
+      if (includeHighscores && (session.activities || []).length) {
+        for (const activity of (session.activities || [])) {
+          const rowsForActivity = scoresRows.filter(r => r.activity_id == activity.id);
+          const highs = this._computeHighscoresForActivity(activity, rowsForActivity, session.teams || [], session.players || []);
+          highs.forEach(h => highscoresRows.push(Object.assign({ activity_id: activity.id, activity_name: activity.name }, h)));
+        }
+      }
+
+      const safeName = (session.name || `session-${session.id}`).replace(/[^a-z0-9\-_ ]/ig, '_').substring(0, 80);
+
+      if (format === 'xlsx' && window.XLSX) {
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([sessionRow]), 'Session');
+        if (includeTeams && teamsRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(teamsRows), 'Teams');
+        if (includePlayers && playersRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(playersRows), 'Players');
+        if (includeActivities && activitiesRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(activitiesRows), 'Activities');
+        if (includeScores && scoresRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(scoresRows), 'Scores');
+        if (includeHighscores && highscoresRows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(highscoresRows), 'Highscores');
+        window.XLSX.writeFile(wb, `${safeName}.xlsx`);
+        this.showSuccessMessage('Export voltooid.');
+      } else {
+        if (includeScores) {
+          const headers = ['session_id','session_name','activity_id','activity_name','team_id','player_id','points','reason','round_number','timestamp'];
+          const rows = scoresRows.map(r => ([session.id, session.name, r.activity_id, r.activity_name, r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]));
+          const csv = this._arrayToCsv([headers].concat(rows));
+          this._downloadBlob(csv, `${safeName}.csv`, 'text/csv;charset=utf-8;');
+        }
+        if (includeHighscores && highscoresRows.length) {
+          const hsHeaders = ['activity_id','activity_name','rank','entity_type','entity_id','entity_name','total_score'];
+          const hsRows = highscoresRows.map(h => [h.activity_id, h.activity_name, h.rank, h.entity_type, h.entity_id, h.entity_name, h.total_score]);
+          const csv2 = this._arrayToCsv([hsHeaders].concat(hsRows));
+          this._downloadBlob(csv2, `${safeName}_highscores.csv`, 'text/csv;charset=utf-8;');
+        }
+        this.showSuccessMessage('Export voltooid.');
+      }
+
+    } catch (err) {
+      console.error('Error exporting session', err);
+      this.showErrorMessage('Fout bij exporteren sessie.');
+    } finally { if (statusEl) statusEl.textContent = ''; }
+  }
+
+  // Enhanced exportAllSessions - include highscores sheet if requested
+  async exportAllSessions(format = 'csv', activityFilter = null, sessionFilter = null) {
+    const statusEl = document.getElementById('export-status'); if (statusEl) statusEl.textContent = 'Exporteren geschiedenis...';
+    try {
+      // reset export progress bar
+      this._updateExportProgress(0, '');
+      const includeTeams = !!document.getElementById('include-teams')?.checked;
+      const includePlayers = !!document.getElementById('include-players')?.checked;
+      const includeActivities = !!document.getElementById('include-activities')?.checked;
+      const includeScores = !!document.getElementById('include-scores')?.checked;
+      const includeHighscores = !!document.getElementById('include-highscores')?.checked;
+
+      if (!this.historySessions || !this.historySessions.length) {
+        await this.loadHistorySessions();
+      }
+      const combinedRows = [];
+      const activitiesMeta = {}; // activity_id -> meta { name, scoring_mode, game_type }
+      // precompute total activities for progress feedback
+      let totalActivities = 0;
+      for (const s of (this.historySessions || [])) {
+        const acts = s.activities || (await this.api.getSessionActivities(s.id).then(r => this.api.extractArray(r, 'activities')));
+        totalActivities += (acts || []).length;
+      }
+
+      let processed = 0;
+      for (const session of (this.historySessions || [])) {
+        // if sessionFilter specified and doesn't match, skip
+        if (sessionFilter && session.id !== sessionFilter) continue;
+        const activities = session.activities || (await this.api.getSessionActivities(session.id).then(r => this.api.extractArray(r, 'activities')));
+        for (const activity of (activities || [])) {
+          // if activityFilter is provided (array) and doesn't include this, skip
+          if (activityFilter && Array.isArray(activityFilter) && activityFilter.length && !activityFilter.includes(activity.id)) { processed++; continue; }
+          activitiesMeta[activity.id] = { name: activity.name, scoring_mode: activity.scoring_mode, game_type: activity.game_type };
+          try {
+            const resp = await this.api.getActivityScores(activity.id);
+            const s = this.api.extractArray(resp, 'scores');
+            (s || []).forEach(score => combinedRows.push(Object.assign({ session_id: session.id, session_name: session.name, activity_id: activity.id, activity_name: activity.name, activity_scoring_mode: activity.scoring_mode, activity_game_type: activity.game_type }, score)));
+          } catch (err) { console.warn('Skipping scores for activity', activity.id, err); }
+          processed++;
+          const pct = totalActivities ? Math.round((processed / totalActivities) * 100) : Math.round((processed / 1) * 100);
+          this._updateExportProgress(pct, `Laden activiteit ${processed}/${totalActivities}`);
+        }
+      }
+
+      const filenameBase = `sportscore_history_${(new Date()).toISOString().slice(0,10)}`;
+
+      if (format === 'xlsx' && window.XLSX) {
+        const wb = window.XLSX.utils.book_new();
+        if (combinedRows.length && includeScores) {
+          const rows = combinedRows.map(s => ({ session_id: s.session_id, session_name: s.session_name, activity_id: s.activity_id, activity_name: s.activity_name, team_id: s.team_id, player_id: s.player_id, points: s.points, reason: s.reason, round_number: s.round_number, timestamp: s.timestamp }));
+          window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(rows), 'Scores');
+        } else if (includeScores) {
+          window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([]), 'Scores');
+        }
+
+        if (includeHighscores) {
+          const hs = this._computeAggregatedHighscoresFromCombinedRows(combinedRows, activitiesMeta);
+          if (hs.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(hs), 'Highscores');
+        }
+
+        // Optionally include global lists
+        try {
+          if (includeTeams) {
+            const tResp = await this.api.getTeams();
+            const trows = this.api.extractArray(tResp, 'teams');
+            if (trows && trows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(trows), 'Teams');
+          }
+        } catch (err) { console.warn('Failed to load teams for export', err); }
+        try {
+          if (includePlayers) {
+            const pResp = await this.api.getPlayers();
+            const prows = this.api.extractArray(pResp, 'players');
+            if (prows && prows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(prows), 'Players');
+          }
+        } catch (err) { console.warn('Failed to load players for export', err); }
+        try {
+          if (includeActivities) {
+            const aResp = await this.api.getActivities();
+            const arows = this.api.extractArray(aResp, 'activities');
+            if (arows && arows.length) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(arows), 'Activities');
+          }
+        } catch (err) { console.warn('Failed to load activities for export', err); }
+
+        window.XLSX.writeFile(wb, `${filenameBase}.xlsx`);
+        this.showSuccessMessage('Export voltooid.');
+      } else {
+        if (includeScores) {
+          const headers = ['session_id','session_name','activity_id','activity_name','team_id','player_id','points','reason','round_number','timestamp'];
+          const rows = combinedRows.map(r => ([r.session_id, r.session_name, r.activity_id, r.activity_name, r.team_id, r.player_id, r.points, r.reason, r.round_number, r.timestamp]));
+          const csv = this._arrayToCsv([headers].concat(rows));
+          this._downloadBlob(csv, `${filenameBase}.csv`, 'text/csv;charset=utf-8;');
+        }
+
+        if (includeHighscores) {
+          const hs = this._computeAggregatedHighscoresFromCombinedRows(combinedRows, activitiesMeta);
+          if (hs.length) {
+            const hsHeaders = ['activity_id','activity_name','rank','entity_type','entity_id','total_score'];
+            const hsRows = hs.map(h => [h.activity_id, h.activity_name, h.rank, h.entity_type, h.entity_id, h.total_score]);
+            const csv2 = this._arrayToCsv([hsHeaders].concat(hsRows));
+            this._downloadBlob(csv2, `${filenameBase}_highscores.csv`, 'text/csv;charset=utf-8;');
+          }
+        }
+
+        // optionally export teams/players/activities lists as CSV
+        try {
+          if (includeTeams) {
+            const tResp = await this.api.getTeams(); const trows = this.api.extractArray(tResp, 'teams');
+            if (trows && trows.length) this._downloadBlob(this._arrayToCsv([Object.keys(trows[0])].concat(trows.map(r => Object.values(r)))), `${filenameBase}_teams.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load teams for export', err); }
+        try {
+          if (includePlayers) {
+            const pResp = await this.api.getPlayers(); const prows = this.api.extractArray(pResp, 'players');
+            if (prows && prows.length) this._downloadBlob(this._arrayToCsv([Object.keys(prows[0])].concat(prows.map(r => Object.values(r)))), `${filenameBase}_players.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load players for export', err); }
+        try {
+          if (includeActivities) {
+            const aResp = await this.api.getActivities(); const arows = this.api.extractArray(aResp, 'activities');
+            if (arows && arows.length) this._downloadBlob(this._arrayToCsv([Object.keys(arows[0])].concat(arows.map(r => Object.values(r)))), `${filenameBase}_activities.csv`, 'text/csv;charset=utf-8;');
+          }
+        } catch (err) { console.warn('Failed to load activities for export', err); }
+
+        this.showSuccessMessage('Export voltooid.');
+      }
+    } catch (err) {
+      console.error('Error exporting all sessions', err);
+      this.showErrorMessage('Fout bij exporteren geschiedenis.');
+    } finally { if (statusEl) statusEl.textContent = ''; }
   }
 
   openHistoryModal(sessionId) {
@@ -358,6 +1087,14 @@ class Homepage {
             <option value="">-- Kies een activiteit --</option>
             ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
           </select>
+
+          <div id="modal-activity-exports-${session.id}" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+            ${(session.activities || []).map(a => `<div style="display:flex; gap:6px; align-items:center;">
+              <div style="font-size:0.9em; color:var(--text-secondary);">${this.escapeHtml(a.name)}</div>
+              <button class="btn btn-sm" onclick="window.homepage.exportActivity(${session.id}, ${a.id}, 'csv')">CSV</button>
+              <button class="btn btn-sm" onclick="window.homepage.exportActivity(${session.id}, ${a.id}, 'xlsx')">XLSX</button>
+            </div>`).join('')}
+          </div>
         </div>
 
         <div id="modal-scores-${session.id}" class="scores-display" style="display: none;"></div>
