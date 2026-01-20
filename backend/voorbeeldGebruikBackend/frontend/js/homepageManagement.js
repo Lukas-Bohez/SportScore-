@@ -108,6 +108,10 @@ export class HomepageManagement {
 		// Mapping wrappers for name mode toggling
 		this.playerImportMapNameCol = document.getElementById('map-name-col');
 		this.playerImportMapFirstLast = document.getElementById('map-first-last');
+		// Mapping summary & edit inline toggles
+		this.playerImportMappingSummaryText = document.getElementById('player-import-mapping-summary-text');
+		this.playerImportEditMappingBtnInline = document.getElementById('player-import-edit-mapping-btn-inline');
+		// top-level edit mapping button removed; inline editor button retained
 
 		// Setup color preview if elements exist
 		if (this.teamColorInput) {
@@ -135,6 +139,43 @@ export class HomepageManagement {
 				if (this.playerImportColLast) this.playerImportColLast.disabled = false;
 				if (this.playerImportColName) this.playerImportColName.disabled = true;
 			}
+		} catch (e) { /* ignore */ }
+	}
+
+	// Toggle showing/hiding the detailed mapping editor
+	toggleMappingEditor() {
+		try {
+			const mappingEl = document.getElementById('player-import-mapping');
+			if (!mappingEl) return;
+			const isHidden = mappingEl.style.display === 'none' || getComputedStyle(mappingEl).display === 'none';
+			if (isHidden) {
+				mappingEl.style.display = 'flex';
+				if (this.playerImportEditMappingBtnInline) this.playerImportEditMappingBtnInline.textContent = 'Verberg mapping';
+				// ensure name-mode UI matches
+				this.toggleImportNameModeUI();
+			} else {
+				mappingEl.style.display = 'none';
+				if (this.playerImportEditMappingBtnInline) this.playerImportEditMappingBtnInline.textContent = 'Bewerk mapping';
+			}
+		} catch (e) { /* ignore */ }
+	}
+
+	updateMappingSummary() {
+		try {
+			if (!this.playerImportMappingSummaryText) return;
+			const mode = (this.playerImportNameMode && this.playerImportNameMode.value) || 'full';
+			let text = '';
+			if (mode === 'full') {
+				const nameColText = this.playerImportColName ? (this.playerImportColName.options[this.playerImportColName.selectedIndex]?.text || this.playerImportColName.value) : '(geen)';
+				const teamColText = this.playerImportColTeam ? (this.playerImportColTeam.options[this.playerImportColTeam.selectedIndex]?.text || this.playerImportColTeam.value) : '(geen)';
+				text = `Volledige naam — Kolom: ${nameColText} • Team: ${teamColText}`;
+			} else {
+				const firstText = this.playerImportColFirst ? (this.playerImportColFirst.options[this.playerImportColFirst.selectedIndex]?.text || this.playerImportColFirst.value) : '(geen)';
+				const lastText = this.playerImportColLast ? (this.playerImportColLast.options[this.playerImportColLast.selectedIndex]?.text || this.playerImportColLast.value) : '(geen)';
+				const teamColText = this.playerImportColTeam ? (this.playerImportColTeam.options[this.playerImportColTeam.selectedIndex]?.text || this.playerImportColTeam.value) : '(geen)';
+				text = `Voornaam + Achternaam — Voornaam: ${firstText} • Achternaam: ${lastText} • Team: ${teamColText}`;
+			}
+			this.playerImportMappingSummaryText.textContent = text;
 		} catch (e) { /* ignore */ }
 	}
 
@@ -218,11 +259,13 @@ export class HomepageManagement {
 		if (this.playerImportAutoDetectBtn) this.playerImportAutoDetectBtn.addEventListener('click', () => { if (this._parsedImportRows) { this._importColumnMap = this._detectColumns(this._parsedImportRows.rows, this._parsedImportRows.headers); this.populateImportMappingUI(this._parsedImportRows.rows, this._parsedImportRows.headers); this.showImportPreview(); } });
 		if (this.playerImportPreviewBtn) this.playerImportPreviewBtn.addEventListener('click', () => this.showImportPreview());
 		if (this.playerImportStartBtn) this.playerImportStartBtn.addEventListener('click', () => this.startImport());
-		if (this.playerImportNameMode) this.playerImportNameMode.addEventListener('change', () => { this.toggleImportNameModeUI(); this.showImportPreview(); });
+		if (this.playerImportNameMode) this.playerImportNameMode.addEventListener('change', () => { this.toggleImportNameModeUI(); this.updateMappingSummary(); this.showImportPreview(); });
+		if (this.playerImportEditMappingBtnInline) this.playerImportEditMappingBtnInline.addEventListener('click', () => this.toggleMappingEditor());
+		// top-level editor button removed; inline button still toggles mapping editor via its handler
 		if (this.playerImportColName) this.playerImportColName.addEventListener('change', () => this.showImportPreview());
 		if (this.playerImportColFirst) this.playerImportColFirst.addEventListener('change', () => this.showImportPreview());
 		if (this.playerImportColLast) this.playerImportColLast.addEventListener('change', () => this.showImportPreview());
-		if (this.playerImportColTeam) this.playerImportColTeam.addEventListener('change', () => this.showImportPreview());
+		if (this.playerImportColTeam) this.playerImportColTeam.addEventListener('change', () => { this.updateMappingSummary(); this.showImportPreview(); });
 	}
 
 	updateTeamVsTimeUI(gameType, scoringMode) {
@@ -986,6 +1029,7 @@ export class HomepageManagement {
 			html += `</div>`;
 		}
 		container.innerHTML = html;
+		this.updateMappingSummary();
 	}
 
 	async startImport() {
@@ -1109,6 +1153,9 @@ export class HomepageManagement {
 		// set name mode
 		if (map.nameIdx !== null && this.playerImportNameMode) this.playerImportNameMode.value = 'full';
 		else if (map.firstIdx !== null && map.lastIdx !== null && this.playerImportNameMode) this.playerImportNameMode.value = 'split';
+		// hide the detailed mapping by default and update summary
+		try { if (document.getElementById('player-import-mapping')) document.getElementById('player-import-mapping').style.display = 'none'; } catch (_) {}
+		this.updateMappingSummary();
 	}
 
 

@@ -1224,8 +1224,7 @@
                         <div id="history-tab" class="tab-pane active">
                             <div class="history-export-controls"
                                 style="margin-bottom:10px; display:flex; gap:8px; align-items:center;">
-                                <button id="export-all-csv" class="btn btn-sm">Export alle sessies (CSV)</button>
-                                <button id="export-all-xlsx" class="btn btn-sm">Export alle sessies (XLSX)</button>
+                                <button id="export-all-btn" class="btn btn-sm">Export alle sessies</button>
                                 <label style="margin-left:8px; font-size:0.9em;"><input type="checkbox"
                                         id="include-highscores" checked /> Inclusief highscores</label>
                                 <label style="font-size:0.9em;"><input type="checkbox" id="include-details" checked />
@@ -1297,11 +1296,7 @@
                             style="max-height:300px; overflow:auto; border:1px solid #eee; padding:8px; border-radius:6px;">
                         </div>
                         <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-                            <label style="font-size:0.9em;">Format:</label>
-                            <select id="export-confirm-format">
-                                <option value="csv">CSV</option>
-                                <option value="xlsx">XLSX</option>
-                            </select>
+                            <div style="font-size:0.9em; color:var(--text-secondary);">Formaat: XLSX</div>
                             <button id="export-confirm-start" class="btn btn-sm" style="margin-left:auto;">Start
                                 export</button>
                             <button id="export-confirm-cancel" class="btn btn-sm">Annuleren</button>
@@ -1338,11 +1333,10 @@
                                 </select>
                             </label>
                             <button id="player-import-auto-detect-btn" class="btn btn-sm">Detecteer kolommen</button>
-                            <button id="player-import-preview-btn" class="btn btn-sm">Voorbeeld</button>
                             <button id="player-import-start-btn" class="btn btn-sm">Importeer</button>
                         </div>
                         <div id="player-import-mapping"
-                            style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            style="margin-top:8px; display:none; gap:8px; flex-wrap:wrap; align-items:center;">
                             <div style="display:flex; gap:6px; align-items:center;"><label>Naam modus:</label>
                                 <select id="player-import-name-mode">
                                     <option value="full">Volledige naam</option>
@@ -1366,6 +1360,15 @@
                                 <select id="player-import-col-team"></select>
                             </div>
                         </div>
+
+                        <!-- Mapping summary (visible by default) -->
+                        <div id="player-import-mapping-summary"
+                            style="margin-top:8px; color:var(--text-secondary); font-size:0.95em;">Huidige mapping:
+                            <span id="player-import-mapping-summary-text">(geen bestand geselecteerd)</span> <button
+                                id="player-import-edit-mapping-btn-inline" class="btn btn-sm"
+                                style="margin-left:8px;">Bewerk mapping</button>
+                        </div>
+
                         <div style="margin-top:8px;">
                             <div id="player-import-progress"
                                 style="height:12px; background:#eee; border-radius:6px; overflow:hidden;">
