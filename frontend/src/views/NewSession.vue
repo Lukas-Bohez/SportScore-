@@ -9,6 +9,7 @@ import GenericInput from "@/components/Generic/GenericInput.vue";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericCheckbox from "@/components/Generic/GenericCheckbox.vue";
+// import GenericModel from "@/components/Generic/GenericModel.vue";
 
 const router = useRouter();
 
@@ -125,7 +126,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-2"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -133,7 +134,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-3"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -141,7 +142,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-4"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -149,7 +150,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-5"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -157,7 +158,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-6"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -165,7 +166,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-7"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -173,7 +174,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-8"
               />
             </div>
           </div>
@@ -188,9 +189,51 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="step === 3">
-          <p>Step 3: Confirm details</p>
-          <button @click="back">Back</button>
-          <button @click="next">Create Session</button>
+          <div>
+            <h3><span>Deelnemers</span> toevoegen</h3>
+            <div class="input-stap-3">
+              <GenericInput label="Team naam" placeholder="Voer team naam in" />
+              <GenericInput label="Imoji" placeholder="Voer imoji in" />
+            </div>
+            <div class="input-stap-3">
+              <GenericInput
+                label="Speler naam"
+                placeholder="Voer speler naam in"
+              />
+              <GenericInput label="Imoji" placeholder="Voer imoji in" />
+            </div>
+            <GenericButton variant="primary">Deelnemer toevoegen</GenericButton>
+          </div>
+          <div class="button-group">
+            <GenericButton variant="secondary" @click="back"
+              ><ChevronLeft /> Vorige</GenericButton
+            >
+            <GenericButton variant="primary" @click="next"
+              >Volgende <ChevronRight
+            /></GenericButton>
+          </div>
+        </div>
+        <div v-else-if="step === 4">
+          <div>
+            <h3><span>Sessie</span> overzicht</h3>
+          </div>
+          <div>
+            <p class="session-name-overview">
+              Sessie naam: <span>Team Building Dag 2025</span>
+            </p>
+            <div></div>
+            <div class="activity-container">
+              <p class="activity-item">Voetbal</p>
+              <p class="activity-item">Voetbal</p>
+              <p class="activity-item">Voetbal</p>
+            </div>
+          </div>
+          <div class="button-group">
+            <GenericButton variant="secondary" @click="back"
+              ><ChevronLeft /> Vorige</GenericButton
+            >
+            <GenericButton variant="primary">Opslaan</GenericButton>
+          </div>
         </div>
       </div>
     </RouterView>
@@ -267,5 +310,38 @@ h4 {
 
 .section-new-activity {
   margin-bottom: var(--space-5);
+}
+
+.input-stap-3 {
+  display: flex;
+  gap: var(--space-5);
+  align-items: end;
+}
+
+.input-stap-3 :deep(.generic-input:nth-child(2)) {
+  flex: 0 0 25%;
+}
+
+.session-name-overview {
+  font-size: var(--font-size-M);
+  font-size: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.activity-container {
+  display: flex;
+  gap: var(--space-4);
+
+  &P {
+    padding: var(--space-4);
+    border: 1px solid var(--black-100);
+    border-radius: var(--radius-M);
+  }
+}
+
+.activity-item {
+  padding: var(--space-4);
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius-M);
 }
 </style>

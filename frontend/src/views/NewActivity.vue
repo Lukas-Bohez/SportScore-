@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import GenericInput from "@/components/Generic/GenericInput.vue";
 import GenericToggle from "@/components/Generic/GenericToggle.vue";
+import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 
 const router = useRouter();
 
@@ -32,13 +33,48 @@ function saveActivity() {
         label="Activiteit naam"
         placeholder="Voer activiteit naam in"
       />
-
-      <!-- Add more form fields as needed -->
+      <GenericDropdown
+        :options="[
+          { label: 'Categorie 1', value: 1 },
+          { label: 'Categorie 2', value: 2 },
+          { label: 'Categorie 3', value: 3 },
+        ]"
+        label="Game type (modus)"
+        placeholder="Selecteer een Game type"
+      />
+      <GenericDropdown
+        :options="[
+          { label: 'Categorie 1', value: 1 },
+          { label: 'Categorie 2', value: 2 },
+          { label: 'Categorie 3', value: 3 },
+        ]"
+        label="Stijl (sport type)"
+        placeholder="Selecteer een sport stijl"
+      />
+      <GenericDropdown
+        :options="[
+          { label: 'Categorie 1', value: 1 },
+          { label: 'Categorie 2', value: 2 },
+          { label: 'Categorie 3', value: 3 },
+        ]"
+        label="Scoring mode"
+        placeholder="Selecteer een scoring mode"
+      />
+      <div class="input-next-row">
+        <GenericInput
+          label="Aantal Roundes"
+          placeholder="Voer activiteit naam in"
+        />
+        <GenericInput
+          label="Tijdlimiet (min):"
+          placeholder="Voer activiteit naam in"
+        />
+      </div>
     </div>
 
     <div class="button-group">
       <GenericButton variant="secondary" @click="goBack">
-        <ChevronLeft /> Annuleren
+        Annuleren
       </GenericButton>
       <GenericButton variant="primary" @click="saveActivity">
         Opslaan
@@ -53,7 +89,7 @@ function saveActivity() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
 h3 {
@@ -67,6 +103,8 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  overflow: auto;
+  max-height: 23rem;
 }
 
 .button-group {
@@ -77,5 +115,10 @@ h3 {
 
 .icon--quaternary {
   color: inherit;
+}
+
+.input-next-row {
+  display: flex;
+  gap: var(--space-5);
 }
 </style>

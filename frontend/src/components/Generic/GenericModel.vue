@@ -1,40 +1,94 @@
 <template>
-  <div class="generic-model">
-    <button class="generic-model__close-button" @click="$emit('close')">
-      <X />
-    </button>
-    <div class="generic-model__content">
-      <div class="generic-model__icon-wrapper">
-        <!-- <i data-lucide="triangle-alert" class="generic-model__warning-icon"></i> -->
-        <TriangleAlert class="generic-model__warning-icon" />
-      </div>
-      <div class="generic-model__message text">
-        Bent u zeker dat u het team wilt verwijderen?
-      </div>
-      <div class="generic-model__buttons">
-        <GenericButton variant="secondary" label="Nee" />
-        <GenericButton variant="primary" label="Ja" />
+  <div class="generic-model-overlay" @click.self="$emit('close')">
+    <div class="generic-model">
+      <button class="generic-model__close-button" @click="$emit('close')">
+        <X />
+      </button>
+      <div class="generic-model__content">
+        <div class="generic-model__icon-wrapper">
+          <component
+            :is="iconComponent"
+            class="generic-model__icon"
+            :style="{ stroke: iconColor }"
+          />
+        </div>
+        <div class="generic-model__message text">
+          {{ message }}
+        </div>
+        <div class="generic-model__buttons">
+          <GenericButton variant="secondary" label="Nee" />
+          <GenericButton variant="primary" label="Ja" />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { TriangleAlert, X } from "lucide-vue-next";
+import { TriangleAlert, CircleCheck, X } from "lucide-vue-next";
 import GenericButton from "./GenericButton.vue";
 
 export default {
   name: "GenericModel",
   components: {
     TriangleAlert,
+    CircleCheck,
     X,
     GenericButton,
+  },
+  props: {
+    message: {
+      type: String,
+      default: "Bent u zeker dat u het team wilt verwijderen?",
+    },
+    icon: {
+      type: String,
+      default: "triangle-alert",
+      validator: (value) => ["triangle-alert", "circle-check"].includes(value),
+    },
+    iconColor: {
+      type: String,
+      default: null,
+    },
+  },
+  computed: {
+    iconComponent() {
+      const iconMap = {
+        "triangle-alert": "TriangleAlert",
+        "circle-check": "CircleCheck",
+      };
+      return iconMap[this.icon] || "TriangleAlert";
+    },
+    computedIconColor() {
+      if (this.iconColor) {
+        return this.iconColor;
+      }
+      // Default colors based on icon type
+      return this.icon === "circle-check"
+        ? "var(--green-100)"
+        : "var(--red-100)";
+    },
   },
   emits: ["close", "cancel", "confirm"],
 };
 </script>
 
 <style scoped>
+.generic-model-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  margin: 0;
+  padding: 0;
+}
+
 .generic-model {
   width: 20rem; /* 320px */
   border-radius: var(--radius-L);
@@ -89,10 +143,9 @@ export default {
   border-radius: var(--radius-XL);
 }
 
-.generic-model__warning-icon {
+.generic-model__icon {
   width: 2rem; /* 32px */
   height: 2rem; /* 32px */
-  stroke: var(--red-100);
 }
 
 .generic-model__message {
