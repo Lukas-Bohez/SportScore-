@@ -38,12 +38,13 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4) var(--space-5);
   font-family: var(--font-family);
   cursor: pointer;
   transition: all 0.3s ease;
   border: none;
   gap: var(--space-4);
+  border: 1px solid var(--blue-100);
 }
 
 .generic-button--primary {

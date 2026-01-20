@@ -44,7 +44,8 @@ export default {
   justify-content: center;
   width: fit-content;
   min-width: 17.1875rem;
-  margin: var(--space-6) 0;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .generic-stepbar__step {

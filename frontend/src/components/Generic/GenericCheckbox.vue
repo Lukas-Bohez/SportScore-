@@ -15,11 +15,11 @@
       </div>
       <div class="label-wrapper">
         <span class="label-text">{{ label }}</span>
-        <div
+        <!-- <div
           v-if="showDot"
           class="color-dot circle-base"
           :style="{ backgroundColor: dotColor }"
-        ></div>
+        ></div> -->
       </div>
     </div>
     <div class="actions">
@@ -61,10 +61,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  dotColor: {
-    type: String,
-    default: "#EE1313",
-  },
+  // dotColor: {
+  //   type: String,
+  //   default: "#EE1313",
+  // },
 });
 
 defineEmits(["update:checked", "edit", "delete"]);
@@ -77,7 +77,7 @@ defineOptions({
 <style scoped>
 .generic-checkbox {
   width: 100%;
-  height: 2.8125rem;
+  min-height: 2.8125rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,7 +96,11 @@ defineOptions({
 .checkbox-content {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   gap: var(--space-5);
+=======
+  gap: 1rem;
+>>>>>>> origin/feature/new-session
 }
 
 .checkbox-wrapper {
@@ -117,7 +121,11 @@ defineOptions({
   width: 1.5rem;
   height: 1.5rem;
   border: 1px solid var(--black-40);
+<<<<<<< HEAD
   border-radius: var(--radius-S);
+=======
+  border-radius: 0.1875rem;
+>>>>>>> origin/feature/new-session
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: var(--white);
@@ -150,7 +158,11 @@ defineOptions({
 .label-wrapper {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   gap: var(--space-2);
+=======
+  gap: 0.25rem;
+>>>>>>> origin/feature/new-session
 }
 
 .label-text {
@@ -159,10 +171,17 @@ defineOptions({
   color: var(--black-100);
 }
 
+<<<<<<< HEAD
 .color-dot {
   width: 0.5625rem;
   height: 0.5625rem;
 }
+=======
+/* .color-dot {
+  width: 9px;
+  height: 9px;
+} */
+>>>>>>> origin/feature/new-session
 
 .actions {
   display: flex;
