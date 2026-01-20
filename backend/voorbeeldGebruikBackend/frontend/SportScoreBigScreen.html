@@ -9,7 +9,7 @@
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/themes.css">
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
@@ -33,92 +33,277 @@
     <!-- QR Code Overlay -->
     <div id="qr-overlay" class="qr-overlay">
         <div class="qr-container">
-            <h2>Connect to WiFi</h2>
-            <div id="qrcode"></div>
-            <p>Scan to connect to PiHotspot</p>
-            <p>Password: raspberry</p>
-        </div>
-    </div>
+            <div class="qr-row">
+                <div class="qr-item">
+                    <h2>Connect to WiFi</h2>
+                    <div id="qrcode-wifi"></div>
+                    <p>Scan to connect to PiHotspot</p>
+                    <p>Password: raspberry</p>
+                </div>
+                <div class="qr-item">
+                    <h2>Open Admin Panel</h2>
+                    <div id="qrcode-admin"></div>
+                    <p>Scan to access SportScore admin</p>
+                    <p id="admin-url" style="font-size: 0.9em; color: #666;"></p>
+                </div>
+            </div>
+            <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+            <script src="js/api.js"></script>
+            <script src="js/shared-utils.js"></script>
+            <script src="js/bigscreen.js"></script>
+            <script>
+                // Wait for API to initialize socket, then set up logging
+                document.addEventListener('DOMContentLoaded', () => {
+                    const socket = api.socket;
+                    if (socket) {
+                        console.log('BigScreen: Using global API socket, connecting to:', api.baseURL);
+                        socket.on('connect', () => {
+                            console.log('BigScreen: Socket connected');
+                        });
+                        socket.on('disconnect', () => {
+                            console.log('BigScreen: Socket disconnected');
+                        });
+                        socket.on('connect_error', (error) => {
+                            console.error('BigScreen: Socket connection error:', error);
+                        });
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/shared-utils.js"></script>
-    <script src="js/bigscreen.js"></script>
-    <script>
-        // Wait for API to initialize socket, then set up logging
-        document.addEventListener('DOMContentLoaded', () => {
-            const socket = api.socket;
-            if (socket) {
-                console.log('BigScreen: Using global API socket, connecting to:', api.baseURL);
-                socket.on('connect', () => {
-                    console.log('BigScreen: Socket connected');
-                });
-                socket.on('disconnect', () => {
-                    console.log('BigScreen: Socket disconnected');
-                });
-                socket.on('connect_error', (error) => {
-                    console.error('BigScreen: Socket connection error:', error);
+                        // Socket is already connected if already available
+                        if (socket.connected) {
+                            console.log('BigScreen: Socket already connected');
+                        }
+                    } else {
+                        console.error('BigScreen: No socket available from API');
+                    }
                 });
 
-                // Socket is already connected if already available
-                if (socket.connected) {
-                    console.log('BigScreen: Socket already connected');
+                // Generate QR code for WiFi
+                const wifiString = 'WIFI:T:WPA;S:pihotspot;P:raspberry;;';
+                try {
+                    new QRCode(document.getElementById('qrcode-wifi'), {
+                        text: wifiString,
+                        width: 256,
+                        height: 256
+                    });
+                } catch (e) {
+                    console.error('WiFi QRCode generation failed:', e);
+                    document.getElementById('qrcode-wifi').innerHTML = '<p>QR Code: ' + wifiString + '</p>';
                 }
-            } else {
-                console.error('BigScreen: No socket available from API');
-            }
-        });
 
-        // Generate QR code for WiFi
-        const wifiString = 'WIFI:T:WPA;S:pihotspot;P:raspberry;;';
-        try {
-            new QRCode(document.getElementById('qrcode'), {
-                text: wifiString,
-                width: 256,
-                height: 256
-            });
-        } catch (e) {
-            console.error('QRCode generation failed:', e);
-            document.getElementById('qrcode').innerHTML = '<p>QR Code: ' + wifiString + '</p>';
-        }
+                // Generate QR code for admin interface
+                // Probe a set of likely addresses and pick the first that responds (useful when on AP/hotspot)
+                (async function resolveAdminUrlAndRender() {
+                    // Prefer Wi-Fi AP addresses first so scanning devices get a reachable URL
+                    const wifiIPs = ['http://10.42.0.1', 'http://192.168.4.1'];
+                    const candidates = [];
 
-        // QR functionality is handled by BigScreenDisplay class in bigscreen.js
-    </script>
-    <style>
-        .qr-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
+                    // Push WiFi IPs (HTTP and common backend port 8000)
+                    wifiIPs.forEach(ip => {
+                        candidates.push(ip);
+                        candidates.push(ip + ':8000');
+                    });
 
-        .qr-container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            max-width: 92vw;
-            /* ensure it never extends beyond viewport width */
-            box-sizing: border-box;
-            overflow: hidden;
-        }
+                    // If api.baseURL is configured and not a localhost-only address, include it as a candidate
+                    if (typeof api !== 'undefined' && api?.baseURL) {
+                        const base = api.baseURL.replace(/\/$/, '');
+                        candidates.push(base);
 
-        .qr-container h2 {
-            margin-bottom: 20px;
-        }
+                        // If base uses localhost, add mapped variants using WiFi IPs preserving the port
+                        try {
+                            const u = new URL(base);
+                            if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+                                wifiIPs.forEach(ip => {
+                                    try {
+                                        const up = new URL(ip);
+                                        const portPart = u.port ? (':' + u.port) : '';
+                                        candidates.push(`${up.protocol}//${up.hostname}${portPart}`);
+                                    } catch (_) { }
+                                });
+                            }
+                        } catch (_) { }
+                    }
 
-        .qr-container p {
-            margin: 10px 0;
-        }
-    </style>
+                    // Fallbacks
+                    candidates.push('http://localhost');
+                    candidates.push('http://localhost:8000');
+
+                    // Deduplicate while keeping order
+                    const uniq = [...new Set(candidates)];
+
+                    // Test a URL by attempting a short fetch with timeout. Use no-cors mode so opaque responses still count as reachable.
+                    function testUrl(url, timeout = 1200) {
+                        return new Promise((resolve) => {
+                            const controller = new AbortController();
+                            const signal = controller.signal;
+                            const timer = setTimeout(() => {
+                                controller.abort();
+                                resolve(false);
+                            }, timeout);
+
+                            fetch(url, { method: 'GET', mode: 'no-cors', signal })
+                                .then(() => {
+                                    clearTimeout(timer);
+                                    resolve(true);
+                                })
+                                .catch(() => {
+                                    clearTimeout(timer);
+                                    resolve(false);
+                                });
+                        });
+                    }
+
+                    let chosen = null;
+                    for (const c of uniq) {
+                        try {
+                            const ok = await testUrl(c + '/');
+                            if (ok) {
+                                chosen = c.replace(/\/$/, '');
+                                break;
+                            }
+                        } catch (e) {
+                            // ignore and try next
+                        }
+                    }
+
+                    if (!chosen) chosen = uniq[0] || 'http://10.42.0.1';
+
+                    try {
+                        new QRCode(document.getElementById('qrcode-admin'), {
+                            text: chosen,
+                            width: 256,
+                            height: 256
+                        });
+                    } catch (e) {
+                        console.error('Admin QRCode generation failed:', e);
+                        const adminEl = document.getElementById('qrcode-admin');
+                        adminEl.innerHTML = '<p><a href="' + chosen + '">' + chosen + '</a></p>';
+                    }
+
+                    // Update visible admin URL text
+                    const adminUrlEl = document.getElementById('admin-url');
+                    if (adminUrlEl) adminUrlEl.textContent = chosen;
+                })();
+
+                // QR functionality is handled by BigScreenDisplay class in bigscreen.js
+            </script>
+            <style>
+                .qr-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    backdrop-filter: blur(10px);
+                    display: none;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
+                }
+
+                .qr-container {
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    text-align: center;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+                    max-width: 92vw;
+                    /* ensure it never extends beyond viewport width */
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+
+                /* New layout: place QR codes side-by-side and center them */
+                .qr-row {
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-start;
+                    gap: 40px;
+                    flex-wrap: wrap;
+                    margin-top: 8px;
+                }
+
+                .qr-item {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                    width: 320px;
+                    max-width: 45vw;
+                }
+
+                #qrcode-wifi,
+                #qrcode-admin {
+                    width: 256px;
+                    height: 256px;
+                    display: block;
+                    margin: 0 auto 8px;
+                }
+
+                .qr-container h2 {
+                    margin-bottom: 12px;
+                }
+
+                .qr-container p {
+                    margin: 6px 0;
+                }
+
+                @media (max-width: 640px) {
+                    .qr-row {
+                        flex-direction: column;
+                        gap: 20px;
+                    }
+
+                    .qr-item {
+                        width: 92vw;
+                        max-width: 92vw;
+                    }
+
+                    #qrcode-wifi,
+                    #qrcode-admin {
+                        width: min(60vw, 256px);
+                        height: auto;
+                    }
+                }
+            </style>
+            <style>
+                /* Prefer system emoji fonts where emoji glyphs are shown to avoid square placeholders */
+                body,
+                .team-icon,
+                .participant-medal,
+                .participant-total,
+                .player-badge-bigscreen {
+                    font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                }
+
+                /* Remove excessive spacing and ensure clean typography for BigScreen */
+                body,
+                .container,
+                .header,
+                .team,
+                .leaderboard-container,
+                .leaderboard-team,
+                .team-name,
+                .team-position,
+                .team-score,
+                .participant-name,
+                .participant-total,
+                .player-badge-bigscreen,
+                .qr-container,
+                .qr-item {
+                    letter-spacing: normal !important;
+                    word-spacing: normal !important;
+                }
+
+                /* Reduce header tracking for improved appearance on the bigscreen */
+                .header h1 {
+                    letter-spacing: 1px !important;
+                }
+
+                /* Ensure QR items are centered nicely */
+                .qr-container .qr-row {
+                    justify-content: center;
+                }
+            </style>
 </body>
 
 </html>

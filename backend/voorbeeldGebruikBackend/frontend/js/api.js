@@ -55,17 +55,28 @@ class ScoreboardAPI {
 
         let detected = null;
         if (typeof window !== 'undefined') {
-            detected = window.SCOREBOARD_API_BASE || 
+            detected = window.SCOREBOARD_API_BASE ||
                        new URLSearchParams(window.location.search).get('apiBase');
-            
+
+            // If no base provided, try to derive from window.location.
+            // When opened via file://, window.location.hostname is empty,
+            // so avoid constructing invalid 'http://:8000' and fall back to localhost.
             if (!detected) {
-                detected = `http://${window.location.hostname}:8000`;
+                const hostname = (window.location && window.location.hostname) || 'localhost';
+                detected = `http://${hostname || 'localhost'}:8000`;
             }
         } else {
             detected = 'http://localhost:8000';
         }
 
-        this.baseURL = detected.replace(/\/$/, '');
+        try {
+            // Validate URL by constructing a URL object. If invalid, fallback to localhost.
+            new URL(detected);
+            this.baseURL = detected.replace(/\/$/, '');
+        } catch (e) {
+            console.warn('API: Invalid baseURL detected, falling back to http://localhost:8000', detected, e);
+            this.baseURL = 'http://localhost:8000';
+        }
     }
 
     // ==========================================
@@ -81,18 +92,23 @@ class ScoreboardAPI {
             return;
         }
 
-        this.socket = io(this.baseURL, {
-            transports: ['polling', 'websocket'],
-            timeout: 30000,
-            reconnection: true,
-            reconnectionAttempts: 10,
-            reconnectionDelay: 2000,
-            reconnectionDelayMax: 10000,
-            autoConnect: true,
-        });
+        try {
+            this.socket = io(this.baseURL, {
+                transports: ['polling', 'websocket'],
+                timeout: 30000,
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 2000,
+                reconnectionDelayMax: 10000,
+                autoConnect: true,
+            });
 
-        window.socket = this.socket;
-        this.setupSocketListeners();
+            window.socket = this.socket;
+            this.setupSocketListeners();
+        } catch (e) {
+            console.error('API: Failed to initialize Socket.IO, falling back to polling:', e);
+            this.startPollingFallback();
+        }
     }
 
     setupSocketListeners() {
