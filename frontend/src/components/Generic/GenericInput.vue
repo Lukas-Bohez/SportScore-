@@ -42,7 +42,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-bottom: 2rem;
+  padding-bottom: var(--space-5);
 }
 
 .generic-input__field {

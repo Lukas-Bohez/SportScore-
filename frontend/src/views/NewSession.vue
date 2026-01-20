@@ -125,7 +125,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-2"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -133,7 +133,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-3"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -141,7 +141,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-4"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -149,7 +149,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-5"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -157,7 +157,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-6"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -165,7 +165,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-7"
               />
               <GenericCheckbox
                 :label="truncateLabel('Rood hhhhhhhhhhhhhhhhhhhhhh')"
@@ -173,7 +173,7 @@ onUnmounted(() => {
                 @update:checked="isChecked = $event"
                 @edit="handleEdit"
                 @delete="handleDelete"
-                id="checkbox-1"
+                id="checkbox-8"
               />
             </div>
           </div>
