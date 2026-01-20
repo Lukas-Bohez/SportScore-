@@ -24,7 +24,7 @@
     </div>
     <div class="actions">
       <button
-        @click="$emit('edit')"
+        @click="($emit('edit'), (showModel = true))"
         class="icon-button hover-opacity edit-button"
         type="button"
       >
@@ -35,6 +35,7 @@
         class="icon-button hover-opacity delete-button"
         type="button"
       >
+        <GenericModel v-if="showModel" @close="showModel = false" />
         <Trash2 class="generic-checkbox-icon" />
       </button>
     </div>
@@ -42,7 +43,12 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { Check, Pencil, Trash2 } from "lucide-vue-next";
+import GenericModel from "../Generic/GenericModel.vue";
+import GenericButton from "./GenericButton.vue";
+
+const showModel = ref(false);
 
 defineProps({
   label: {
