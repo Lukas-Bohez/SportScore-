@@ -82,7 +82,7 @@ export default {
 
 .generic-stepbar__line {
   width: 3.75rem;
-  height: 2px;
+  height: 0.125rem;
   background-color: var(--blue-100);
   position: relative;
   z-index: 1;

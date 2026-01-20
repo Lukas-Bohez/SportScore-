@@ -1,7 +1,7 @@
 <template>
   <div class="feature-counter">
     <button class="feature-counter-icon" @click="increment">
-      <Plus :size="24" />
+      <Plus class="feature-counter-icon-svg" />
     </button>
     <div class="feature-counter-form">
       <GenericInput
@@ -13,7 +13,7 @@
     </div>
 
     <button class="feature-counter-icon" @click="decrement">
-      <Minus :size="24" />
+      <Minus class="feature-counter-icon-svg" />
     </button>
   </div>
 </template>
@@ -99,7 +99,10 @@ export default {
   color: var(--white);
   transition: opacity 0.2s ease;
 }
-
+.feature-counter-icon-svg {
+  height: 1.5rem;
+  width: 1.5rem;
+}
 .feature-counter-icon:hover {
   opacity: 0.7;
 }

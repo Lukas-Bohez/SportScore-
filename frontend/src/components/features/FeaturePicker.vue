@@ -48,7 +48,7 @@ function onSelectEmoji(emoji) {
 .selected-emoji {
   padding: 1rem;
   background: var(--white);
-  border-radius: 8px;
+  border-radius: var(--radius-M);
   text-align: center;
 }
 

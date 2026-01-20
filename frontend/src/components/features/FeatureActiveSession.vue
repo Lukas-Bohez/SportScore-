@@ -29,11 +29,11 @@ defineProps({
 .feature-active-session-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-3);
 }
 .color-dot {
-    width: 9px;
-    height: 9px;
+    width: .5625rem;
+    height: .5625rem;
     background-color: var(--red-60);
     border-radius: var(--radius-XL);
 }

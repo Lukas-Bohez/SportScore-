@@ -1,7 +1,7 @@
 <template>
-  <div class="feature-clock">
+  <h2 class="feature-clock">
     {{ formattedTime }}
-  </div>
+  </h2>
 </template>
 
 <script setup>
@@ -47,7 +47,7 @@ const formattedTime = computed(() => {
 
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
     2,
-    "0"
+    "0",
   )}:${String(seconds).padStart(2, "0")}`;
 });
 
@@ -75,11 +75,9 @@ defineOptions({
 <style scoped>
 .feature-clock {
   background-color: var(--blue-70);
-  color: white;
-  font-size: 32px;
-  font-weight: bold;
-  padding: 15px 30px;
-  border-radius: 12px;
+  color: var(--white);
+  padding: var(--space-5) var(--space-7);
+  border-radius: var(--radius-L);
   display: inline-block;
 }
 </style>
