@@ -4,162 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SportScore — Snelstartgids</title>
-  <style>
-    /* Global Styles */
-    :root {
-      --primary: #0b5cff;
-      --text: #1e293b;
-      --bg-print: #ffffff;
-      --bg-screen: #f3f4f6;
-    }
-    body { 
-      font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif; 
-      color: var(--text); 
-      line-height: 1.6; 
-      margin: 0; 
-      background: var(--bg-screen);
-    }
-    
-    /* A4 Paper Container */
-    .page {
-      background: var(--bg-print);
-      max-width: 210mm;
-      margin: 40px auto;
-      padding: 25mm;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-      border-radius: 4px;
-      box-sizing: border-box;
-    }
-
-    /* Header */
-    header { 
-      border-bottom: 2px solid var(--primary); 
-      padding-bottom: 20px; 
-      margin-bottom: 35px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: flex-end; 
-    }
-    h1 { 
-      font-size: 28px; 
-      margin: 0; 
-      color: var(--primary); 
-      font-weight: 800; 
-      letter-spacing: -0.5px; 
-    }
-    .subtitle { font-size: 16px; color: #64748b; margin-top: 5px; font-weight: 500; }
-
-    /* Sections */
-    .section { margin-bottom: 35px; }
-    h2 { 
-      font-size: 18px; 
-      margin: 0 0 15px 0; 
-      display: flex; 
-      align-items: center; 
-      color: var(--text);
-    }
-    
-    /* Number Circles */
-    .step-num { 
-      background: var(--primary); 
-      color: white; 
-      width: 28px; 
-      height: 28px; 
-      border-radius: 50%; 
-      display: inline-flex; 
-      align-items: center; 
-      justify-content: center; 
-      font-weight: bold;
-      font-size: 15px; 
-      margin-right: 12px; 
-      flex-shrink: 0;
-    }
-
-    /* Instructions */
-    p { margin: 0 0 10px 0; font-size: 15px; color: #334155; }
-    
-    /* WiFi Box - Clean & Friendly */
-    .wifi-card { 
-      background: #f8fafc; 
-      border: 2px solid #e2e8f0; 
-      border-radius: 12px; 
-      padding: 20px; 
-      display: flex; 
-      gap: 25px; 
-      align-items: center; 
-      margin-top: 10px;
-    }
-    .wifi-info p { margin-bottom: 5px; font-size: 16px; }
-    .wifi-label { font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: bold; letter-spacing: 1px; }
-    .wifi-value { font-family: monospace; font-size: 18px; color: var(--primary); font-weight: bold; background: #eef2ff; padding: 2px 6px; border-radius: 4px; }
-    
-    .qr-box {
-      width: 110px; height: 110px; 
-      background: white; 
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 5px;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* Steps List */
-    ol.steps { padding-left: 0; list-style: none; margin: 0; }
-    ol.steps li { 
-      margin-bottom: 12px; 
-      font-size: 15px; 
-      padding-left: 40px; /* Align with text of H2 */
-      position: relative;
-    }
-    ol.steps li::before {
-      content: "•";
-      color: var(--primary);
-      font-weight: bold;
-      position: absolute;
-      left: 25px;
-    }
-    
-    /* Footer */
-    footer { 
-      margin-top: 60px; 
-      padding-top: 20px; 
-      border-top: 1px solid #e2e8f0; 
-      text-align: center; 
-      font-size: 13px; 
-      color: #94a3b8; 
-    }
-
-    /* Important Highlight Box */
-    .highlight-box {
-      background: #fffbeb;
-      border-left: 4px solid #f59e0b;
-      padding: 15px;
-      margin-left: 40px;
-      font-size: 14px;
-      color: #92400e;
-      border-radius: 0 4px 4px 0;
-    }
-
-    /* Screen-only Button */
-    .no-print { text-align: center; padding: 30px; }
-    .btn { background: var(--primary); color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(11, 92, 255, 0.2); transition: transform 0.1s; }
-    .btn:hover { transform: translateY(-1px); }
-
-    /* Print Specifics */
-    @media print {
-      body { background: white; }
-      .page { box-shadow: none; margin: 0; padding: 0; width: 100%; max-width: 100%; }
-      .no-print { display: none; }
-      /* Avoid breaking instruction blocks across pages */
-      .section, .wifi-card, .qr-box, .highlight-box { page-break-inside: avoid; -webkit-column-break-inside: avoid; break-inside: avoid; }
-      /* Ensure colors print correctly */
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    }
-  </style>
+  <link rel="stylesheet" href="quickstart.css">
 </head>
 <body>
 
   <div class="no-print">
-    <a href="javascript:window.print()" class="btn">🖨️ Handleiding Afdrukken</a>
+    <a href="javascript:window.print()" class="btn">Handleiding Afdrukken</a>
   </div>
 
   <div class="page">
@@ -171,10 +21,10 @@
     </header>
 
     <div class="section">
-      <h2><span class="step-num">1</span> 🛠️ Aansluiten & Opstarten</h2>
+      <h2><span class="step-num">1</span> Aansluiten & Opstarten</h2>
       <ol class="steps">
         <li>Sluit het <strong>HDMI-scherm</strong> (TV of beamer) aan op de SportScore unit.</li>
-        <li>Sluit de <strong>stroomkabel</strong> aan.</li>
+        <li>Sluit de <strong>stroomkabel</strong> aan op het stopcontact.</li>
         <li>Wacht ongeveer <strong>1 minuut</strong>. De SportScore applicatie verschijnt automatisch op het grote scherm.</li>
       </ol>
       <div class="highlight-box">
@@ -183,71 +33,61 @@
     </div>
 
     <div class="section">
-      <h2><span class="step-num">2</span> 📶 Netwerk</h2>
-      <p style="margin-left: 40px;">Verbind uw bedieningsapparaat (laptop/tablet) met het lokale netwerk van de unit. <strong>Scan eerst de Wi‑Fi QR (linker QR).</strong></p>
+      <h2><span class="step-num">2</span> Netwerk & Verbinding</h2>
+      <p style="margin-left: 46px;">Verbind uw laptop of tablet met het wifi-netwerk van de unit om de scorebord-app te beheren.</p>
       
-      <div class="wifi-card" style="margin-left: 40px;">
-        <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap; width:100%;">
-          <div style="text-align:center; width:160px;">
-            <div class="qr-box" style="width:120px; height:120px;">
-              <img src="wifi_qr.png" alt="Scan WiFi QR" style="width:100%; height:100%; object-fit:contain;">
+      <div class="wifi-card" style="margin-left: 46px;">
+        <div style="display: flex; gap: 20px;">
+          <div style="text-align: center;">
+            <div class="qr-box">
+               <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQAAAADAX2ykAAACeElEQVR4nO2bQY7bMAxFH2sDWdo3yFHkmxVzpLmBfZTcQFoGcPC7kGQn0w46gzpGXFALB5De4gMEKYpkTHxnTT++hYPzzjvvvPPOO/8Zb2W1QDJj6m/lQ6pnw456nN+YD5KkCExnCVKLDekkG2gkSXrkn63H+Y34tvymHsI7GBjQxbwtEhg08056nH8634hwabHhRfQ4/w98+9tOFxHMCMDC+756nH8O30kaAUIEG7iZDalFIyBp/sg/W4/zm/KTmZn1AKkF0iknVDZwy+nzvnqc34jP8fmuSDmdi6+KBHo420GP89vy5MdPiAD5LTRTH0TN44Gk8dX0O/8VXm99I4KuJUhP1qKxq7duiDePz8fkKY4ZQYqNoJtzVgU0gk754/57SH6xb7VlWIysSE6nCZpLicvtezC+3r+aqXft6snlQKPfv0fli/+ONQwX1802r4lXiAv3avqd/8squXKubzT5c+e1Y47U7r/H5sPFLAdpuqvl+saaNS9v4pfV7/xn685/Fde9GeiWrKrz/Oqg/FLfaFQsmLdLaaPUpGvNw+17NP5j/lzMCPXWjU2uZLl9D82nk/R2lspUTs2kbaCEaxt21eP8Nvx9/zdcDJFaLFzqEMfUY0Azax89zm/L1/pVXSyxeK1aEfx9dGx+nZ+UYun6MtlJpR28tx7nN+ZDbTLcNfmDrpYfSdP56v2jY/NpmXDuilVzz3Ays3Wc43X1O/9FPsRGTHaS/Yw3K46tq8+3/yf81IPG7moa00mrY5fCx8vrd/6PfFerGiM3s4FGwK3ev/3uepzfhl9mrQDW1lE3o7ErjUPvHx2XN/9/t/POO++8887vzv8C1ZvmCM8ltd4AAAAASUVORK5CYII=" alt="WiFi QR">
             </div>
-            <div class="wifi-label" style="margin-top:8px;">Wi‑Fi</div>
-            <div class="wifi-info" style="margin-top:4px;">
-              <div class="wifi-value">pihotspot</div>
-              <div class="small">Wachtwoord: <code>raspberry</code></div>
-            </div>
-            <div class="small" style="margin-top:6px;">Scan de QR om direct te verbinden</div>
+            <div class="subtitle" style="font-size: 10px;">1. Scan WiFi</div>
           </div>
-
-          <div style="text-align:center; width:160px;">
-            <div class="qr-box" style="width:120px; height:120px;">
-              <img src="admin_qr.png" alt="Scan Admin QR" style="width:100%; height:100%; object-fit:contain;">
+          
+          <div style="text-align: center;">
+            <div class="qr-box">
+               <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUoAAAFKAQAAAABTUiuoAAAB7UlEQVR4nO2aTYqkQBCFX4zCLFOYA9RR0ps1c6S5gXmgAV0WpLxeRJal3dBYBWouXq5K61s8CF5k/GjEzpN+7SUBoUKFChUq9EjUymlhZi2QrIX10+N1f7gAoa+gkSQ5AhzC3QDMxgENSZJb9BgBQl9Bp4eF4gjYx9h4jNxqZwgQ+gZq1gFAyLD+EgFCfzjttzfTb7cVMZ0hQOgbaCA5AEAcZ8+J1gMgmc8RIHQ/msysJEE0BKYWAGYvCc8QIHTP8Uy4Hj+FDKTb3YCwnUpdrlVo6bd6ANZPtiren36z/nABQveddUcVSCBkcMByZYXsCIfLtQot0Ypjs3THuQQqjg2fLbKiVQG68haH8HDZKlAj5K1q0BKKxUzrTOghQ5lLKVrXo1tv5WKwyOyP/kveqgTdemvTDnvIdG9ViE4tvCZMXXEZUtcQwKzuuBp0nQm9ovDLa6nq5a3q0BKyQFofMjhMZohe2p8iQOgL6HN37DkxkmVYmG6a6laHPnfHf28ZZQYVMoBJU9160GWWgdJvxRFeCfrf/k73Vh3o120kU9dkiwQQ//3JSB3krWrQ77vj8N+QrMm+O46cWx4pQOgb6LI7Bh4fPqXb3fQVTVXoZmPit1Xpt8oZoTlhNejX3TG3j+sF8uVahQoVKlSo0E+my1eh96HhCAAAAABJRU5ErkJggg==" alt="Admin QR">
             </div>
-            <div class="wifi-label" style="margin-top:8px;">Beheer</div>
-            <div class="small" style="margin-top:6px;">Scan alleen nadat u verbonden bent met Wi‑Fi</div>
-            <div class="small">Directe link: <code>http://10.42.0.1</code></div>
+            <div class="subtitle" style="font-size: 10px;">2. Scan Beheer</div>
           </div>
+        </div>
 
-          <div class="wifi-info" style="min-width:180px; margin-left:6px;">
-            <div style="margin-bottom:10px;">
-              <div class="wifi-label">Netwerk (SSID)</div>
-              <div class="wifi-value">pihotspot</div>
-            </div>
-            <div>
-              <div class="wifi-label">Wachtwoord</div>
-              <div class="wifi-value">raspberry</div>
-            </div>
+        <div class="wifi-info">
+          <div class="wifi-row">
+            <span class="wifi-label">Netwerk (SSID)</span>
+            <div class="wifi-value">pihotspot</div>
+          </div>
+          <div class="wifi-row">
+            <span class="wifi-label">Wachtwoord</span>
+            <div class="wifi-value">raspberry</div>
+          </div>
+          <div class="small" style="margin-top: 10px;">
+            URL: <code>http://10.42.0.1</code>
           </div>
         </div>
       </div>
-    </div>"},{ 
+    </div>
 
     <div class="section">
-      <h2><span class="step-num">3</span> 🎮 Wedstrijd Beheren</h2>
-      <div style="margin-left:40px; display:flex; gap:12px; flex-direction:column;">
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div style="font-size:22px; width:28px;">🛠️</div>
-          <div><strong>Instellen:</strong> Klik <em>Nieuwe Sessie</em>, geef een naam en voeg activiteiten en deelnemers toe.</div>
-        </div>
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div style="font-size:22px; width:28px;">▶️</div>
-          <div><strong>Spelen:</strong> Start de sessie, open de BigScreen en laat deelnemers de QR scannen om scores in te voeren.</div>
-        </div>
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div style="font-size:22px; width:28px;">📥</div>
-          <div><strong>Afronden:</strong> Exporteren via <em>Geschiedenis</em> of sessie beëindigen.</div>
-        </div>
-        <p class="small" style="margin-top:8px;">Opmerking: alle bediening vindt plaats op één overzichtspagina. Scan de beheer-QR of gebruik <code>http://10.42.0.1</code> en volg de korte instructies.</p>
-      </div>
-        <li>Klik op <strong>Nieuwe Sessie</strong>, geef de sessie een naam en klik <strong>Volgende</strong>.</li>
-        <li>Voeg activiteiten toe of kies bestaande activiteiten. Stel indien nodig aantal rondes of tijdslimieten in.</li>
-        <li>Voeg teams en/of deelnemers toe (namen, emoji/icoon) of importeer spelers via CSV.</li>
-        <li>Start de sessie en open de BigScreen‑weergave. Laat deelnemers de QR op het BigScreen scannen om scores in te voeren — volg de instructies op één pagina.</li>
-        <li>Na afloop: exporteer de resultaten via <strong>Geschiedenis</strong> of sluit de sessie.</li>
+      <h2><span class="step-num">3</span> Wedstrijd Beheren</h2>
+      <ol class="steps">
+        <li>Klik op <strong>Nieuwe Sessie</strong> en geef uw evenement een naam. Klik op <strong>Volgende</strong>.</li>
+        <li><strong>Activiteiten toevoegen:</strong> Kies sporten of spellen, stel tijdslimieten of aantal rondes in indien nodig.</li>
+        <li><strong>Deelnemers toevoegen:</strong> Voeg teams of individuele spelers toe, of importeer een lijst via CSV- of XLS-bestand.</li>
+        <li><strong>Sessie starten:</strong> Klik op <strong>Start Sessie</strong>. Het grote scherm toont nu een QR-code voor deelnemers.</li>
+        <li><strong>Spelen:</strong> Deelnemers scannen de QR op het grote scherm met hun telefoon om scores in te voeren tijdens het spel.</li>
+        <li><strong>Afronden:</strong> Na afloop, bekijk resultaten in <strong>Geschiedenis</strong> en exporteer als XLS-bestand.</li>
       </ol>
-      <p style="margin-left:40px; margin-top:8px;">Opmerking: alle bediening vindt plaats op één overzichtspagina. Volg de korte instructies op de website om snel door de stappen te lopen.</p>
+      <div class="highlight-box" style="background: #f0f9ff; border-left-color: #0ea5e9; color: #075985;">
+        <strong>Tip:</strong> Alle instellingen en bediening gebeuren op één overzichtspagina in uw browser. Het grote scherm is alleen voor live weergave en deelnemer-QR.
+      </div>
     </div>
+
+    <footer>
+      SportScore Quickstart Guide &copy; 2026 — sportscore.local
+    </footer>
+  </div>
 
 </body>
 </html>
