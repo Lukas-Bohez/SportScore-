@@ -454,6 +454,15 @@ export class HomepageManagement {
 			const response = await this.api.getTeams();
 			const teams = this.api.extractArray(response, 'teams');
 			this.renderTeams(teams);
+
+			// Refresh team-related UI elements after loading teams
+			try {
+				this.updateTeamSelect();
+				this.updateExistingTeamSelect();
+				this.updatePlayerManagerDisplay();
+			} catch (err) {
+				console.warn('Failed to refresh team UI elements:', err);
+			}
 		} catch (error) {
 			console.error('Error loading teams:', error);
 			if (this.teamsList) this.teamsList.innerHTML = '<p>Fout bij laden teams.</p>';
@@ -792,6 +801,14 @@ export class HomepageManagement {
 			}
 			this.hideTeamForm();
 			await this.loadTeams();
+			// Ensure dropdowns/player manager are up-to-date after creating the team
+			try {
+				this.updateTeamSelect();
+				this.updateExistingTeamSelect();
+				this.updatePlayerManagerDisplay();
+			} catch (err) {
+				console.warn('Failed to refresh team UI elements after create:', err);
+			}
 		} catch (error) {
 			this.api.handleError && this.api.handleError(error, 'creating/updating team');
 			alert('Fout bij het opslaan van team.');

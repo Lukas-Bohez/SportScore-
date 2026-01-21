@@ -14,8 +14,9 @@ class HomepageExport {
     if (statusEl) statusEl.textContent = 'Exporteren...';
 
     try {
-      const includeHighscores = !!document.getElementById('include-highscores')?.checked;
-      const includeDetails = !!document.getElementById('include-details')?.checked;
+      // Always include highscores and details (checkboxes removed from UI)
+      const includeHighscores = true;
+      const includeDetails = true;
 
       const session = this.homepage.historySessions.find(s => s.id == sessionId);
       if (!session) {
@@ -110,6 +111,7 @@ class HomepageExport {
         const totalPoints = teamScores.reduce((sum, s) => sum + (s.points || 0), 0);
         const avgPoints = teamScores.length ? (totalPoints / teamScores.length).toFixed(2) : 0;
         const activitiesParticipated = new Set(teamScores.map(s => s.activity_id)).size;
+        const bestScore = teamScores.length ? Math.max(...teamScores.map(s => s.points || 0)) : 0;
         
         return {
           'Team ID': t.id,
@@ -118,8 +120,10 @@ class HomepageExport {
           'Icoon': t.icon || '',
           'Aantal Spelers': (session.players || []).filter(p => p.team_id === t.id).length,
           'Activiteiten Deelgenomen': activitiesParticipated,
+          'Totaal Aantal Scores': teamScores.length,
           'Totaal Punten': totalPoints,
           'Gemiddelde Punten': avgPoints,
+          'Beste Score': bestScore,
           'Beschrijving': t.description || ''
         };
       });
@@ -131,6 +135,7 @@ class HomepageExport {
         const totalPoints = playerScores.reduce((sum, s) => sum + (s.points || 0), 0);
         const avgPoints = playerScores.length ? (totalPoints / playerScores.length).toFixed(2) : 0;
         const activitiesParticipated = new Set(playerScores.map(s => s.activity_id)).size;
+        const bestScore = playerScores.length ? Math.max(...playerScores.map(s => s.points || 0)) : 0;
         
         return {
           'Speler ID': p.id,
@@ -138,8 +143,10 @@ class HomepageExport {
           'Team ID': p.team_id || '',
           'Teamnaam': team ? team.name : '',
           'Activiteiten Deelgenomen': activitiesParticipated,
+          'Totaal Aantal Scores': playerScores.length,
           'Totaal Punten': totalPoints,
-          'Gemiddelde Punten': avgPoints
+          'Gemiddelde Punten': avgPoints,
+          'Beste Score': bestScore
         };
       });
 
@@ -151,6 +158,8 @@ class HomepageExport {
         const teamsParticipated = new Set(activityScores.map(s => s.team_id).filter(Boolean)).size;
         const playersParticipated = new Set(activityScores.map(s => s.player_id).filter(Boolean)).size;
         const highestScore = activityScores.length ? Math.max(...activityScores.map(s => s.points || 0)) : 0;
+        const lowestScore = activityScores.length ? Math.min(...activityScores.map(s => s.points || 0)) : 0;
+        const isTimeMode = String(a.game_type) === 'team_vs_time';
         
         return {
           'Activiteit ID': a.id,
@@ -162,9 +171,11 @@ class HomepageExport {
           'Tijdslimiet (sec)': a.time_limit_per_round || '',
           'Teams Deelgenomen': teamsParticipated,
           'Spelers Deelgenomen': playersParticipated,
+          'Totaal Aantal Scores': activityScores.length,
           'Totaal Punten': totalPoints,
           'Gemiddelde Punten': avgPoints,
-          'Hoogste Score': highestScore,
+          'Hoogste Score': isTimeMode ? this._formatTimeScore(highestScore) : highestScore,
+          'Laagste Score': isTimeMode ? this._formatTimeScore(lowestScore) : lowestScore,
           'Beschrijving': a.description || ''
         };
       });
@@ -180,8 +191,11 @@ class HomepageExport {
           'Tijdstempel': s.timestamp || '',
           'Activiteit': s.activity_name,
           'Sporttype': s.activity_sport_type || '',
+          'Speltype': s.activity_game_type || '',
           'Ronde': s.round_number || '',
+          'Team ID': s.team_id || '',
           'Team': team ? team.name : '',
+          'Speler ID': s.player_id || '',
           'Speler': player ? player.name : '',
           'Punten': s.points || 0,
           'Punten (geformatteerd)': isTimeMode ? this._formatTimeScore(s.points) : (s.points || 0),
@@ -202,15 +216,20 @@ class HomepageExport {
           const entityName = isPlayer ? 
             (entry.player_name || (playerMap.get(entry.player_id)?.name) || `Speler ${entry.player_id}`) :
             (entry.team_name || (teamMap.get(entry.team_id)?.name) || `Team ${entry.team_id}`);
+          const score = entry.total_score || entry.score || 0;
           
           finalRankingsRows.push({
             'Activiteit': activity.name,
             'Sporttype': activity.sport_type || '',
             'Rang': index + 1,
             'Type': isPlayer ? 'Speler' : 'Team',
+            'ID': isPlayer ? (entry.player_id || '') : (entry.team_id || ''),
             'Naam': entityName,
-            'Totale Score': entry.total_score || entry.score || 0,
-            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(entry.total_score || entry.score) : (entry.total_score || entry.score || 0)
+            'Totale Score': score,
+            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(score) : score,
+            'Verschil met #1': index === 0 ? 0 : (isTimeMode ? 
+              this._formatTimeScore(score - leaderboard[0].total_score) : 
+              (score - (leaderboard[0].total_score || leaderboard[0].score || 0)))
           });
         });
       }
@@ -234,9 +253,11 @@ class HomepageExport {
             'Sporttype': activity.sport_type || '',
             'Speltype': activity.game_type || '',
             'Type': h.entity_type === 'player' ? 'Speler' : 'Team',
+            'ID': h.entity_id,
             'Naam': h.entity_name,
             'Totale Score': h.total_score,
-            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(h.total_score) : h.total_score
+            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(h.total_score) : h.total_score,
+            'Aantal Scores': h.score_count || 0
           }));
         }
       }
@@ -253,68 +274,58 @@ class HomepageExport {
 
       const wb = window.XLSX.utils.book_new();
 
-      // Add sheets in logical order
-      window.XLSX.utils.book_append_sheet(
-        wb,
-        window.XLSX.utils.json_to_sheet([sessionRow]),
-        'Sessieoverzicht'
-      );
+      // Add sheets in logical order with improved formatting
 
-      // Final Rankings (most important for end users)
+      // 1. Session overview (most important summary)
+      const sessionSheet = window.XLSX.utils.json_to_sheet([sessionRow]);
+      this._applySheetFormatting(sessionSheet, 'summary');
+      window.XLSX.utils.book_append_sheet(wb, sessionSheet, 'Sessieoverzicht');
+
+      // 2. Final Rankings (most important for end users)
       if (finalRankingsRows.length) {
-        window.XLSX.utils.book_append_sheet(
-          wb,
-          window.XLSX.utils.json_to_sheet(finalRankingsRows),
-          'Eindklassement'
-        );
+        const rankingsSheet = window.XLSX.utils.json_to_sheet(finalRankingsRows);
+        this._applySheetFormatting(rankingsSheet, 'rankings');
+        window.XLSX.utils.book_append_sheet(wb, rankingsSheet, 'Eindklassement');
       }
 
-      // Scores sheet (detailed data)
+      // 3. Teams performance summary
+      if (teamsRows.length) {
+        const teamsSheet = window.XLSX.utils.json_to_sheet(teamsRows);
+        this._applySheetFormatting(teamsSheet, 'data');
+        window.XLSX.utils.book_append_sheet(wb, teamsSheet, 'Teams');
+      }
+
+      // 4. Players performance summary
+      if (playersRows.length) {
+        const playersSheet = window.XLSX.utils.json_to_sheet(playersRows);
+        this._applySheetFormatting(playersSheet, 'data');
+        window.XLSX.utils.book_append_sheet(wb, playersSheet, 'Spelers');
+      }
+
+      // 5. Activities summary
+      if (activitiesRows.length) {
+        const activitiesSheet = window.XLSX.utils.json_to_sheet(activitiesRows);
+        this._applySheetFormatting(activitiesSheet, 'data');
+        window.XLSX.utils.book_append_sheet(wb, activitiesSheet, 'Activiteiten');
+      }
+
+      // 6. Top Prestaties (top performers across all activities)
+      if (includeHighscores && highscoresRows.length) {
+        const highscoresSheet = window.XLSX.utils.json_to_sheet(highscoresRows);
+        this._applySheetFormatting(highscoresSheet, 'rankings');
+        window.XLSX.utils.book_append_sheet(wb, highscoresSheet, 'Top Prestaties');
+      }
+
+      // 7. Detailed scores (raw data)
       if (scoresRows.length) {
-        window.XLSX.utils.book_append_sheet(
-          wb,
-          window.XLSX.utils.json_to_sheet(scoresRows),
-          'Alle Scores'
-        );
+        const scoresSheet = window.XLSX.utils.json_to_sheet(scoresRows);
+        this._applySheetFormatting(scoresSheet, 'data');
+        window.XLSX.utils.book_append_sheet(wb, scoresSheet, 'Alle Scores (Details)');
       } else {
         window.XLSX.utils.book_append_sheet(
           wb,
           window.XLSX.utils.json_to_sheet([{'Opmerking': 'Geen scores gevonden'}]),
-          'Alle Scores'
-        );
-      }
-
-      // Enhanced detail sheets
-      if (includeDetails) {
-        if (teamsRows.length) {
-          window.XLSX.utils.book_append_sheet(
-            wb,
-            window.XLSX.utils.json_to_sheet(teamsRows),
-            'Teams'
-          );
-        }
-        if (playersRows.length) {
-          window.XLSX.utils.book_append_sheet(
-            wb,
-            window.XLSX.utils.json_to_sheet(playersRows),
-            'Spelers'
-          );
-        }
-        if (activitiesRows.length) {
-          window.XLSX.utils.book_append_sheet(
-            wb,
-            window.XLSX.utils.json_to_sheet(activitiesRows),
-            'Activiteiten'
-          );
-        }
-      }
-
-      // Optional highscores sheet (top performers)
-      if (includeHighscores && highscoresRows.length) {
-        window.XLSX.utils.book_append_sheet(
-          wb,
-          window.XLSX.utils.json_to_sheet(highscoresRows),
-          'Top Prestaties'
+          'Alle Scores (Details)'
         );
       }
 
@@ -328,6 +339,30 @@ class HomepageExport {
       if (statusEl) statusEl.textContent = '';
       this._updateExportProgress(0, '');
     }
+  }
+
+  _applySheetFormatting(sheet, type) {
+    // Apply column widths based on content
+    if (!sheet['!cols']) sheet['!cols'] = [];
+    
+    const range = window.XLSX.utils.decode_range(sheet['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      let maxWidth = 10;
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        const cellAddress = window.XLSX.utils.encode_cell({r: R, c: C});
+        const cell = sheet[cellAddress];
+        if (cell && cell.v) {
+          const cellLength = String(cell.v).length;
+          maxWidth = Math.max(maxWidth, cellLength);
+        }
+      }
+      // Cap maximum width and add some padding
+      sheet['!cols'][C] = {wch: Math.min(maxWidth + 2, 50)};
+    }
+    
+    // Apply row height for headers
+    if (!sheet['!rows']) sheet['!rows'] = [];
+    sheet['!rows'][0] = {hpt: 20};
   }
 
   _formatTimeScore(ms) {
@@ -467,7 +502,7 @@ class HomepageExport {
   _computeHighscoresForActivity(activity, scoresRows = [], teams = [], players = [], topN = 50) {
     // activity: object with scoring_mode, game_type
     // scoresRows: array of { team_id, player_id, points }
-    const byEntity = {}; // key -> { id, name, total }
+    const byEntity = {}; // key -> { id, name, total, count }
     const isPlayerMode = String(activity.scoring_mode || 'team') === 'player';
     const isTimeMode = String(activity.game_type || '').toLowerCase() === 'team_vs_time';
 
@@ -489,10 +524,11 @@ class HomepageExport {
           const t = teamMap.get(id);
           name = t ? t.name : (id ? `Team ${id}` : 'Onbekend');
         }
-        byEntity[key] = { id: id, name: name, total: 0 };
+        byEntity[key] = { id: id, name: name, total: 0, count: 0 };
       }
       const val = Number(s.points || 0);
       byEntity[key].total = (byEntity[key].total || 0) + val;
+      byEntity[key].count = (byEntity[key].count || 0) + 1;
     });
 
     const rows = Object.keys(byEntity).map(k => {
@@ -501,7 +537,8 @@ class HomepageExport {
         entity_id: ent.id, 
         entity_name: ent.name, 
         entity_type: (k.startsWith('p:') ? 'player' : 'team'), 
-        total_score: ent.total 
+        total_score: ent.total,
+        score_count: ent.count
       };
     });
 
@@ -525,7 +562,7 @@ class HomepageExport {
 
   _computeAggregatedHighscoresFromCombinedRows(combinedRows = [], activitiesMeta = {}) {
     // combinedRows: [{ activity_id, activity_name, activity_scoring_mode, activity_game_type, team_id, player_id, points }]
-    const byActivity = {}; // activity_id -> map(key-> total)
+    const byActivity = {}; // activity_id -> map(key-> {total, count})
     
     combinedRows.forEach(r => {
       const aid = r.activity_id;
@@ -534,7 +571,11 @@ class HomepageExport {
       const isTimeMode = String(meta.game_type || '').toLowerCase() === 'team_vs_time';
       const key = isPlayerMode ? `p:${r.player_id || 'none'}` : `t:${r.team_id || 'none'}`;
       byActivity[aid] = byActivity[aid] || { meta, map: {} };
-      byActivity[aid].map[key] = (byActivity[aid].map[key] || 0) + Number(r.points || 0);
+      if (!byActivity[aid].map[key]) {
+        byActivity[aid].map[key] = { total: 0, count: 0 };
+      }
+      byActivity[aid].map[key].total += Number(r.points || 0);
+      byActivity[aid].map[key].count += 1;
     });
 
     const result = [];
@@ -554,7 +595,8 @@ class HomepageExport {
           activity_name: meta.name || '', 
           entity_type: parts[0] === 'p' ? 'player' : 'team', 
           entity_id: entityId, 
-          total_score: map[key] 
+          total_score: map[key].total,
+          score_count: map[key].count
         };
       }).filter(Boolean); // Remove null entries
       
@@ -596,8 +638,8 @@ class HomepageExport {
       const scoresResp = await this.api.getActivityScores(activityId);
       const scores = this.api.extractArray(scoresResp, 'scores') || [];
 
-      // fetch players/teams optionally
-      const includeDetails = !!document.getElementById('include-details')?.checked;
+      // Always include details
+      const includeDetails = true;
       let players = session.players || [];
       let teams = session.teams || [];
       if (includeDetails) {
@@ -635,8 +677,10 @@ class HomepageExport {
 
     try {
       this._updateExportProgress(0, '');
-      const includeHighscores = !!document.getElementById('include-highscores')?.checked;
-      const includeDetails = !!document.getElementById('include-details')?.checked;
+      
+      // Always include highscores and details
+      const includeHighscores = true;
+      const includeDetails = true;
 
       if (!this.homepage.historySessions || !this.homepage.historySessions.length) {
         await this.homepage.loadHistorySessions();
@@ -758,8 +802,11 @@ class HomepageExport {
           'Sessie': s.session_name,
           'Activiteit': s.activity_name,
           'Sporttype': s.activity_sport_type || '',
+          'Speltype': s.activity_game_type || '',
           'Ronde': s.round_number || '',
+          'Team ID': s.team_id || '',
           'Team': team ? team.name : '',
+          'Speler ID': s.player_id || '',
           'Speler': player ? player.name : '',
           'Punten': s.points || 0,
           'Punten (geformatteerd)': isTimeMode ? this._formatTimeScore(s.points) : (s.points || 0),
@@ -772,20 +819,16 @@ class HomepageExport {
 
       // Session summaries sheet (overview of all sessions)
       if (sessionSummaries.length) {
-        window.XLSX.utils.book_append_sheet(
-          wb,
-          window.XLSX.utils.json_to_sheet(sessionSummaries),
-          'Sessies Overzicht'
-        );
+        const summarySheet = window.XLSX.utils.json_to_sheet(sessionSummaries);
+        this._applySheetFormatting(summarySheet, 'summary');
+        window.XLSX.utils.book_append_sheet(wb, summarySheet, 'Sessies Overzicht');
       }
 
       // Main scores sheet
       if (scoresRowsWithNames.length) {
-        window.XLSX.utils.book_append_sheet(
-          wb,
-          window.XLSX.utils.json_to_sheet(scoresRowsWithNames),
-          'Alle Scores'
-        );
+        const scoresSheet = window.XLSX.utils.json_to_sheet(scoresRowsWithNames);
+        this._applySheetFormatting(scoresSheet, 'data');
+        window.XLSX.utils.book_append_sheet(wb, scoresSheet, 'Alle Scores');
       } else {
         window.XLSX.utils.book_append_sheet(
           wb,
@@ -794,7 +837,7 @@ class HomepageExport {
         );
       }
 
-      // Highscores sheet
+      // Highscores sheet (always included)
       if (includeHighscores) {
         const hs = this._computeAggregatedHighscoresFromCombinedRows(
           combinedRows,
@@ -820,22 +863,23 @@ class HomepageExport {
             'Activiteit': h.activity_name,
             'Sporttype': meta.sport_type || '',
             'Type': isPlayer ? 'Speler' : 'Team',
+            'ID': h.entity_id,
             'Naam': entityName,
+            'Aantal Scores': h.score_count || 0,
             'Totale Score': h.total_score,
-            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(h.total_score) : h.total_score
+            'Score (geformatteerd)': isTimeMode ? this._formatTimeScore(h.total_score) : h.total_score,
+            'Gemiddelde Score': h.score_count ? (h.total_score / h.score_count).toFixed(2) : 0
           };
         }).filter(h => h.Naam && h.Naam !== 'Onbekend'); // Filter out unknown entities
         
         if (hsWithDutch.length) {
-          window.XLSX.utils.book_append_sheet(
-            wb,
-            window.XLSX.utils.json_to_sheet(hsWithDutch),
-            'Top Prestaties'
-          );
+          const highscoresSheet = window.XLSX.utils.json_to_sheet(hsWithDutch);
+          this._applySheetFormatting(highscoresSheet, 'rankings');
+          window.XLSX.utils.book_append_sheet(wb, highscoresSheet, 'Top Prestaties');
         }
       }
 
-      // Optional global lists
+      // Optional global lists (always included)
       if (includeDetails) {
         try {
           const tResp = await this.api.getTeams();
@@ -848,11 +892,9 @@ class HomepageExport {
               'Icoon': t.icon || '',
               'Beschrijving': t.description || ''
             }));
-            window.XLSX.utils.book_append_sheet(
-              wb,
-              window.XLSX.utils.json_to_sheet(teamsWithDutch),
-              'Alle Teams'
-            );
+            const teamsSheet = window.XLSX.utils.json_to_sheet(teamsWithDutch);
+            this._applySheetFormatting(teamsSheet, 'data');
+            window.XLSX.utils.book_append_sheet(wb, teamsSheet, 'Alle Teams');
           }
         } catch (err) {
           console.warn('Failed to load teams for export', err);
@@ -871,11 +913,9 @@ class HomepageExport {
                 'Teamnaam': team ? team.name : ''
               };
             });
-            window.XLSX.utils.book_append_sheet(
-              wb,
-              window.XLSX.utils.json_to_sheet(playersWithDutch),
-              'Alle Spelers'
-            );
+            const playersSheet = window.XLSX.utils.json_to_sheet(playersWithDutch);
+            this._applySheetFormatting(playersSheet, 'data');
+            window.XLSX.utils.book_append_sheet(wb, playersSheet, 'Alle Spelers');
           }
         } catch (err) {
           console.warn('Failed to load players for export', err);
@@ -893,11 +933,9 @@ class HomepageExport {
               'Scoremodus': a.scoring_mode || 'team',
               'Beschrijving': a.description || ''
             }));
-            window.XLSX.utils.book_append_sheet(
-              wb,
-              window.XLSX.utils.json_to_sheet(activitiesWithDutch),
-              'Alle Activiteiten'
-            );
+            const activitiesSheet = window.XLSX.utils.json_to_sheet(activitiesWithDutch);
+            this._applySheetFormatting(activitiesSheet, 'data');
+            window.XLSX.utils.book_append_sheet(wb, activitiesSheet, 'Alle Activiteiten');
           }
         } catch (err) {
           console.warn('Failed to load activities for export', err);
