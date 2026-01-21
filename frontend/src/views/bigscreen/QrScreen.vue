@@ -21,9 +21,9 @@
   </div>
 </template>
 <script setup>
-import FeatureDevider from "../components/features/FeatureDevider.vue";
+import FeatureDevider from "../../components/features/FeatureDevider.vue";
 </script>
-// ...existing code...
+
 <style scoped>
 .qr-screen {
   text-align: center;

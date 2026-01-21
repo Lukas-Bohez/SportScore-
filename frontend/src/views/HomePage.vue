@@ -20,6 +20,11 @@ import { Plus } from "lucide-vue-next";
           Nieuwe sessie
         </RouterLink>
       </GenericButton>
+      <div>
+        <RouterLink class="router-link" to="/bigscreen/qrscreen">
+          QR Code Scannen
+        </RouterLink>
+      </div>
     </div>
     <div class="nav-container">
       <GenericNav />

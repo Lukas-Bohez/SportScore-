@@ -5,7 +5,7 @@
   </div>
 </template>
 <script setup>
-import FeatureCountdown from "../components/features/FeatureCountdown.vue";
+import FeatureCountdown from "../../components/features/FeatureCountdown.vue";
 </script>
 <style scoped>
 .countdown-screen {
