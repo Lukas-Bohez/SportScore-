@@ -460,6 +460,8 @@ class Homepage {
     if (!activity) return;
 
     const scoringMode = activity.scoring_mode || 'team';
+    const lowerIsBetter = SharedUtils.isLowerBetter(activity);
+    const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
     const teams = session.teams || [];
     const players = session.players || [];
 
@@ -501,22 +503,50 @@ class Homepage {
             name: teamName,
             color: team?.color,
             icon: team?.icon,
-            score: 0,
+            score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity),
             players: {},
             type: 'team'
           };
         }
-        aggregatedScores[teamId].score += (score.points || 0);
+        
+        const currentScore = score.points || 0;
+        if (isTimeMode && lowerIsBetter) {
+          aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+        } else if (!lowerIsBetter) {
+          aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
+        } else {
+          aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+        }
 
         if (score.player_id && score.points) {
           const playerId = score.player_id;
           const player = playerMap[playerId];
           const playerName = player?.name || `Speler ${playerId}`;
           if (!aggregatedScores[teamId].players[playerId]) {
-            aggregatedScores[teamId].players[playerId] = { name: playerName, score: 0 };
+            aggregatedScores[teamId].players[playerId] = { name: playerName, score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity) };
           }
-          aggregatedScores[teamId].players[playerId].score += (score.points || 0);
+
+          if (isTimeMode && lowerIsBetter) {
+            aggregatedScores[teamId].players[playerId].score = Math.min(aggregatedScores[teamId].players[playerId].score, currentScore);
+          } else if (!lowerIsBetter) {
+            aggregatedScores[teamId].players[playerId].score = Math.max(aggregatedScores[teamId].players[playerId].score, currentScore);
+          } else {
+            aggregatedScores[teamId].players[playerId].score = Math.min(aggregatedScores[teamId].players[playerId].score, currentScore);
+          }
         }
+      });
+      
+      // Handle edge case: if team score is still Infinity/-Infinity, set to 0
+      Object.values(aggregatedScores).forEach(team => {
+        if (team.score === Infinity || team.score === -Infinity) {
+          team.score = 0;
+        }
+        // Also fix player scores
+        Object.values(team.players || {}).forEach(player => {
+          if (player.score === Infinity || player.score === -Infinity) {
+            player.score = 0;
+          }
+        });
       });
     } else {
       activityScores.forEach(score => {
@@ -540,9 +570,8 @@ class Homepage {
     const container = document.getElementById(`modal-scores-${sessionId}`);
     if (!container) return;
 
-    // Determine ordering and time-based formatting rules
-    const lowerIsBetter = SharedUtils.isLowerBetter(activity);
-    const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
+    // Determine ordering and time-based formatting rules (computed earlier)
+    
 
     let scoresList = Object.values(aggregatedScores);
     scoresList.sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
@@ -565,7 +594,10 @@ class Homepage {
                 <span style="font-size: 1.3em;">${iconEmoji}</span>
                 <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
               </div>
-              <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}</div>
+              <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">
+              ${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}
+              ${isTimeMode ? '<small style="font-size: 0.7em; color: var(--text-secondary);"> (beste tijd)</small>' : ''}
+              </div>
               ${playersList.length > 0 ? `
                 <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
                   <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
@@ -747,24 +779,70 @@ class Homepage {
               name: teamName,
               color: team?.color,
               icon: team?.icon,
-              score: 0,
+              score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity),
               players: {},
               type: 'team'
             };
           }
-          // Add to team total
-          aggregatedScores[teamId].score += (score.points || 0);
           
-          // Also track individual player scores (only if they have points)
+          // For team vs time with lower-is-better (time), track the BEST (lowest) time among players
+          // For regular scoring with higher-is-better, track the BEST (highest) score among players
+          const currentScore = score.points || 0;
+          
+          if (isTimeMode && lowerIsBetter) {
+            // Time mode: lower time is better - track minimum time
+            aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+          } else if (!lowerIsBetter) {
+            // Regular scoring: higher score is better - track maximum score
+            aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
+          } else {
+            // Lower is better but not time mode (e.g., golf) - track minimum score
+            aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+          }
+          
+          // Also track individual player scores
           if (score.player_id && score.points) {
             const playerId = score.player_id;
             const player = playerMap[playerId];
             const playerName = player?.name || `Speler ${playerId}`;
             if (!aggregatedScores[teamId].players[playerId]) {
-              aggregatedScores[teamId].players[playerId] = { name: playerName, score: 0 };
+              aggregatedScores[teamId].players[playerId] = { 
+                name: playerName, 
+                score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity) 
+              };
             }
-            aggregatedScores[teamId].players[playerId].score += (score.points || 0);
+            
+            // Update player's best score using same logic as team
+            if (isTimeMode && lowerIsBetter) {
+              aggregatedScores[teamId].players[playerId].score = Math.min(
+                aggregatedScores[teamId].players[playerId].score, 
+                currentScore
+              );
+            } else if (!lowerIsBetter) {
+              aggregatedScores[teamId].players[playerId].score = Math.max(
+                aggregatedScores[teamId].players[playerId].score, 
+                currentScore
+              );
+            } else {
+              aggregatedScores[teamId].players[playerId].score = Math.min(
+                aggregatedScores[teamId].players[playerId].score, 
+                currentScore
+              );
+            }
           }
+        });
+        
+        // Handle edge case: if team score is still Infinity/-Infinity, set to 0
+        Object.values(aggregatedScores).forEach(team => {
+          if (team.score === Infinity || team.score === -Infinity) {
+            team.score = 0;
+          }
+          // Also fix player scores
+          Object.values(team.players || {}).forEach(player => {
+            if (player.score === Infinity || player.score === -Infinity) {
+              player.score = 0;
+            }
+          });
         });
       } else {
         // Default to team mode - group by team_id
@@ -813,7 +891,10 @@ class Homepage {
                   <span style="font-size: 1.3em;">${iconEmoji}</span>
                   <span style="font-size: 1.15em;">${this.escapeHtml(team.name)}</span>
                 </div>
-                <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: var(--primary-color); margin-bottom: 16px;">
+                ${isTimeMode ? SharedUtils.formatMs(team.score) : (team.score + ' punten')}
+                ${isTimeMode ? '<small style="font-size: 0.7em; color: var(--text-secondary);"> (beste tijd)</small>' : ''}
+                </div>
                 ${playersList.length > 0 ? `
                   <div style="padding-top: 12px; border-top: 2px solid var(--border-color); margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-color); font-size: 1.05em;">Spelers:</div>
