@@ -313,3 +313,29 @@ footer {
   /* Clean links */
   a { text-decoration: none; color: #000; }
 }
+
+/* --- Printing Fixes --- */
+@media print {
+  /* This forces a clean break if the content is too long */
+  .page-break-before {
+    page-break-before: always;
+    margin-top: 40mm !important; /* Adds professional padding at top of page 2 */
+  }
+
+  .section {
+    page-break-inside: avoid;
+    margin-bottom: 30px;
+  }
+
+  /* Ensure the page container doesn't cut off */
+  .page {
+    height: auto;
+    min-height: initial;
+    padding: 15mm;
+  }
+}
+
+/* Helper class for the specific section */
+.page-break-before {
+    padding-top: 20px;
+}
