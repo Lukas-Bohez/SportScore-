@@ -1,5 +1,5 @@
 <template>
-  <div class="background-effect loading-screen">
+  <div class="background-effect">
     <div class="spinner-container">
       <div class="spinner"></div>
     </div>

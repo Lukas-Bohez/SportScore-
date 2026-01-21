@@ -6,7 +6,7 @@ import { Plus } from "lucide-vue-next";
 </script>
 
 <template>
-  <div class="layout-page-container">
+  <div class="layout-home-page">
     <div class="home-content">
       <h1>Welkom bij</h1>
       <h3>SportScore!</h3>
@@ -26,9 +26,9 @@ import { Plus } from "lucide-vue-next";
         </RouterLink>
       </div>
     </div>
-    <div class="nav-container">
-      <GenericNav />
-    </div>
+  </div>
+  <div class="nav-container">
+    <GenericNav />
   </div>
 </template>
 
@@ -49,7 +49,7 @@ import { Plus } from "lucide-vue-next";
   }
 
   .vector-container {
-    margin-bottom: var(--space-9);
+    margin-bottom: var(--space-8);
   }
 
   & p {
@@ -57,5 +57,15 @@ import { Plus } from "lucide-vue-next";
     color: var(--black-100);
     text-align: center;
   }
+}
+
+.layout-home-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 4.875rem); /* Adjust for nav height */
+  width: 100%;
 }
 </style>

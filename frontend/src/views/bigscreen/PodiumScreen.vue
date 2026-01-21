@@ -1,5 +1,5 @@
 <template>
-  <div class="background-effect">
+  <div class="">
     <div class="scorescreen-header">
       <FeatureClock initialTime="01:20:00" />
       <h2>Leaderboard</h2>

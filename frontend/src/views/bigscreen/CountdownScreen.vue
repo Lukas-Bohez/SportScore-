@@ -1,5 +1,5 @@
 <template>
-  <div class="countdown-screen background-effect">
+  <div class="countdown-screen">
     <h3>Hou je klaar we <strong>beginnen</strong> in :</h3>
     <FeatureCountdown />
   </div>

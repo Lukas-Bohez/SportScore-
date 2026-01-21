@@ -3,8 +3,8 @@ import GenericNav from "@/components/Generic/GenericNav.vue";
 </script>
 
 <template>
-  <main>
+  <h1>Actief</h1>
+  <div class="nav-container">
     <GenericNav />
-    Actief
-  </main>
+  </div>
 </template>

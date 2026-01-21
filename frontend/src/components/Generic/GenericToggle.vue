@@ -51,8 +51,6 @@ export default {
   gap: var(--space-4);
   text-align: center;
   color: var(--white);
-  margin-top: 2rem;
-  margin-bottom: 2rem;
   flex-wrap: wrap;
 }
 

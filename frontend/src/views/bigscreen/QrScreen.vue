@@ -1,5 +1,5 @@
 <template>
-  <div class="qr-screen background-effect">
+  <div class="qr-screen">
     <h2><strong>SportScore!</strong></h2>
     <h4>Laat de wedstrijd <strong>beginnen!</strong></h4>
     <div class="qr-screen-content">

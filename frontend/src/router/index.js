@@ -41,11 +41,6 @@ const router = createRouter({
       name: "qrscreen",
       component: () => import("../views/bigscreen/QrScreen.vue"),
     },
-    {
-      path: "/bigscreen/qrscreen",
-      name: "qrscreen",
-      component: () => import("../views/bigscreen/QrScreen.vue"),
-    },
   ],
 });
 

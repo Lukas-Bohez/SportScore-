@@ -12,8 +12,4 @@ import Home from "@/views/HomePage.vue";
   </main>
 </template>
 
-<style scoped>
-.app-container {
-  padding: 1.3125rem 2.6875rem;
-}
-</style>
+<style scoped></style>
