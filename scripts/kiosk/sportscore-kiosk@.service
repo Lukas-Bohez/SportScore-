@@ -1,0 +1,18 @@
+[Unit]
+Description=SportScore Kiosk Browser for user %i
+Wants=network-online.target
+After=network-online.target graphical.target
+
+[Service]
+Type=simple
+User=%i
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/%i/.Xauthority
+# Set any extra chromium flags via EXTRA_CHROMIUM_FLAGS
+Environment=EXTRA_CHROMIUM_FLAGS=
+ExecStart=/home/%i/.local/bin/start-kiosk.sh http://localhost/SportScoreBigScreen.html
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

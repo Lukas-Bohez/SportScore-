@@ -1,0 +1,18 @@
+[Unit]
+Description=SportScore Kiosk Browser (user service)
+Wants=network-online.target
+After=network-online.target graphical.target
+
+[Service]
+Type=simple
+# Edit ExecStart to point to the installed wrapper if you move it.
+ExecStart=%h/.local/bin/start-kiosk.sh http://localhost
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+# Example: set EXTRA_CHROMIUM_FLAGS='--disable-gpu --use-gl=egl' when needed
+Environment=EXTRA_CHROMIUM_FLAGS=
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
