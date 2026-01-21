@@ -14,16 +14,18 @@
  */
 
 // ============================================================================
+
+// Provide default config to avoid ReferenceError if not defined elsewhere
+const SCORE_CONFIG = {
+  MIN_POINTS: 0,
+  MAX_POINTS: 100000,
+  RELOAD_DELAY: 1000,
+  ANIMATION_DURATION: 1200
+};
+
+// ============================================================================
 // Constants & Configuration
 // ============================================================================
-
-const SCORE_CONFIG = {
-  MIN_POINTS: -100,
-  MAX_POINTS: 100,
-  ANIMATION_DURATION: 2000,
-  RELOAD_DELAY: 500,
-  ACK_TIMEOUT: 1500
-};
 
 const SPORT_QUICK_BUTTONS = {
   quiz: [
@@ -166,11 +168,11 @@ class ScoreInput {
     this.activities = [];
     this.selectedActivityId = null;
     this.activeActivityId = null;
-    
+
     // Team & Player State
     this.teams = [];
     this.participantName = null;
-    
+
     // UI State
     this.recentScoresData = [];
     this.leaderboardData = null;
@@ -178,38 +180,24 @@ class ScoreInput {
     this.leaderboardLowerIsBetter = false;
     this.customQuickActions = [];
     this.isSubmitting = false;
-    
-    // Timer State (for countdown)
-    this.timeRemaining = 0;
-    this.timerInterval = null;
-    
-    // Round State
-    this.currentActivity = null;
-    this.roundStatus = 'not_started';
-    this.currentRound = 1;
-    this.totalRounds = 1;
-    this.roundStartTime = null;
-    this.timeLimitPerRound = null;
-    this.roundTimeRemaining = 0;
-    this.roundTimerInterval = null;
-    
+
     // Utilities
     this.sharedUtils = new SharedUtils(api);
-    
+
     // DOM Elements (bound in bindElements)
     this.elements = {};
-    
-    if (!this.sessionId) {
-      this.showFatalError('Geen sessie ID gevonden in de URL. Voeg ?session=<id> toe.');
-      return;
-    }
-    
+
+    // Team vs Time and round/timer logic
+    this.teamVsTime = new ScoreInputTeamVsTime(this);
+
+    if (!this.sessionId) {/* Lines 203-205 omitted */}
+
     this.initialize();
   }
 
-  // ==========================================================================
-  // Initialization
-  // ==========================================================================
+  // ========================================================================== 
+  // Methods
+  // ========================================================================== 
 
   extractSessionId() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1158,51 +1146,37 @@ class ScoreInput {
     }
   }
 
-  async addTimeFromInputs() {
-    if (!this.validateTimeInputs()) return;
-    
-    const deltaMs = this.getTimeFromInputs();
-    const { teamId, playerId } = this.getTeamAndPlayer();
-    
-    if (!teamId) {
-      alert('Selecteer een team.');
-      return;
-    }
-    
-    this.disableSubmitButtons();
-    
-    try {
-      const currentMs = await this.getCurrentRecordedMs(teamId, playerId);
-      const newMs = Math.max(0, currentMs + deltaMs);
-      
-      console.debug('Add Time:', { teamId, playerId, deltaMs, currentMs, newMs });
-      
-      this.elements.pointsInput.value = SharedUtils.formatMs(newMs);
-      await this.submitDeltaScore(deltaMs, teamId, playerId);
-    } finally {
-      this.enableSubmitButtons();
-    }
-  }
 
-  validateTimeInputs() {
-    const mins = parseInt(this.elements.setMinutes?.value) || 0;
-    const secs = parseInt(this.elements.setSeconds?.value) || 0;
-    const ms = parseInt(this.elements.setMs?.value) || 0;
-    
-    if (secs < 0 || secs > 59 || ms < 0 || ms > 999 || mins < 0) {
-      alert('Voer een geldige tijd in (seconden 0-59, milliseconden 0-999).');
-      return false;
-    }
-    
-    return true;
-  }
+  // Delegated team vs time and round/timer logic
+  setTimeFromInputs() { return this.teamVsTime.setTimeFromInputs(); }
+  addTimeFromInputs() { return this.teamVsTime.addTimeFromInputs(); }
+  validateTimeInputs() { return this.teamVsTime.validateTimeInputs(); }
+  getTimeFromInputs() { return this.teamVsTime.getTimeFromInputs(); }
+  getTeamAndPlayer() { return this.teamVsTime.getTeamAndPlayer(); }
+  getCurrentRecordedMs(teamId, playerId) { return this.teamVsTime.getCurrentRecordedMs(teamId, playerId); }
+  submitDeltaScore(deltaMs, teamId, playerId) { return this.teamVsTime.submitDeltaScore(deltaMs, teamId, playerId); }
 
-  getTimeFromInputs() {
-    const mins = parseInt(this.elements.setMinutes?.value) || 0;
-    const secs = parseInt(this.elements.setSeconds?.value) || 0;
-    const ms = parseInt(this.elements.setMs?.value) || 0;
-    return (mins * 60000) + (secs * 1000) + ms;
-  }
+  startRound() { return this.teamVsTime.startRound(); }
+  pauseRound() { return this.teamVsTime.pauseRound(); }
+  resumeRound() { return this.teamVsTime.resumeRound(); }
+  endRound() { return this.teamVsTime.endRound(); }
+  nextActivityRound() { return this.teamVsTime.nextActivityRound(); }
+  loadRoundStatus() { return this.teamVsTime.loadRoundStatus(); }
+  updateRoundDisplay(roundStatus) { return this.teamVsTime.updateRoundDisplay(roundStatus); }
+  updateRoundControlButtons() { return this.teamVsTime.updateRoundControlButtons(); }
+  updateRoundTimerDisplay(seconds) { return this.teamVsTime.updateRoundTimerDisplay(seconds); }
+
+  startRoundTimer(initialSeconds) { return this.teamVsTime.startRoundTimer(initialSeconds); }
+  stopRoundTimer() { return this.teamVsTime.stopRoundTimer(); }
+
+  handleRoundStarted(data) { return this.teamVsTime.handleRoundStarted(data); }
+  handleRoundEnded(data) { return this.teamVsTime.handleRoundEnded(data); }
+  handleRoundChanged(data) { return this.teamVsTime.handleRoundChanged(data); }
+  handleRoundPaused(data) { return this.teamVsTime.handleRoundPaused(data); }
+  handleRoundResumed(data) { return this.teamVsTime.handleRoundResumed(data); }
+  handleRoundTimeUpdate(data) { return this.teamVsTime.handleRoundTimeUpdate(data); }
+  handleRoundAutoAdvanced(data) { return this.teamVsTime.handleRoundAutoAdvanced(data); }
+  handleActivityCompleted(data) { return this.teamVsTime.handleActivityCompleted(data); }
 
   getTeamAndPlayer() {
     const teamId = parseInt(this.elements.teamSelect?.value) || null;
@@ -2362,6 +2336,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// Export for module usage
+if (typeof module !== 'undefined' && module.exports) {
+}
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { ScoreInput };
