@@ -1467,6 +1467,9 @@ class Homepage {
     const lowerIsBetter = SharedUtils.isLowerBetter(activity);
     const isTimeMode = !!(activity && String(activity.game_type) === 'team_vs_time');
 
+    // Debug: include lowerIsBetter in logs to help trace sorting/formatting issues
+    console.debug(`Displaying highscores for activity ${activityId} (lowerIsBetter: ${lowerIsBetter})`, { activityId, leaderboardCount: (leaderboard||[]).length, scoringMode, isTimeMode });
+
     if (scoringMode === 'player') {
       const sortedPlayers = (leaderboard || []).slice().sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
       container.innerHTML = sortedPlayers.map((player, index) => `
