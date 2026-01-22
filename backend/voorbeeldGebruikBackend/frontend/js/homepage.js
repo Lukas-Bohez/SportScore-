@@ -1044,11 +1044,11 @@ class Homepage {
 
   async loadActivitiesForHighscores() {
     try {
-      // Use only history sessions, like history loading
-      const allSessions = this.historySessions || [];
+      // Include both active and history sessions so ongoing games count
+      const allSessions = (this.activeSessions || []).concat(this.historySessions || []);
       
-      // Map activity names to their highest scoring instance
-      const activityMap = new Map(); // name -> {activity, maxScore}
+      // Map activity names to their best scoring instance (min or max depending on rules)
+      const activityMap = new Map(); // name -> tracker
       
       for (const session of allSessions) {
         const activities = session.activities || [];
@@ -1058,7 +1058,13 @@ class Homepage {
           let current = activityMap.get(key);
           
           if (!current) {
-            current = { activity: { ...activity, session_id: session.id }, maxScore: 0 };
+            const lowerIsBetter = SharedUtils.isLowerBetter(activity);
+            current = { 
+              activity: { ...activity, session_id: session.id },
+              bestMin: Infinity,
+              bestMax: -Infinity,
+              anyLowerIsBetter: !!lowerIsBetter
+            };
             activityMap.set(key, current);
           }
           
@@ -1066,10 +1072,83 @@ class Homepage {
           try {
             const lbResponse = await this.api.getActivityLeaderboard(activity.id);
             const lb = lbResponse.leaderboard || [];
-            const max = lb.length > 0 ? Math.max(...lb.map(t => t.total_score || 0)) : 0;
-            
-            if (max > current.maxScore) {
-              current.maxScore = max;
+
+            const instLowerIsBetter = SharedUtils.isLowerBetter(activity);
+            let bestInThisInstance = instLowerIsBetter ? Infinity : -Infinity;
+
+            if (lb.length > 0) {
+              // If this activity is player-scored, prefer player entries; ignore team-only leaderboards
+              if (String(activity.scoring_mode) === 'player') {
+                const playerEntries = lb.filter(e => e.player_id || e.player_name);
+                if (playerEntries.length > 0) {
+                  const scores = playerEntries.map(t => {
+                    const raw = t.total_score ?? t.score ?? t.points;
+                    return raw !== undefined && raw !== null ? Number(raw) : (instLowerIsBetter ? Infinity : -Infinity);
+                  });
+                  bestInThisInstance = instLowerIsBetter ? Math.min(...scores) : Math.max(...scores);
+                } else {
+                  // Leaderboard contains team-level entries only; fall back to detailed per-player scores
+                  try {
+                    const scoresResp = await this.api.getActivityScores(activity.id);
+                    const scoresArr = this.api.extractArray(scoresResp, 'scores') || [];
+                    const totals = {};
+                    scoresArr.forEach(s => {
+                      if (!s.player_id && !s.player_name) return; // skip team-only rows
+                      const pid = s.player_id ?? s.player_name;
+                      const keyId = String(pid);
+                      const val = s.points ?? s.score ?? s.total_score;
+                      const n = val !== undefined && val !== null ? Number(val) : 0;
+                      totals[keyId] = (totals[keyId] || 0) + n;
+                    });
+                    if (Object.keys(totals).length > 0) {
+                      const vals = Object.values(totals);
+                      bestInThisInstance = instLowerIsBetter ? Math.min(...vals) : Math.max(...vals);
+                    }
+                  } catch (e) {
+                    console.warn(`Fallback: could not fetch detailed scores for activity ${activity.id}:`, e);
+                  }
+                }
+              } else {
+                // Non-player mode: use whatever the leaderboard provides (teams or players aggregated)
+                const scores = lb.map(t => {
+                  const raw = t.total_score ?? t.score ?? t.points;
+                  return raw !== undefined && raw !== null ? Number(raw) : (instLowerIsBetter ? Infinity : -Infinity);
+                });
+                bestInThisInstance = instLowerIsBetter ? Math.min(...scores) : Math.max(...scores);
+              }
+            } else {
+              // Fallback: try detailed scores and aggregate per player/team within this instance
+              try {
+                const scoresResp = await this.api.getActivityScores(activity.id);
+                const scoresArr = this.api.extractArray(scoresResp, 'scores') || [];
+                const totals = {};
+                const isPlayerMode = String(activity.scoring_mode) === 'player';
+                scoresArr.forEach(s => {
+                  let pid = null;
+                  if (isPlayerMode) {
+                    pid = s.player_id ?? s.player_name ?? null;
+                  } else {
+                    pid = s.player_id ?? s.player_name ?? s.team_id ?? s.team_name ?? null;
+                  }
+                  if (pid === null || pid === undefined) return;
+                  const keyId = String(pid);
+                  const val = s.points ?? s.score ?? s.total_score;
+                  const n = val !== undefined && val !== null ? Number(val) : 0;
+                  totals[keyId] = (totals[keyId] || 0) + n;
+                });
+                if (Object.keys(totals).length > 0) {
+                  const vals = Object.values(totals);
+                  bestInThisInstance = instLowerIsBetter ? Math.min(...vals) : Math.max(...vals);
+                }
+              } catch (e) {
+                console.warn(`Fallback: could not fetch detailed scores for activity ${activity.id}:`, e);
+              }
+            }
+
+            if (bestInThisInstance !== (instLowerIsBetter ? Infinity : -Infinity)) {
+              current.anyLowerIsBetter = current.anyLowerIsBetter || instLowerIsBetter;
+              if (instLowerIsBetter) current.bestMin = Math.min(current.bestMin, bestInThisInstance);
+              current.bestMax = Math.max(current.bestMax, bestInThisInstance);
               current.activity = { ...activity, session_id: session.id }; // Ensure session_id is included
             }
           } catch (e) {
@@ -1079,10 +1158,15 @@ class Homepage {
       }
       
       // Convert to array for rendering
-      const activitiesWithScores = Array.from(activityMap.values()).map(({activity, maxScore}) => ({
-        ...activity,
-        highest_score: maxScore
-      }));
+      const activitiesWithScores = Array.from(activityMap.values()).map(({activity, bestMin, bestMax, anyLowerIsBetter}) => {
+        const chosen = anyLowerIsBetter ? bestMin : bestMax;
+        const invalid = anyLowerIsBetter ? (chosen === Infinity) : (chosen === -Infinity);
+        return {
+          ...activity,
+          highest_score: invalid ? null : chosen,
+          lower_is_better: anyLowerIsBetter
+        };
+      });
       
       // Store for client-side filtering & wire controls
       this.highscoresActivities = activitiesWithScores;
@@ -1104,7 +1188,13 @@ class Homepage {
       return;
     }
 
-    grid.innerHTML = activities.map(activity => `
+    grid.innerHTML = activities.map(activity => {
+      const isTime = String(activity.game_type) === 'team_vs_time';
+      const scoreText = activity.highest_score !== null
+        ? (isTime ? SharedUtils.formatMs(activity.highest_score) : activity.highest_score)
+        : (isTime ? 'Geen tijden' : 'Geen scores');
+
+      return `
       <div class="highscores-card" data-activity-id="${activity.id}" data-session-id="${activity.session_id}">
         <h3>${this.escapeHtml(activity.name)}</h3>
         <div class="highscores-meta">
@@ -1113,10 +1203,10 @@ class Homepage {
         </div>
         <p>${activity.description ? this.escapeHtml(activity.description) : ''}</p>
         <div class="highscores-stats">
-          <span>Hoogste score: ${activity.highest_score || 0}</span>
+          <span>Beste score: ${scoreText}</span>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
 
     // Add click handlers
     grid.querySelectorAll('.highscores-card').forEach(card => {
