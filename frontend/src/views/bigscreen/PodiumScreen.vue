@@ -1,5 +1,5 @@
 <template>
-  <div class="background-effect">
+  <div class="scorescreen-container">
     <div class="scorescreen-header">
       <FeatureClock initialTime="01:20:00" />
       <h2>Leaderboard</h2>
@@ -23,9 +23,9 @@
   </div>
 </template>
 <script setup>
-import FeatureClock from "../components/features/FeatureClock.vue";
-import FeaturePodium from "../components/features/FeaturePodium.vue";
-import GenericResult from "../components/Generic/GenericResult.vue";
+import FeatureClock from "../../components/features/FeatureClock.vue";
+import FeaturePodium from "../../components/features/FeaturePodium.vue";
+import GenericResult from "../../components/Generic/GenericResult.vue";
 </script>
 <style scoped>
 .scorescreen-header {

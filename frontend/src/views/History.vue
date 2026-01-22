@@ -21,9 +21,9 @@
     <p v-if="filteredCards.length === 0" class="no-results">
       Geen resultaten gevonden
     </p>
-    <div class="nav-container">
-      <GenericNav />
-    </div>
+  </div>
+  <div class="nav-container">
+    <GenericNav />
   </div>
 </template>
 <script setup>

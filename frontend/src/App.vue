@@ -6,14 +6,8 @@ import Home from "@/views/HomePage.vue";
 
 <template>
   <main class="background-effect">
-    <div class="app-container">
-      <RouterView />
-    </div>
+    <RouterView />
   </main>
 </template>
 
-<style scoped>
-.app-container {
-  padding: 1.3125rem 2.6875rem;
-}
-</style>
+<style scoped></style>

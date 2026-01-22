@@ -1,32 +1,48 @@
 <template>
-  <div class="generic-model-overlay" @click.self="$emit('close')">
-    <div class="generic-model">
-      <button class="generic-model__close-button" @click="$emit('close')">
-        <X />
-      </button>
-      <div class="generic-model__content">
-        <div class="generic-model__icon-wrapper">
-          <component
-            :is="iconComponent"
-            class="generic-model__icon"
-            :style="{ stroke: iconColor }"
-          />
-        </div>
-        <div class="generic-model__message text">
-          {{ message }}
-        </div>
-        <div class="generic-model__buttons">
-          <GenericButton variant="secondary" label="Nee" />
-          <GenericButton variant="primary" label="Ja" />
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="isOpen" class="generic-model-overlay" @click.self="closeModal">
+        <div class="generic-model">
+          <button class="generic-model__close-button" @click="closeModal">
+            <X :size="24" />
+          </button>
+          <div class="generic-model__content">
+            <div class="generic-model__icon-wrapper">
+              <component
+                :is="iconComponent"
+                class="generic-model__icon"
+                :size="48"
+                :style="{ stroke: iconColor }"
+              />
+            </div>
+            <div class="generic-model__message text">
+              {{ message }}
+            </div>
+            <div class="generic-model__buttons">
+              <GenericButtonNew
+                v-if="showCancel"
+                :label="cancelText"
+                variant="secondary"
+                :showIcons="false"
+                @click="handleCancel"
+              />
+              <GenericButtonNew
+                :label="confirmText"
+                variant="primary"
+                :showIcons="false"
+                @click="handleConfirm"
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script>
 import { TriangleAlert, CircleCheck, X } from "lucide-vue-next";
-import GenericButton from "./GenericButton.vue";
+import GenericButtonNew from "./GenericButtonNew.vue";
 
 export default {
   name: "GenericModel",
@@ -34,12 +50,17 @@ export default {
     TriangleAlert,
     CircleCheck,
     X,
-    GenericButton,
+    GenericButtonNew,
+  },
+  data() {
+    return {
+      isOpen: false,
+    };
   },
   props: {
     message: {
       type: String,
-      default: "Bent u zeker dat u het team wilt verwijderen?",
+      default: "Bent u zeker dat u deze sessie wilt stoppen?",
     },
     icon: {
       type: String,
@@ -48,9 +69,22 @@ export default {
     },
     iconColor: {
       type: String,
-      default: null,
+      default: "var(--red-100)",
+    },
+    confirmText: {
+      type: String,
+      default: "Ja",
+    },
+    cancelText: {
+      type: String,
+      default: "Nee",
+    },
+    showCancel: {
+      type: Boolean,
+      default: true,
     },
   },
+  emits: ["confirm", "cancel"],
   computed: {
     iconComponent() {
       const iconMap = {
@@ -59,17 +93,23 @@ export default {
       };
       return iconMap[this.icon] || "TriangleAlert";
     },
-    computedIconColor() {
-      if (this.iconColor) {
-        return this.iconColor;
-      }
-      // Default colors based on icon type
-      return this.icon === "circle-check"
-        ? "var(--green-100)"
-        : "var(--red-100)";
+  },
+  methods: {
+    open() {
+      this.isOpen = true;
+    },
+    closeModal() {
+      this.isOpen = false;
+    },
+    handleConfirm() {
+      this.$emit("confirm");
+      this.closeModal();
+    },
+    handleCancel() {
+      this.$emit("cancel");
+      this.closeModal();
     },
   },
-  emits: ["close", "cancel", "confirm"],
 };
 </script>
 
@@ -80,17 +120,15 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--background-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  margin: 0;
-  padding: 0;
+  z-index: 1000;
 }
 
 .generic-model {
-  width: 20rem; /* 320px */
+  width: 20rem;
   border-radius: var(--radius-L);
   background-color: var(--white);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -105,19 +143,17 @@ export default {
   background: none;
   border: none;
   cursor: pointer;
-  width: 1.5rem; /* 24px */
+  width: 1.5rem;
   height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: stroke 0.2s;
+  transition: all 0.2s;
 }
 
 .generic-model__close-button :deep(svg) {
   stroke: var(--black-100);
-  width: 1.5rem; /* 24px */
-  height: 1.5rem; /* 24px */
   transition: stroke 0.2s;
 }
 
@@ -137,15 +173,6 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 3.5rem; /* 56px */
-  height: 3.5rem; /* 56px */
-
-  border-radius: var(--radius-XL);
-}
-
-.generic-model__icon {
-  width: 2rem; /* 32px */
-  height: 2rem; /* 32px */
 }
 
 .generic-model__message {
@@ -160,7 +187,33 @@ export default {
   width: 100%;
   margin-top: var(--space-2);
 }
-.generic-model__buttons :deep(svg) {
-  display: none;
+
+/* Override Element Plus button hover */
+.generic-model__buttons :deep(.el-button) {
+  transition: all 0.2s ease !important;
+}
+
+.generic-model__buttons :deep(.el-button.generic-button--secondary:hover) {
+  background-color: var(--blue-20) !important;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .generic-model,
+.modal-leave-active .generic-model {
+  transition: transform 0.3s ease;
+}
+
+.modal-enter-from .generic-model,
+.modal-leave-to .generic-model {
+  transform: scale(0.9);
 }
 </style>

@@ -37,14 +37,6 @@ export default {
 </script>
 
 <style scoped>
-.generic-input {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-bottom: var(--space-5);
-}
-
 .generic-input__field {
   width: 100%;
 }

@@ -44,7 +44,7 @@ export default {
   transition: all 0.3s ease;
   border: none;
   gap: var(--space-4);
-  border: 1px solid var(--blue-100);
+  /* border: 1px solid var(--blue-100); */
 }
 
 .generic-button--primary {

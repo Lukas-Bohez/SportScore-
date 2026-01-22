@@ -57,6 +57,8 @@ export default {
   align-items: center;
   text-align: center;
   color: var(--black-100);
+  max-width: 50rem;
+  padding: 0 var(--space-6);
 }
 .generic-nav-item {
   display: flex;

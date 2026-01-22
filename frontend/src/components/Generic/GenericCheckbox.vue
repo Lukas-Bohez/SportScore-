@@ -1,6 +1,6 @@
 <template>
   <div class="generic-checkbox">
-    <div class="checkbox-content">
+    <label :for="id" class="checkbox-content">
       <div class="checkbox-wrapper">
         <input
           type="checkbox"
@@ -9,9 +9,9 @@
           @change="$emit('update:checked', $event.target.checked)"
           class="checkbox-input"
         />
-        <label :for="id" class="checkbox-custom circle-base">
+        <div class="checkbox-custom circle-base">
           <Check class="generic-checkbox-icon" :stroke-width="3" />
-        </label>
+        </div>
       </div>
       <div class="label-wrapper">
         <span class="label-text">{{ label }}</span>
@@ -21,7 +21,7 @@
           :style="{ backgroundColor: dotColor }"
         ></div> -->
       </div>
-    </div>
+    </label>
     <div class="actions">
       <button
         @click="($emit('edit'), (showModel = true))"
@@ -31,13 +31,23 @@
         <Pencil class="generic-checkbox-icon" />
       </button>
       <button
-        @click="$emit('delete')"
+        @click="openModal"
         class="icon-button hover-opacity delete-button"
         type="button"
       >
-        <GenericModel v-if="showModel" @close="showModel = false" />
         <Trash2 class="generic-checkbox-icon" />
       </button>
+
+      <GenericModel
+        ref="modalRef"
+        icon="triangle-alert"
+        iconColor="var(--red-100)"
+        message="Bent u zeker dat u deze activiteit wilt verwijderen?"
+        confirmText="Ja"
+        cancelText="Nee"
+        @confirm="handleConfirm"
+        @cancel="handleCancel"
+      />
     </div>
   </div>
 </template>
@@ -46,9 +56,29 @@
 import { ref } from "vue";
 import { Check, Pencil, Trash2 } from "lucide-vue-next";
 import GenericModel from "../Generic/GenericModel.vue";
-import GenericButton from "./GenericButton.vue";
 
-const showModel = ref(false);
+const modalRef = ref(null);
+const successModalRef = ref(null);
+
+const openModal = () => {
+  modalRef.value.open();
+};
+
+const openSuccessModal = () => {
+  successModalRef.value.open();
+};
+
+const handleConfirm = () => {
+  console.log("Bevestigd!");
+};
+
+const handleCancel = () => {
+  console.log("Geannuleerd!");
+};
+
+const handleSuccess = () => {
+  console.log("Success!");
+};
 
 defineProps({
   label: {
@@ -103,6 +133,8 @@ defineOptions({
   display: flex;
   align-items: center;
   gap: var(--space-5);
+  flex: 1;
+  cursor: pointer;
 }
 
 .checkbox-wrapper {
@@ -127,6 +159,9 @@ defineOptions({
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .generic-checkbox-icon {
