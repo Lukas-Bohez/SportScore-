@@ -50,12 +50,16 @@ from fastapi import Query
 import queue
 from uuid import uuid4
 import json
+import os
+import subprocess
 
 # ----------------------------------------------------
 # Logging Setup
 # ----------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+# Admin secret for sensitive operations; set in environment for production
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "changeme")
 
 # ----------------------------------------------------
 # App setup
@@ -2077,6 +2081,30 @@ async def delete_session_template(template_id: int):
 @app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
 async def health():
     return {"status": "ok", "time": datetime.now(CET).isoformat()}
+
+# System control endpoints (require ADMIN_SECRET header 'X-Admin-Secret')
+@app.post(f"{ENDPOINT}/system/shutdown", tags=["System"], summary="Shutdown Raspberry Pi")
+async def system_shutdown(x_admin_secret: Optional[str] = Header(None)):
+    """Trigger an immediate shutdown/poweroff of the host machine.
+
+    Note: The running process must have permission to poweroff (run as root or be allowed via sudoers).
+    Set the ADMIN_SECRET environment variable to secure this endpoint (default: 'changeme').
+    """
+    if x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    logger.info("Shutdown requested via API")
+    try:
+        # Prefer systemctl when available
+        cmd = ["/bin/systemctl", "poweroff"]
+        if not os.path.exists(cmd[0]):
+            cmd = ["/sbin/shutdown", "-h", "now"]
+        # Start shutdown asynchronously so we can return immediately
+        subprocess.Popen(cmd)
+        return JSONResponse({"message": "Shutdown initiated"}, status_code=202)
+    except Exception as e:
+        logger.exception("Failed to initiate shutdown")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Live Leaderboard
 @app.get(f"{ENDPOINT}/live-leaderboard", tags=["Live"])

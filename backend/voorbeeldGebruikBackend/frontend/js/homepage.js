@@ -2,6 +2,7 @@
 // homepage.js - Handles the homepage functionality
 
 import { HomepageManagement } from './homepageManagement.js';
+import { HomepageHistory } from './homepageHistory.js';
 
 class Homepage {
   constructor() {
@@ -14,6 +15,8 @@ class Homepage {
     this.activeSessions = [];
     this.historySessions = [];
     this.export = new HomepageExport(this.api, this.sharedUtils, this);
+    // History/highscores helper (delegates implementation to homepageHistory.js)
+    this.history = new HomepageHistory(this.api, this.sharedUtils, this);
     this.init();
   }
 
@@ -368,84 +371,10 @@ class Homepage {
   // ---------------------- Export helpers ----------------------
 
   openHistoryModal(sessionId) {
-    const session = this.historySessions.find(s => s.id == sessionId);
-    if (!session) {
-      console.error('Session not found:', sessionId);
-      return;
-    }
-
-    const modal = document.getElementById('history-modal');
-    const modalBody = document.getElementById('history-modal-body');
-    
-    if (!modal || !modalBody) {
-      console.error('Modal elements not found');
-      return;
-    }
-
-    // Create modal content using similar structure to active session
-    modalBody.innerHTML = `
-      <div class="active-session-card" style="border: none; box-shadow: none; padding: 0;">
-        <div class="session-header">
-          <div>
-            <h3 class="session-title">${this.escapeHtml(session.name)}</h3>
-            <p style="margin: 5px 0; color: var(--text-secondary);">${this.formatDate(session.created_at)}</p>
-          </div>
-          <span class="session-status completed">✓ Voltooid</span>
-        </div>
-        
-        <div class="session-details">
-          <div class="detail-box">
-            <label>Teams</label>
-            <value>${session.teams?.length || 0} teams</value>
-          </div>
-          <div class="detail-box">
-            <label>Activiteiten</label>
-            <value>${session.activities?.length || 0} activiteiten</value>
-          </div>
-          <div class="detail-box">
-            <label>Spelers</label>
-            <value>${session.players?.length || 0} spelers</value>
-          </div>
-        </div>
-
-        <div class="activity-selector-container">
-          <label for="modal-activity-select-${session.id}">Selecteer activiteit om scores te bekijken:</label>
-          <select id="modal-activity-select-${session.id}" onchange="window.homepage.displayModalActivityScores(${session.id}, this.value)">
-            <option value="">-- Kies een activiteit --</option>
-            ${(session.activities || []).map(a => `<option value="${a.id}">${this.escapeHtml(a.name)}</option>`).join('')}
-          </select>
-
-          <div id="modal-activity-exports-${session.id}" style="margin-top:12px; padding-top:12px; border-top: 1px solid var(--border-color);">
-            <div style="font-weight:600; margin-bottom:8px; color: var(--text-color);">📊 Export Optie:</div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-primary" onclick="window.homepage.export.exportSession(${session.id})">
-                Exporteer Volledige Sessie
-              </button>
-            </div>
-            <div style="margin-top:8px; font-size:0.9em; color: var(--text-secondary);">
-              Bevat alle scores, teams, spelers en activiteiten van deze sessie
-            </div>
-          </div>
-        </div>
-
-        <div id="modal-scores-${session.id}" class="scores-display" style="display: none;"></div>
-
-        <div class="session-controls">
-          <button class="btn btn-secondary" onclick="document.getElementById('history-modal').classList.remove('show')">✕ Sluiten</button>
-        </div>
-      </div>
-    `;
-
-    modal.classList.add('show');
-
-    // Limit modal height to avoid overlapping nav
-    const modalContent = modal.querySelector('.modal-content');
-    if (modalContent) {
-      modalContent.style.maxHeight = '70vh';
-    }
+    return this.history.openHistoryModal.apply(this.history, arguments);
   }
 
-  async displayModalActivityScores(sessionId, activityId) {
+  async displayModalActivityScores(sessionId, activityId) { return this.history.displayModalActivityScores.apply(this.history, arguments);
     if (!activityId) {
       const container = document.getElementById(`modal-scores-${sessionId}`);
       if (container) container.style.display = 'none';
@@ -493,59 +422,83 @@ class Homepage {
         aggregatedScores[playerId].score += (score.points || 0);
       });
     } else if (scoringMode === 'team_with_players') {
+      // Group by team_id with player info
       activityScores.forEach(score => {
         const teamId = score.team_id;
         const team = teamMap[teamId];
-        const teamName = team?.name || `Team ${teamId}`;
+        if (!team) return;
+
         if (!aggregatedScores[teamId]) {
-          aggregatedScores[teamId] = { 
-            id: teamId, 
-            name: teamName,
+          aggregatedScores[teamId] = {
+            id: teamId,
+            name: team?.name || `Team ${teamId}`,
             color: team?.color,
             icon: team?.icon,
-            score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity),
+            score: null,
             players: {},
             type: 'team'
           };
         }
-        
-        const currentScore = score.points || 0;
-        if (isTimeMode && lowerIsBetter) {
-          aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
-        } else if (!lowerIsBetter) {
-          aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
+
+        const raw = score.points ?? score.score ?? score.total_score;
+        if (raw === undefined || raw === null) return;
+
+        // Parse time strings when needed
+        let currentScore;
+        if (isTimeMode) {
+          if (typeof raw === 'string') {
+            let parsed = SharedUtils.parseTimeToMs(String(raw));
+            if (!isFinite(parsed)) return;
+            parsed = Math.abs(parsed);
+            currentScore = parsed;
+          } else {
+            const parsedRaw = Number(raw);
+            if (!isFinite(parsedRaw)) return;
+            currentScore = Math.abs(parsedRaw);
+          }
         } else {
-          aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+          const parsed = Number(raw);
+          if (!isFinite(parsed)) return;
+          currentScore = parsed;
         }
 
-        if (score.player_id && score.points) {
-          const playerId = score.player_id;
-          const player = playerMap[playerId];
-          const playerName = player?.name || `Speler ${playerId}`;
-          if (!aggregatedScores[teamId].players[playerId]) {
-            aggregatedScores[teamId].players[playerId] = { name: playerName, score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity) };
-          }
+        // Ignore zero times when lower-is-better/time mode
+        if ((isTimeMode || lowerIsBetter) && currentScore === 0) return;
 
-          if (isTimeMode && lowerIsBetter) {
-            aggregatedScores[teamId].players[playerId].score = Math.min(aggregatedScores[teamId].players[playerId].score, currentScore);
-          } else if (!lowerIsBetter) {
-            aggregatedScores[teamId].players[playerId].score = Math.max(aggregatedScores[teamId].players[playerId].score, currentScore);
+        // Update team best (null -> set first value; then min/max)
+        if (aggregatedScores[teamId].score === null) {
+          aggregatedScores[teamId].score = currentScore;
+        } else {
+          if (isTimeMode || lowerIsBetter) {
+            aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
           } else {
-            aggregatedScores[teamId].players[playerId].score = Math.min(aggregatedScores[teamId].players[playerId].score, currentScore);
+            aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
+          }
+        }
+
+        // Track individual player best
+        if (score.player_id) {
+          const playerId = score.player_id;
+          const playerObj = playerMap[playerId];
+          const playerName = playerObj?.name || `Speler ${playerId}`;
+          if (!aggregatedScores[teamId].players[playerId]) {
+            aggregatedScores[teamId].players[playerId] = { name: playerName, score: currentScore };
+          } else {
+            const prev = aggregatedScores[teamId].players[playerId].score;
+            if (isTimeMode || lowerIsBetter) {
+              aggregatedScores[teamId].players[playerId].score = Math.min(prev, currentScore);
+            } else {
+              aggregatedScores[teamId].players[playerId].score = Math.max(prev, currentScore);
+            }
           }
         }
       });
-      
-      // Handle edge case: if team score is still Infinity/-Infinity, set to 0
+
+      // Clean up nulls -> default 0
       Object.values(aggregatedScores).forEach(team => {
-        if (team.score === Infinity || team.score === -Infinity) {
-          team.score = 0;
-        }
-        // Also fix player scores
+        if (team.score === null) team.score = 0;
         Object.values(team.players || {}).forEach(player => {
-          if (player.score === Infinity || player.score === -Infinity) {
-            player.score = 0;
-          }
+          if (player.score === null || player.score === undefined) player.score = 0;
         });
       });
     } else {
@@ -772,76 +725,79 @@ class Homepage {
         activityScores.forEach(score => {
           const teamId = score.team_id;
           const team = teamMap[teamId];
-          const teamName = team?.name || `Team ${teamId}`;
+          if (!team) return;
+
           if (!aggregatedScores[teamId]) {
-            aggregatedScores[teamId] = { 
-              id: teamId, 
-              name: teamName,
+            aggregatedScores[teamId] = {
+              id: teamId,
+              name: team?.name || `Team ${teamId}`,
               color: team?.color,
               icon: team?.icon,
-              score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity),
+              score: null,
               players: {},
               type: 'team'
             };
           }
-          
-          // For team vs time with lower-is-better (time), track the BEST (lowest) time among players
-          // For regular scoring with higher-is-better, track the BEST (highest) score among players
-          const currentScore = score.points || 0;
-          
-          if (isTimeMode && lowerIsBetter) {
-            // Time mode: lower time is better - track minimum time
-            aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
-          } else if (!lowerIsBetter) {
-            // Regular scoring: higher score is better - track maximum score
-            aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
-          } else {
-            // Lower is better but not time mode (e.g., golf) - track minimum score
-            aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
-          }
-          
-          // Also track individual player scores
-          if (score.player_id && score.points) {
-            const playerId = score.player_id;
-            const player = playerMap[playerId];
-            const playerName = player?.name || `Speler ${playerId}`;
-            if (!aggregatedScores[teamId].players[playerId]) {
-              aggregatedScores[teamId].players[playerId] = { 
-                name: playerName, 
-                score: isTimeMode && lowerIsBetter ? Infinity : (lowerIsBetter ? Infinity : -Infinity) 
-              };
-            }
-            
-            // Update player's best score using same logic as team
-            if (isTimeMode && lowerIsBetter) {
-              aggregatedScores[teamId].players[playerId].score = Math.min(
-                aggregatedScores[teamId].players[playerId].score, 
-                currentScore
-              );
-            } else if (!lowerIsBetter) {
-              aggregatedScores[teamId].players[playerId].score = Math.max(
-                aggregatedScores[teamId].players[playerId].score, 
-                currentScore
-              );
+
+          const raw = score.points ?? score.score ?? score.total_score;
+          if (raw === undefined || raw === null) return;
+
+          // Parse time strings when needed
+          let currentScore;
+          if (isTimeMode) {
+            if (typeof raw === 'string') {
+              let parsed = SharedUtils.parseTimeToMs(String(raw));
+              if (!isFinite(parsed)) return;
+              parsed = Math.abs(parsed);
+              currentScore = parsed;
             } else {
-              aggregatedScores[teamId].players[playerId].score = Math.min(
-                aggregatedScores[teamId].players[playerId].score, 
-                currentScore
-              );
+              const parsedRaw = Number(raw);
+              if (!isFinite(parsedRaw)) return;
+              currentScore = Math.abs(parsedRaw);
+            }
+          } else {
+            const parsed = Number(raw);
+            if (!isFinite(parsed)) return;
+            currentScore = parsed;
+          }
+
+          // Ignore zero times when lower-is-better/time mode
+          if ((isTimeMode || lowerIsBetter) && currentScore === 0) return;
+
+          // Update team best (null -> set first value; then min/max)
+          if (aggregatedScores[teamId].score === null) {
+            aggregatedScores[teamId].score = currentScore;
+          } else {
+            if (isTimeMode || lowerIsBetter) {
+              aggregatedScores[teamId].score = Math.min(aggregatedScores[teamId].score, currentScore);
+            } else {
+              aggregatedScores[teamId].score = Math.max(aggregatedScores[teamId].score, currentScore);
+            }
+          }
+
+          // Track individual player best
+          if (score.player_id) {
+            const playerId = score.player_id;
+            const playerObj = playerMap[playerId];
+            const playerName = playerObj?.name || `Speler ${playerId}`;
+            if (!aggregatedScores[teamId].players[playerId]) {
+              aggregatedScores[teamId].players[playerId] = { name: playerName, score: currentScore };
+            } else {
+              const prev = aggregatedScores[teamId].players[playerId].score;
+              if (isTimeMode || lowerIsBetter) {
+                aggregatedScores[teamId].players[playerId].score = Math.min(prev, currentScore);
+              } else {
+                aggregatedScores[teamId].players[playerId].score = Math.max(prev, currentScore);
+              }
             }
           }
         });
-        
-        // Handle edge case: if team score is still Infinity/-Infinity, set to 0
+
+        // Clean up nulls -> default 0
         Object.values(aggregatedScores).forEach(team => {
-          if (team.score === Infinity || team.score === -Infinity) {
-            team.score = 0;
-          }
-          // Also fix player scores
+          if (team.score === null) team.score = 0;
           Object.values(team.players || {}).forEach(player => {
-            if (player.score === Infinity || player.score === -Infinity) {
-              player.score = 0;
-            }
+            if (player.score === null || player.score === undefined) player.score = 0;
           });
         });
       } else {
@@ -1043,224 +999,21 @@ class Homepage {
   }
 
   async loadActivitiesForHighscores() {
-    try {
-      // Include both active and history sessions so ongoing games count
-      const allSessions = (this.activeSessions || []).concat(this.historySessions || []);
-      
-      // Map activity names to their best scoring instance (min or max depending on rules)
-      const activityMap = new Map(); // name -> tracker
-      
-      for (const session of allSessions) {
-        const activities = session.activities || [];
-        
-        for (const activity of activities) {
-          const key = activity.name;
-          let current = activityMap.get(key);
-          
-          if (!current) {
-            const lowerIsBetter = SharedUtils.isLowerBetter(activity);
-            current = { 
-              activity: { ...activity, session_id: session.id },
-              bestMin: Infinity,
-              bestMax: -Infinity,
-              anyLowerIsBetter: !!lowerIsBetter
-            };
-            activityMap.set(key, current);
-          }
-          
-          // Get leaderboard for this activity instance
-          try {
-            const lbResponse = await this.api.getActivityLeaderboard(activity.id);
-            const lb = lbResponse.leaderboard || [];
-
-            const instLowerIsBetter = SharedUtils.isLowerBetter(activity);
-            let bestInThisInstance = instLowerIsBetter ? Infinity : -Infinity;
-
-            if (lb.length > 0) {
-              // If this activity is player-scored, prefer player entries; ignore team-only leaderboards
-              if (String(activity.scoring_mode) === 'player') {
-                const playerEntries = lb.filter(e => e.player_id || e.player_name);
-                if (playerEntries.length > 0) {
-                  const scores = playerEntries.map(t => {
-                    const raw = t.total_score ?? t.score ?? t.points;
-                    return raw !== undefined && raw !== null ? Number(raw) : (instLowerIsBetter ? Infinity : -Infinity);
-                  });
-                  bestInThisInstance = instLowerIsBetter ? Math.min(...scores) : Math.max(...scores);
-                } else {
-                  // Leaderboard contains team-level entries only; fall back to detailed per-player scores
-                  try {
-                    const scoresResp = await this.api.getActivityScores(activity.id);
-                    const scoresArr = this.api.extractArray(scoresResp, 'scores') || [];
-                    const totals = {};
-                    scoresArr.forEach(s => {
-                      if (!s.player_id && !s.player_name) return; // skip team-only rows
-                      const pid = s.player_id ?? s.player_name;
-                      const keyId = String(pid);
-                      const val = s.points ?? s.score ?? s.total_score;
-                      const n = val !== undefined && val !== null ? Number(val) : 0;
-                      totals[keyId] = (totals[keyId] || 0) + n;
-                    });
-                    if (Object.keys(totals).length > 0) {
-                      const vals = Object.values(totals);
-                      bestInThisInstance = instLowerIsBetter ? Math.min(...vals) : Math.max(...vals);
-                    }
-                  } catch (e) {
-                    console.warn(`Fallback: could not fetch detailed scores for activity ${activity.id}:`, e);
-                  }
-                }
-              } else {
-                // Non-player mode: use whatever the leaderboard provides (teams or players aggregated)
-                const scores = lb.map(t => {
-                  const raw = t.total_score ?? t.score ?? t.points;
-                  return raw !== undefined && raw !== null ? Number(raw) : (instLowerIsBetter ? Infinity : -Infinity);
-                });
-                bestInThisInstance = instLowerIsBetter ? Math.min(...scores) : Math.max(...scores);
-              }
-            } else {
-              // Fallback: try detailed scores and aggregate per player/team within this instance
-              try {
-                const scoresResp = await this.api.getActivityScores(activity.id);
-                const scoresArr = this.api.extractArray(scoresResp, 'scores') || [];
-                const totals = {};
-                const isPlayerMode = String(activity.scoring_mode) === 'player';
-                scoresArr.forEach(s => {
-                  let pid = null;
-                  if (isPlayerMode) {
-                    pid = s.player_id ?? s.player_name ?? null;
-                  } else {
-                    pid = s.player_id ?? s.player_name ?? s.team_id ?? s.team_name ?? null;
-                  }
-                  if (pid === null || pid === undefined) return;
-                  const keyId = String(pid);
-                  const val = s.points ?? s.score ?? s.total_score;
-                  const n = val !== undefined && val !== null ? Number(val) : 0;
-                  totals[keyId] = (totals[keyId] || 0) + n;
-                });
-                if (Object.keys(totals).length > 0) {
-                  const vals = Object.values(totals);
-                  bestInThisInstance = instLowerIsBetter ? Math.min(...vals) : Math.max(...vals);
-                }
-              } catch (e) {
-                console.warn(`Fallback: could not fetch detailed scores for activity ${activity.id}:`, e);
-              }
-            }
-
-            if (bestInThisInstance !== (instLowerIsBetter ? Infinity : -Infinity)) {
-              current.anyLowerIsBetter = current.anyLowerIsBetter || instLowerIsBetter;
-              if (instLowerIsBetter) current.bestMin = Math.min(current.bestMin, bestInThisInstance);
-              current.bestMax = Math.max(current.bestMax, bestInThisInstance);
-              current.activity = { ...activity, session_id: session.id }; // Ensure session_id is included
-            }
-          } catch (e) {
-            console.warn(`Error fetching leaderboard for activity ${activity.id}:`, e);
-          }
-        }
-      }
-      
-      // Convert to array for rendering
-      const activitiesWithScores = Array.from(activityMap.values()).map(({activity, bestMin, bestMax, anyLowerIsBetter}) => {
-        const chosen = anyLowerIsBetter ? bestMin : bestMax;
-        const invalid = anyLowerIsBetter ? (chosen === Infinity) : (chosen === -Infinity);
-        return {
-          ...activity,
-          highest_score: invalid ? null : chosen,
-          lower_is_better: anyLowerIsBetter
-        };
-      });
-      
-      // Store for client-side filtering & wire controls
-      this.highscoresActivities = activitiesWithScores;
-      this.setupHighscoresControls();
-      this.filterAndRenderHighscores();
-    } catch (error) {
-      console.error('Error loading highscores:', error);
-      const grid = document.getElementById('highscores-grid');
-      if (grid) grid.innerHTML = '<div class="empty-state">Fout bij het laden van activiteiten.</div>';
-    }
+    return this.history.loadActivitiesForHighscores.apply(this.history, arguments);
   }
 
   renderHighscores(activities) {
-    const grid = document.getElementById('highscores-grid');
-    if (!grid) return;
-    
-    if (activities.length === 0) {
-      grid.innerHTML = '<div class="empty-state">Geen activiteiten beschikbaar.</div>';
-      return;
-    }
-
-    grid.innerHTML = activities.map(activity => {
-      const isTime = String(activity.game_type) === 'team_vs_time';
-      const scoreText = activity.highest_score !== null
-        ? (isTime ? SharedUtils.formatMs(activity.highest_score) : activity.highest_score)
-        : (isTime ? 'Geen tijden' : 'Geen scores');
-
-      return `
-      <div class="highscores-card" data-activity-id="${activity.id}" data-session-id="${activity.session_id}">
-        <h3>${this.escapeHtml(activity.name)}</h3>
-        <div class="highscores-meta">
-          <span>${this.escapeHtml(activity.sport_type)}</span>
-          <span>${this.escapeHtml(activity.game_type || 'custom')}</span>
-        </div>
-        <p>${activity.description ? this.escapeHtml(activity.description) : ''}</p>
-        <div class="highscores-stats">
-          <span>Beste score: ${scoreText}</span>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Add click handlers
-    grid.querySelectorAll('.highscores-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const activityId = card.dataset.activityId;
-        this.showHighscoreDetails(activityId);
-      });
-    });
+    return this.history.renderHighscores.apply(this.history, arguments);
   }
 
   // Wire the highscores filter/search controls within the active highscores pane and attach handlers
   setupHighscoresControls() {
-    // Prefer controls inside the tab pane, fall back to embedded section
-    const controlsContainer = document.querySelector('#highscores-tab .highscores-controls') || document.querySelector('#highscores-section .highscores-controls');
-    if (!controlsContainer) return;
-
-    const filterEl = controlsContainer.querySelector('#filter-sport');
-    const searchEl = controlsContainer.querySelector('#search-activity');
-
-    // Remove existing listeners to avoid duplicates
-    if (!this._highscoresHandler) this._highscoresHandler = () => this.filterAndRenderHighscores();
-    if (filterEl) {
-      filterEl.removeEventListener('change', this._highscoresHandler);
-      filterEl.addEventListener('change', this._highscoresHandler);
-    }
-    if (searchEl) {
-      searchEl.removeEventListener('input', this._highscoresHandler);
-      searchEl.addEventListener('input', this._highscoresHandler);
-    }
+    return this.history.setupHighscoresControls.apply(this.history, arguments);
   }
 
   // Apply active filters and render highscores
   filterAndRenderHighscores() {
-    let activities = (this.highscoresActivities || []).slice();
-    const controlsContainer = document.querySelector('#highscores-tab .highscores-controls') || document.querySelector('#highscores-section .highscores-controls');
-    if (!controlsContainer) {
-      this.renderHighscores(activities);
-      return;
-    }
-
-    const filterEl = controlsContainer.querySelector('#filter-sport');
-    const searchEl = controlsContainer.querySelector('#search-activity');
-
-    const sport = filterEl ? (filterEl.value || '').trim().toLowerCase() : '';
-    const search = searchEl ? (searchEl.value || '').trim().toLowerCase() : '';
-
-    if (sport) {
-      activities = activities.filter(a => ((a.sport_type || '') + '').toLowerCase() === sport);
-    }
-    if (search) {
-      activities = activities.filter(a => ((a.name || '') + '').toLowerCase().includes(search));
-    }
-
-    this.renderHighscores(activities);
+    return this.history.filterAndRenderHighscores.apply(this.history, arguments);
   }
 
   async showHighscoreDetails(activityId) {
@@ -1371,13 +1124,19 @@ class Homepage {
               const teamAccum = {};
               lb.forEach(entry => {
                 const pid = entry.player_id || entry.id || entry.player_name;
-                const pts = Number(entry.total_score || entry.points || entry.score || 0);
+                const raw = entry.total_score ?? entry.points ?? entry.score;
+                if (raw === undefined || raw === null) return;
+                const pts = Number(raw);
                 const player = getPlayer(pid);
                 const teamId = player ? player.team_id : null;
                 if (!teamId) return;
                 const key = String(teamId);
-                if (!teamAccum[key]) teamAccum[key] = 0;
-                teamAccum[key] += pts;
+                if (instLowerIsBetter) {
+                  if (pts === 0) return; // ignore zero times
+                  teamAccum[key] = teamAccum[key] === undefined ? pts : Math.min(teamAccum[key], pts);
+                } else {
+                  teamAccum[key] = (teamAccum[key] || 0) + pts;
+                }
               });
 
               // If teamAccum is empty, fallback to detailed scores
@@ -1386,12 +1145,22 @@ class Homepage {
                   const scoresResp = await this.api.getActivityScores(inst.activity.id);
                   const scores = this.api.extractArray(scoresResp, 'scores');
                   scores.forEach(s => {
-                    const teamId = s.team_id || (s.player_id ? (getPlayer(s.player_id)?.team_id) : null);
+                    let teamId = s.team_id ?? null;
+                    if (!teamId && s.player_id) {
+                      const p = getPlayer(s.player_id);
+                      teamId = p ? (p.team_id ?? p.team) : null;
+                    }
                     if (!teamId) return;
                     const key = String(teamId);
-                    const pts = Number(s.points || s.score || 0);
-                    if (!teamAccum[key]) teamAccum[key] = 0;
-                    teamAccum[key] += pts;
+                    const raw = s.points ?? s.score ?? s.total_score;
+                    if (raw === undefined || raw === null) return;
+                    const pts = Number(raw);
+                    if (instLowerIsBetter) {
+                      if (pts === 0) return; // ignore zero times
+                      teamAccum[key] = teamAccum[key] === undefined ? pts : Math.min(teamAccum[key], pts);
+                    } else {
+                      teamAccum[key] = (teamAccum[key] || 0) + pts;
+                    }
                   });
                 } catch (e) {
                   console.warn(`Fallback: could not fetch detailed scores for instance ${inst.activity.id}:`, e);
@@ -1402,8 +1171,8 @@ class Homepage {
                 const score = teamAccum[key];
                 const teamObj = getTeam(key);
                 const tname = teamObj?.name || `Team ${key}`;
-                if (!teamScoresMap[key]) teamScoresMap[key] = { team_name: tname, total_score: (lowerIsBetter ? Infinity : 0) };
-                teamScoresMap[key].total_score = lowerIsBetter ? Math.min(teamScoresMap[key].total_score, score) : Math.max(teamScoresMap[key].total_score, score);
+                if (!teamScoresMap[key]) teamScoresMap[key] = { team_name: tname, total_score: (instLowerIsBetter ? Infinity : 0) };
+                teamScoresMap[key].total_score = instLowerIsBetter ? Math.min(teamScoresMap[key].total_score, score) : Math.max(teamScoresMap[key].total_score, score);
               });
             }
           } catch (e) {
@@ -1489,13 +1258,42 @@ class Homepage {
                   }
                   if (!teamId) return;
                   const tid = String(teamId);
-                  if (!teamsInstance[tid]) teamsInstance[tid] = { score: 0, players: {} };
+                  if (!teamsInstance[tid]) teamsInstance[tid] = { score: null, players: {} };
+
                   const pid = s.player_id;
-                  const pts = Number(s.points || s.score || 0);
-                  teamsInstance[tid].score += pts;
+                  const raw = s.points ?? s.score ?? s.total_score;
+                  if (raw === undefined || raw === null) return;
+
+                  // parse time-like values when instance uses lower-is-better or time mode
+                  const instLowerIsBetter5a = SharedUtils.isLowerBetter(inst.activity);
+                  let pts;
+                  if (instLowerIsBetter5a) {
+                    pts = (typeof raw === 'string') ? SharedUtils.parseTimeToMs(String(raw)) : Number(raw);
+                    if (!Number.isFinite(pts)) return;
+                    if (pts === 0) return; // ignore zeros for time-like
+                  } else {
+                    pts = Number(raw);
+                    if (!Number.isFinite(pts)) return;
+                  }
+
+                  // update team score: min for lower-is-better, sum for higher-is-better
+                  if (instLowerIsBetter5a) {
+                    if (teamsInstance[tid].score === null) teamsInstance[tid].score = pts;
+                    else teamsInstance[tid].score = Math.min(teamsInstance[tid].score, pts);
+                  } else {
+                    teamsInstance[tid].score = (teamsInstance[tid].score || 0) + pts;
+                  }
+
+                  // update player score: min for lower-is-better, sum otherwise
                   if (pid) {
                     const pidKey = String(pid);
-                    teamsInstance[tid].players[pidKey] = { name: getPlayer(pidKey)?.name || `Speler ${pid}`, score: (teamsInstance[tid].players[pidKey]?.score || 0) + pts };
+                    if (!teamsInstance[tid].players[pidKey]) teamsInstance[tid].players[pidKey] = { name: getPlayer(pidKey)?.name || `Speler ${pid}`, score: null };
+                    if (instLowerIsBetter5a) {
+                      if (teamsInstance[tid].players[pidKey].score === null) teamsInstance[tid].players[pidKey].score = pts;
+                      else teamsInstance[tid].players[pidKey].score = Math.min(teamsInstance[tid].players[pidKey].score, pts);
+                    } else {
+                      teamsInstance[tid].players[pidKey].score = (teamsInstance[tid].players[pidKey].score || 0) + pts;
+                    }
                   }
                 });
 
@@ -1503,9 +1301,15 @@ class Homepage {
                 const instLowerIsBetter5 = SharedUtils.isLowerBetter(inst.activity);
                 Object.keys(teamsInstance).forEach(tid => {
                   const instData = teamsInstance[tid];
-                  if (!teamBest[tid] || (instLowerIsBetter5 ? teamBest[tid].score > instData.score : teamBest[tid].score < instData.score)) {
+                  // default missing scores to 0 for comparison
+                  const compareScore = instData.score === null ? (instLowerIsBetter5 ? Infinity : -Infinity) : instData.score;
+                  if (!teamBest[tid] || (instLowerIsBetter5 ? teamBest[tid].score > compareScore : teamBest[tid].score < compareScore)) {
                     const teamObj = getTeam(tid);
-                    teamBest[tid] = { name: teamObj?.name || `Team ${tid}`, score: instData.score, players: instData.players };
+                    // ensure player scores are normalized (no nulls)
+                    Object.keys(instData.players || {}).forEach(pk => {
+                      if (instData.players[pk].score === null) instData.players[pk].score = 0;
+                    });
+                    teamBest[tid] = { name: teamObj?.name || `Team ${tid}`, score: (instData.score === null ? 0 : instData.score), players: instData.players };
                   }
                 });
                 continue;
@@ -1517,23 +1321,47 @@ class Homepage {
               // lb may contain player entries or team totals; try to build team totals
               const teamsFromLb = {};
               lb.forEach(entry => {
+                const instLowerIsBetter6 = SharedUtils.isLowerBetter(inst.activity);
                 if (entry.team_id || entry.team_name) {
                   const key = entry.team_id ? String(entry.team_id) : `name:${entry.team_name}`;
-                  const sc = Number(entry.total_score || entry.points || entry.score || 0);
-                  if (!teamsFromLb[key]) teamsFromLb[key] = { score: 0, players: {} };
-                  teamsFromLb[key].score = Math.max(teamsFromLb[key].score, sc);
+                  const raw = entry.total_score ?? entry.points ?? entry.score;
+                  if (raw === undefined || raw === null) return;
+                  let sc;
+                  if (instLowerIsBetter6) {
+                    sc = (typeof raw === 'string') ? SharedUtils.parseTimeToMs(String(raw)) : Number(raw);
+                    if (!Number.isFinite(sc)) return;
+                    sc = Math.abs(sc);
+                    if (sc === 0) return; // ignore zero times
+                  } else {
+                    sc = Number(raw);
+                    if (!Number.isFinite(sc)) return;
+                  }
+                  if (!teamsFromLb[key]) teamsFromLb[key] = { score: null, players: {} };
+                  if (teamsFromLb[key].score === null) teamsFromLb[key].score = sc;
+                  else teamsFromLb[key].score = instLowerIsBetter6 ? Math.min(teamsFromLb[key].score, sc) : Math.max(teamsFromLb[key].score, sc);
                 } else if (entry.player_id || entry.player_name) {
                   // assign player's score to their team if possible
                   const pid = entry.player_id || entry.id || entry.player_name;
                   const pidKey = String(pid);
-                  const sc = Number(entry.total_score || entry.points || entry.score || 0);
+                  const raw = entry.total_score ?? entry.points ?? entry.score;
+                  if (raw === undefined || raw === null) return;
+                  let sc;
+                  if (instLowerIsBetter6) {
+                    sc = (typeof raw === 'string') ? SharedUtils.parseTimeToMs(String(raw)) : Number(raw);
+                    if (!Number.isFinite(sc)) return;
+                    if (sc === 0) return;
+                  } else {
+                    sc = Number(raw);
+                    if (!Number.isFinite(sc)) return;
+                  }
                   const player = getPlayer(pidKey);
                   const tid = player?.team_id ? String(player.team_id) : null;
                   if (!tid) return;
-                  if (!teamsFromLb[tid]) teamsFromLb[tid] = { score: 0, players: {} };
+                  if (!teamsFromLb[tid]) teamsFromLb[tid] = { score: null, players: {} };
                   teamsFromLb[tid].players[pidKey] = { name: entry.player_name || player?.name || String(pidKey), score: sc };
-                  // total will be sum of player contributions later, so accumulate
-                  teamsFromLb[tid].score += sc;
+                  // update team score: min for lower-is-better, sum otherwise
+                  if (teamsFromLb[tid].score === null) teamsFromLb[tid].score = instLowerIsBetter6 ? sc : sc;
+                  else teamsFromLb[tid].score = instLowerIsBetter6 ? Math.min(teamsFromLb[tid].score, sc) : (teamsFromLb[tid].score + sc);
                 }
               });
 
@@ -1641,8 +1469,31 @@ class Homepage {
     // Debug: include lowerIsBetter in logs to help trace sorting/formatting issues
     console.debug(`Displaying highscores for activity ${activityId} (lowerIsBetter: ${lowerIsBetter})`, { activityId, leaderboardCount: (leaderboard||[]).length, scoringMode, isTimeMode });
 
+    // Helper: normalize various time representations to integer milliseconds
+    const toMs = (v) => {
+      if (v == null) return 0;
+      // Numbers >= 1000 are assumed to already be milliseconds; smaller numbers are seconds
+      if (typeof v === 'number') {
+        return Math.abs(Math.round(v >= 1000 ? v : v * 1000));
+      }
+      const s = String(v).trim();
+      if (s === '') return 0;
+      if (s.includes(':')) {
+        const parsed = SharedUtils.parseTimeToMs(s);
+        return isNaN(parsed) ? 0 : Math.abs(parsed);
+      }
+      const num = Number(s);
+      if (isNaN(num)) return 0;
+      return Math.abs(Math.round(num >= 1000 ? num : num * 1000));
+    };
+
     if (scoringMode === 'player') {
-      const sortedPlayers = (leaderboard || []).slice().sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
+      const normalized = (leaderboard || []).map(p => {
+        let s = p.total_score;
+        if (isTimeMode) s = toMs(p.total_score);
+        return { ...p, total_score: s };
+      });
+      const sortedPlayers = normalized.slice().sort((a, b) => lowerIsBetter ? (a.total_score - b.total_score) : (b.total_score - a.total_score));
       container.innerHTML = sortedPlayers.map((player, index) => `
         <div class="score-item">
           <div class="score-item-name">#${index + 1} ${this.escapeHtml(player.player_name || 'Onbekend')}</div>
@@ -1651,10 +1502,15 @@ class Homepage {
       `).join('');
     } else if (scoringMode === 'team') {
       // Ensure numeric scores and always show teams (including zero scores)
-      const normalized = (leaderboard || []).map(t => ({
-        team_name: t.team_name || t.name || t.team || 'Onbekend',
-        total_score: Number(t.total_score || t.score || 0)
-      }));
+      const normalized = (leaderboard || []).map(t => {
+        let val = t.total_score ?? t.score ?? 0;
+        if (isTimeMode) val = toMs(val);
+        else val = Number(val);
+        return {
+          team_name: t.team_name || t.name || t.team || 'Onbekend',
+          total_score: val
+        };
+      });
 
       // Debug: log what we will render
       console.debug('Rendering team highscores', normalized);
@@ -1667,14 +1523,36 @@ class Homepage {
         </div>
       `).join('');
     } else if (scoringMode === 'team_with_players') {
-      const sortedTeams = (leaderboard || []).slice().sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
+      const normalizedTeams = (leaderboard || []).map(t => {
+        const playersArray = Array.isArray(t.players) ? t.players : Object.values(t.players || {});
+        const playersList = playersArray.map(p => ({
+          name: p.name,
+          score: isTimeMode ? toMs(p.total_score ?? p.score ?? 0) : (p.total_score ?? p.score ?? 0)
+        }));
+        
+        let teamScore = isTimeMode ? toMs(t.total_score ?? t.score ?? 0) : (Number(t.total_score ?? t.score ?? 0) || 0);
+        
+        if (isTimeMode && playersList.length > 0) {
+          const playerVals = playersList.map(p => p.score);
+          const aggregatePlayerTimes = activity.aggregate_player_times || false;
+          const timeWinner = (activity.time_winner || 'lower').toLowerCase();
+          
+          if (aggregatePlayerTimes) {
+            teamScore = playerVals.reduce((sum, val) => sum + val, 0);
+          } else {
+            teamScore = timeWinner === 'higher' ? Math.max(...playerVals) : Math.min(...playerVals);
+          }
+        }
+        
+        return { ...t, score: teamScore, playersList };
+      });
+      const sortedTeams = normalizedTeams.slice().sort((a, b) => lowerIsBetter ? (a.score - b.score) : (b.score - a.score));
       container.innerHTML = sortedTeams.map((team, index) => {
-        const playersList = Object.values(team.players || {});
         return `
           <div class="score-item">
             <div class="score-item-name">#${index + 1} ${this.escapeHtml(team.name || 'Onbekend')} (${isTimeMode ? SharedUtils.formatMs(team.score) : team.score})</div>
             <div class="score-item-value">
-              ${playersList.map(p => `${this.escapeHtml(p.name)}: ${isTimeMode ? SharedUtils.formatMs(p.score) : p.score}`).join(', ')}
+              ${team.playersList.map(p => `${this.escapeHtml(p.name)}: ${isTimeMode ? SharedUtils.formatMs(p.score) : p.score}`).join(', ')}
             </div>
           </div>
         `;
