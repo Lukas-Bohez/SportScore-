@@ -128,8 +128,8 @@ function selectActivity(activityId) {
 }
 
 .activity-cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-5);
 }
 

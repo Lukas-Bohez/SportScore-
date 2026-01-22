@@ -39,7 +39,7 @@ defineEmits(["select"]);
 <style scoped>
 .activity-card {
   position: relative;
-  width: 100%;
+  display: inline-block;
   min-height: 8rem;
   padding: var(--space-6) var(--space-5);
   border: 1px solid var(--blue-100);
