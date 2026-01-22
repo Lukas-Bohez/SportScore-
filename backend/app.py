@@ -11,12 +11,10 @@ from threading import Lock
 import logging
 
 
-# Define CET/CEST timezone for Belgium
-CET = pytz.timezone('Europe/Brussels')
 
 
 # Import the new repository
-from database.datarepository import (
+from backend.database.datarepository import (
     SportRepository, TeamRepository, PlayerRepository,
     ScoreTypeRepository, GameRepository, ScoreRepository,
     SessionRepository, SessionTeamRepository, SessionScoreRepository,
@@ -25,7 +23,7 @@ from database.datarepository import (
 )
 
 # Import models
-from models.models import (
+from backend.models.models import (
     SportBase, SportCreate, SportUpdate, SportResponse, SportListResponse,
     TeamBase, TeamCreate, TeamUpdate, TeamResponse, TeamListResponse,
     PlayerBase, PlayerCreate, PlayerUpdate, PlayerResponse, PlayerListResponse,
@@ -71,36 +69,25 @@ app = FastAPI(
     description="REST + Socket.IO backend for SportScore. All REST endpoints are prefixed with /api/v1."
 )
 
-# ----------------------------------------------------
-# Helpers
-# ----------------------------------------------------
-def _jsonable(value):
-    """Recursively convert datetimes and nested structures to JSON-serializable types."""
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, dict):
-        return {k: _jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        t = type(value)
-        return t(_jsonable(v) for v in value)
-    if isinstance(value, set):
-        # sets aren't JSON serializable; turn into list
-        return [_jsonable(v) for v in value]
-    return value
+# -----------------------------------------------------------------------------
+# Developer TOC / Module layout
+# -----------------------------------------------------------------------------
+# Sections in this module (helpful pointers for contributors):
+# - Socket.IO setup & event handlers
+# - Background tasks (round timer monitor)
+# - API Routes (grouped): Sessions, Session Teams, Activities, Activity Rounds,
+#   Activity Teams/Players/Scores, Teams (standalone), Players, Scores (session scoped),
+#   Admin/System, Health
+# - Utilities & misc (test endpoints, preflight handler)
+#
+# For larger refactors, consider moving related endpoints to FastAPI routers
+# in `backend/routes/` and importing them here to keep this file concise.
+# -----------------------------------------------------------------------------
 
-def _normalize_activity(activity: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Normalize activity row values for consistent API output."""
-    if not activity:
-        return activity
-    # Ensure time_winner always has a default
-    activity['time_winner'] = activity.get('time_winner') or 'lower'
-    # Convert SQLite 0/1 into Python bool for JSON clients
-    try:
-        raw_agg = activity.get('aggregate_player_times')
-        activity['aggregate_player_times'] = bool(int(raw_agg)) if raw_agg is not None else False
-    except Exception:
-        activity['aggregate_player_times'] = bool(activity.get('aggregate_player_times'))
-    return activity
+# ----------------------------------------------------
+# Helpers (moved to `backend/api_helpers.py` to improve readability and avoid clutter)
+# ----------------------------------------------------
+from backend.utils.api_helpers import _jsonable, _normalize_activity, CET
 
 # CORS middleware - allow all origins for development
 ALLOWED_ORIGINS = ["*"]
@@ -113,6 +100,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register routers (moved routes live in backend/routes/*.py)
+from backend.routes.sessions import router as sessions_router
+app.include_router(sessions_router)
+
 
 
 sio = socketio.AsyncServer(
@@ -120,12 +111,12 @@ sio = socketio.AsyncServer(
     async_mode='asgi',
     logger=False
 )
+# Register sio instance in central manager so other modules can emit events without importing app
+from backend.utils.socketio_manager import set_sio, add_client, remove_client, set_client_type, is_admin, get_connected_count, get_admin_count, get_sio
+set_sio(sio)
 
 ENDPOINT = "/api/v1"  # API base endpoint
 
-# Store connected clients
-connected_clients = {}  # sid: type ('admin' or 'bigscreen')
-admin_clients = set()  # Track admin client sids
 
 
 # Expose Socket.IO as the top-level ASGI app to avoid duplicate CORS headers on /socket.io
@@ -137,8 +128,9 @@ asgi = socketio.ASGIApp(sio, app, socketio_path='socket.io')
 
 @sio.event
 async def connect(sid, environ):
-    print(f"Client {sid} connected - Total clients: {len(connected_clients) + 1}")
-    connected_clients[sid] = None  # not identified yet
+    # Register client in central manager
+    add_client(sid, None)
+    print(f"Client {sid} connected - Total clients: {get_connected_count()}")
 
     # Send welcome message
     await sio.emit('welcome', {
@@ -149,59 +141,67 @@ async def connect(sid, environ):
 
 @sio.event
 async def disconnect(sid, reason=None):
-    print(f"Client {sid} disconnected - Total clients: {len(connected_clients) - 1}")
-    
-    # Check if this was an admin
-    was_admin = sid in admin_clients
+    # Check admin state before removal
+    was_admin = is_admin(sid)
+    remove_client(sid)
+    print(f"Client {sid} disconnected - Total clients: {get_connected_count()}")
+
     if was_admin:
-        admin_clients.discard(sid)
-        print(f"Admin {sid} removed - Remaining admins: {len(admin_clients)}")
-        
+        print(f"Admin {sid} removed - Remaining admins: {get_admin_count()}")
         # If no more admins, show QR code
-        if len(admin_clients) == 0:
+        if get_admin_count() == 0:
             print("No admins connected - showing QR code")
-            await sio.emit('set-qr', True)
-    
-    if sid in connected_clients:
-        del connected_clients[sid]
+            sio = get_sio()
+            if sio:
+                await sio.emit('set-qr', True)
 
 @sio.event
 async def admin_connected(sid):
     print(f"Admin connected: {sid}")
-    admin_clients.add(sid)
-    connected_clients[sid] = 'admin'
-    print(f"Total admins: {len(admin_clients)}")
+    set_client_type(sid, 'admin')
+    print(f"Total admins: {get_admin_count()}")
     
     # Hide QR code when admin connects
-    await sio.emit('set-qr', False)
+    sio = get_sio()
+    if sio:
+        await sio.emit('set-qr', False)
 
 @sio.event
 async def admin_disconnected(sid):
     print(f"Admin disconnected: {sid}")
-    if sid in admin_clients:
-        admin_clients.discard(sid)
-        print(f"Remaining admins: {len(admin_clients)}")
+    was_admin = is_admin(sid)
+    remove_client(sid)
+    if was_admin:
+        print(f"Remaining admins: {get_admin_count()}")
         
         # If no more admins, show QR code
-        if len(admin_clients) == 0:
+        if get_admin_count() == 0:
             print("No admins connected - showing QR code")
-            await sio.emit('set-qr', True)
+            sio = get_sio()
+            if sio:
+                await sio.emit('set-qr', True)
 
 @sio.on('set-qr')
 async def set_qr(sid, data=None):
     print(f"Set QR requested: {data}")
-    await sio.emit('set-qr', data)
+    sio = get_sio()
+    if sio:
+        await sio.emit('set-qr', data)
 
 @sio.on('qr-state')
 async def qr_state(sid, data=None):
     print(f"QR state update: {data}")
-    await sio.emit('qr-state', data)
+    sio = get_sio()
+    if sio:
+        await sio.emit('qr-state', data)
 
 @sio.on('set_active_activity')
 async def set_active_activity(sid, data=None):
     print(f"Admin set active activity: {data}")
     # Broadcast to all connected clients (including BigScreen)
-    await sio.emit('set_active_activity', data)
+    sio = get_sio()
+    if sio:
+        await sio.emit('set_active_activity', data)
 
 # ----------------------------------------------------
 # Background Task: Round Timer Monitor
@@ -220,7 +220,7 @@ async def round_timer_monitor():
             await asyncio.sleep(1)
             
             # Get all active rounds with time limits
-            from database.database import Database
+            from backend.database.database import Database
             sql = """
             SELECT id, current_round, total_rounds, round_start_time, time_limit_per_round, session_id
             FROM activities
@@ -314,6 +314,17 @@ async def round_timer_monitor():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(round_timer_monitor())
+
+    # Developer-friendly: log available API routes (helps during development)
+    try:
+        api_routes = [r for r in app.routes if getattr(r, 'path', '').startswith(ENDPOINT)]
+        logger.info(f"Registered API routes ({len(api_routes)}):")
+        for r in api_routes:
+            methods = getattr(r, 'methods', None)
+            logger.info(f"  {', '.join(sorted(methods)) if methods else ''} {r.path}")
+    except Exception:
+        logger.exception("Failed to enumerate routes on startup")
+
     logger.info("Application startup complete")
 
 # ----------------------------------------------------
@@ -322,107 +333,12 @@ async def startup_event():
 
 # (Sports endpoints removed) — unused by frontend and removed to declutter API docs
 
-# Teams endpoints
-@app.get(f"{ENDPOINT}/teams", response_model=TeamListResponse)
-async def get_teams(sport_id: Optional[int] = Query(None)):
-    if sport_id:
-        teams = TeamRepository.get_teams_by_sport(sport_id)
-    else:
-        teams = TeamRepository.get_all_teams()
-    return {"teams": [TeamResponse(**team) for team in teams]}
+# Teams and Players routes moved to `backend/routes/teams.py` and `backend/routes/players.py` for improved modularity.
+from backend.routes.teams import router as teams_router
+from backend.routes.players import router as players_router
+app.include_router(teams_router)
+app.include_router(players_router)
 
-@app.post(f"{ENDPOINT}/teams", response_model=TeamResponse)
-async def create_team(team: TeamCreate):
-    try:
-        team_id = TeamRepository.create_team(team.name, team.color, team.icon, team.description)
-        if not team_id:
-            raise HTTPException(status_code=400, detail="Failed to create team")
-        created_team = TeamRepository.get_team_by_id(team_id)
-        if not created_team:
-            raise HTTPException(status_code=500, detail="Team created but could not be retrieved")
-        return TeamResponse(**created_team)
-    except Exception as e:
-        if "UNIQUE constraint failed" in str(e):
-            raise HTTPException(status_code=409, detail="Team with this name already exists")
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
-
-@app.get(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
-async def get_team(team_id: int):
-    team = TeamRepository.get_team_by_id(team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return TeamResponse(**team)
-
-@app.put(f"{ENDPOINT}/teams/{{team_id}}", response_model=TeamResponse)
-async def update_team(team_id: int, team_update: TeamUpdate):
-    # Pass the expected fields (name, color, icon, description) to the repository
-    success = TeamRepository.update_team(team_id, team_update.name, team_update.color, team_update.icon, team_update.description)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update team")
-    updated_team = TeamRepository.get_team_by_id(team_id)
-    return TeamResponse(**updated_team)
-
-@app.delete(f"{ENDPOINT}/teams/{{team_id}}")
-async def delete_team(team_id: int):
-    success = TeamRepository.delete_team(team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete team")
-    return {"message": "Team deleted successfully"}
-
-@app.put(f"{ENDPOINT}/teams/{{team_id}}/players/{{player_id}}", response_model=PlayerResponse)
-async def assign_player_to_team(team_id: int, player_id: int):
-    # Check if team exists
-    team = TeamRepository.get_team_by_id(team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Check if player exists
-    player = PlayerRepository.get_player_by_id(player_id)
-    if not player:
-        raise HTTPException(status_code=404, detail="Player not found")
-    
-    # Update player's team_id
-    success = PlayerRepository.update_player(player_id, None, team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to assign player to team")
-    
-    updated_player = PlayerRepository.get_player_by_id(player_id)
-    return PlayerResponse(**updated_player)
-
-# Players endpoints
-@app.get(f"{ENDPOINT}/players", response_model=PlayerListResponse)
-async def get_players(team_id: Optional[int] = Query(None)):
-    if team_id:
-        players = PlayerRepository.get_players_by_team(team_id)
-    else:
-        players = PlayerRepository.get_all_players()
-    return {"players": [PlayerResponse(**player) for player in players]}
-
-@app.post(f"{ENDPOINT}/players", response_model=PlayerResponse)
-async def create_player(player: PlayerCreate):
-    player_id = PlayerRepository.create_player(player.name, player.team_id, player.position)
-    if not player_id:
-        raise HTTPException(status_code=400, detail="Failed to create player")
-    created_player = PlayerRepository.get_player_by_id(player_id)
-    return PlayerResponse(**created_player)
-
-@app.get(f"{ENDPOINT}/players/{{player_id}}", response_model=PlayerResponse)
-async def get_player(player_id: int):
-    player = PlayerRepository.get_player_by_id(player_id)
-    if not player:
-        raise HTTPException(status_code=404, detail="Player not found")
-    return PlayerResponse(**player)
-
-@app.put(f"{ENDPOINT}/players/{{player_id}}", response_model=PlayerResponse)
-async def update_player(player_id: int, player_update: PlayerUpdate):
-    update_data = player_update.dict(exclude_unset=True)
-    success = PlayerRepository.update_player_fields(player_id, update_data)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update player")
-    updated_player = PlayerRepository.get_player_by_id(player_id)
-    return PlayerResponse(**updated_player)
-
-@app.delete(f"{ENDPOINT}/players/{{player_id}}")
 async def delete_player(player_id: int):
     success = PlayerRepository.delete_player(player_id)
     if not success:
@@ -430,74 +346,8 @@ async def delete_player(player_id: int):
     return {"message": "Player deleted successfully"}
 
 
-# Session player assignments endpoints
-@app.post(f"{ENDPOINT}/sessions/{{session_id}}/assign-player", response_model=SessionPlayerResponse)
-async def assign_player(session_id: int, assignment: SessionPlayerCreate):
-    # Ensure session exists
-    session = SessionRepository.get_session_by_id(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    # Ensure player exists
-    player = PlayerRepository.get_player_by_id(assignment.player_id)
-    if not player:
-        raise HTTPException(status_code=404, detail="Player not found")
-
-    # Ensure team is part of session
-    team_in_session = SessionTeamRepository.get_team_in_session(assignment.team_id, session_id)
-    if not team_in_session:
-        raise HTTPException(status_code=400, detail="Team is not part of this session")
-
-    assign_id = SessionPlayerRepository.assign_player_to_session(session_id, assignment.team_id, assignment.player_id)
-    created = SessionPlayerRepository.get_player_assignment(session_id, assignment.player_id)
-
-    # Emit real-time update for team (since players changed)
-    updated_team = SessionTeamRepository.get_team_in_session(assignment.team_id, session_id)
-    total_score = SessionScoreRepository.get_team_total_score(session_id, assignment.team_id)
-    await sio.emit('team_update', _jsonable({
-        'session_id': session_id,
-        'team_id': assignment.team_id,
-        'team': {
-            **updated_team,
-            'total_score': total_score  # Add calculated total score
-        },
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-
-    return SessionPlayerResponse(**created)
-
-
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/assign-player/{{player_id}}")
-async def remove_player_assignment(session_id: int, player_id: int):
-    removed = SessionPlayerRepository.remove_player_from_session(session_id, player_id)
-    if not removed:
-        raise HTTPException(status_code=400, detail="Failed to remove assignment or assignment not found")
-    return {"message": "Assignment removed"}
-
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players/{{player_id}}")
-async def remove_player_from_session_team(session_id: int, team_id: int, player_id: int):
-    removed = SessionPlayerRepository.remove_player_from_session_team(session_id, team_id, player_id)
-    if not removed:
-        raise HTTPException(status_code=400, detail="Failed to remove assignment or assignment not found")
-    return {"message": "Assignment removed"}
-
-
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/participants", response_model=List[str])
-async def get_session_participants(session_id: int):
-    """Get unique participant names for a session"""
-    session = SessionRepository.get_session_by_id(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Get unique player names from activity scores
-    sql = """
-    SELECT DISTINCT player_name 
-    FROM activity_scores 
-    WHERE game_id = ? AND player_name IS NOT NULL AND player_name != ''
-    ORDER BY player_name
-    """
-    participants = Database.get_rows(sql, [session_id])
-    return [p['player_name'] for p in participants]
+# Session assignment endpoints moved to `backend/routes/sessions.py` (see `sessions_router`).
+# GET /api/v1/sessions/{session_id}/participants moved to `backend/routes/sessions.py` as well.
 
 
 @app.get(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players")
@@ -520,991 +370,61 @@ async def get_session_team_players(session_id: int, team_id: int):
 # Session Endpoints (Teambuilding)
 # ===========================================
 
-@app.get(
-    f"{ENDPOINT}/sessions",
-    response_model=SessionListResponse,
-    tags=["Sessions"],
-    summary="List sessions",
-    description="Return all sessions ordered by creation time."
-)
-async def get_sessions():
-    sessions = SessionRepository.get_all_sessions()
-    return SessionListResponse(sessions=[SessionResponse(**session) for session in sessions])
+# GET /api/v1/sessions moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-@app.post(
-    f"{ENDPOINT}/sessions",
-    response_model=SessionResponse,
-    tags=["Sessions"],
-    summary="Create a new session",
-    description="Create a new teambuilding session and broadcast a session_created event."
-)
-async def create_session(session: SessionCreate):
-    # End any currently active session
-    active_session = SessionRepository.get_active_session()
-    if active_session and active_session.get('status') == 'active':
-        SessionRepository.update_session(active_session['id'], status='completed')
-        logger.info(f"Ended active session {active_session['id']} as new session is being created")
-    
-    session_id = SessionRepository.create_session(
-        session.name, session.game_type,
-        session.total_rounds, session.time_limit, session.scoring_mode,
-        session.sport_type, session.show_players
-    )
-    created_session = SessionRepository.get_session_by_id(session_id)
+# POST /api/v1/sessions moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-    # Set the new session as active
-    SessionRepository.update_session(session_id, status='active')
+# GET /api/v1/sessions/active moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-    # Emit real-time update for new session creation
-    await sio.emit('session_created', _jsonable({
-        'session_id': session_id,
-        'session': created_session,
-        'timestamp': datetime.now(CET).isoformat()
-    }))
+# GET /api/v1/sessions/{session_id} moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-    return SessionResponse(**created_session)
+# PUT /api/v1/sessions/{session_id} moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-@app.get(
-    f"{ENDPOINT}/sessions/active",
-    tags=["Sessions"],
-    summary="Get active session",
-    description="Return the currently active session or null if none is active."
-)
-async def get_active_session():
-    """Return the currently active session or null when none exists."""
-    session = SessionRepository.get_active_session()
-    print(f"Active session from DB: {session}")
-    if session:
-        # Ensure defaults for fields that might be None from database
-        if session.get('current_round') is None:
-            session['current_round'] = 1
-        if session.get('total_rounds') is None:
-            session['total_rounds'] = 1
-        if session.get('status') is None:
-            session['status'] = 'setup'
-        if session.get('game_type') is None:
-            session['game_type'] = 'custom'
-        # Convert datetime to str for JSON serialization
-        for key, value in session.items():
-            if isinstance(value, datetime):
-                session[key] = value.isoformat()
-        print(f"Returning session: {session}")
-        return session
-    print("No active session, returning None")
-    return None
+# DELETE /api/v1/sessions/{session_id} moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}", response_model=SessionResponse, tags=["Sessions"], summary="Get a session by id")
-async def get_session(session_id: int):
-    session = SessionRepository.get_session_by_id(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return SessionResponse(**session)
+# Session Teams endpoints moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-@app.put(
-    f"{ENDPOINT}/sessions/{{session_id}}",
-    response_model=SessionResponse,
-    tags=["Sessions"],
-    summary="Update a session",
-    description="Update mutable fields of a session and broadcast a session_update event."
-)
-async def update_session(session_id: int, session_update: SessionUpdate):
-    success = SessionRepository.update_session(
-        session_id, session_update.name, session_update.game_type,
-        session_update.status,
-        session_update.current_round, session_update.total_rounds,
-        session_update.time_limit
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update session")
-    updated_session = SessionRepository.get_session_by_id(session_id)
-
-    # Emit real-time update for session changes
-    await sio.emit('session_update', _jsonable({
-        'session_id': session_id,
-        'session': updated_session,
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-
-    return SessionResponse(**updated_session)
-
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}", tags=["Sessions"], summary="Delete a session")
-async def delete_session(session_id: int):
-    success = SessionRepository.delete_session(session_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete session")
-    return {"message": "Session deleted successfully"}
-
-# Session Teams Endpoints
-@app.get(
-    f"{ENDPOINT}/sessions/{{session_id}}/teams",
-    response_model=SessionTeamListResponse,
-    tags=["Session Teams"],
-    summary="List teams for a session"
-)
-async def get_session_teams(session_id: int):
-    teams = SessionTeamRepository.get_teams_by_session(session_id)
-    return SessionTeamListResponse(teams=[SessionTeamResponse(**team) for team in teams])
-
-@app.post(
-    f"{ENDPOINT}/sessions/{{session_id}}/teams",
-    response_model=SessionTeamResponse,
-    tags=["Session Teams"],
-    summary="Create a team in a session"
-)
-async def create_session_team(session_id: int, request: Request):
-    """Create a team in a session.
-
-    Accepts standard JSON (application/json) and also tolerates plain text bodies
-    containing JSON to be resilient against strict CORS/preflight behaviors on some setups.
-    """
-    payload: Dict[str, Any]
-    try:
-        # Prefer normal JSON parsing
-        payload = await request.json()
-    except Exception:
-        # Fallback: try parsing raw body as JSON even if content-type is not application/json
-        try:
-            raw = await request.body()
-            if isinstance(raw, (bytes, bytearray)):
-                raw = raw.decode('utf-8', errors='ignore')
-            payload = json.loads(raw or '{}')
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid request body")
-
-    # Extract and validate fields
-    body_session_id = payload.get('session_id')
-    name = (payload.get('name') or '').strip()
-    color = (payload.get('color') or '').strip() or '#FF6B6B'
-    icon = (payload.get('icon') or '').strip() or 'team'
-
-    if not name:
-        raise HTTPException(status_code=422, detail="Field 'name' is required")
-
-    # If body had a different session_id than the path, reject
-    if body_session_id is not None and int(body_session_id) != int(session_id):
-        raise HTTPException(status_code=400, detail="Session ID mismatch")
-
-    # Create team
-    team_id = SessionTeamRepository.create_team(session_id, name, color, icon)
-    created_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
-    logger.info(f"Created team {team_id} ({name}) in session {session_id} with color: {created_team.get('color') if created_team else 'None'}")
-
-    # Emit real-time update for new team creation
-    print(f"Emitting team_update event for team creation: session_id={session_id}, team_id={team_id}")
-    total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
-    await sio.emit('team_update', _jsonable({
-        'session_id': session_id,
-        'team_id': team_id,
-        'team': {
-            **created_team,
-            'total_score': total_score
-        },
-        'action': 'created',
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-
-    return SessionTeamResponse(**created_team)
+# POST /api/v1/sessions/{session_id}/teams moved to `backend/routes/sessions.py` (see `sessions_router`).
 
 
-@app.get(
-    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players",
-    response_model=PlayerListResponse,
-    tags=["Session Team Players"],
-    summary="List players for a session team"
-)
-async def get_players_for_team(session_id: int, team_id: int):
-    # Validate team exists in this session using get_team_in_session
-    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found in session")
-    players = PlayerRepository.get_players_by_team(team_id)
-    return PlayerListResponse(players=[PlayerResponse(**p) for p in players])
+# GET /api/v1/sessions/{session_id}/teams/{team_id}/players moved to `backend/routes/sessions.py` (see `sessions_router`).
 
 
-@app.post(
-    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players",
-    response_model=PlayerResponse,
-    tags=["Session Team Players"],
-    summary="Create player for a session team"
-)
-async def create_player_for_team(session_id: int, team_id: int, player: PlayerCreate):
-    # Validate team exists in this session using get_team_in_session
-    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found in session")
+# POST /api/v1/sessions/{session_id}/teams/{team_id}/players moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-    # Ensure team_id matches path
-    if player.team_id and int(player.team_id) != int(team_id):
-        raise HTTPException(status_code=400, detail="Team ID mismatch")
+# PUT /api/v1/sessions/{session_id}/teams/{team_id} moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-    player_id = PlayerRepository.create_player(player.name, team_id, player.position)
-    if not player_id:
-        raise HTTPException(status_code=400, detail="Failed to create player")
-    # Also assign this new player to the session/team mapping for the session
-    try:
-        SessionPlayerRepository.assign_player_to_session(session_id, team_id, player_id)
-    except Exception:
-        # Ignore failures here (e.g., if already assigned) to preserve idempotency
-        pass
-    created_player = PlayerRepository.get_player_by_id(player_id)
-    return PlayerResponse(**created_player)
+# DELETE /api/v1/sessions/{session_id}/teams/{team_id} moved to `backend/routes/sessions.py` (see `sessions_router`).
 
-@app.put(
-    f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}",
-    response_model=SessionTeamResponse,
-    tags=["Session Teams"],
-    summary="Update a team in a session"
-)
-async def update_session_team(session_id: int, team_id: int, team_update: SessionTeamUpdate):
-    success = SessionTeamRepository.update_team(
-        team_id, team_update.name, team_update.color, team_update.icon,
-        None, team_update.score, team_update.is_eliminated
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update team")
-    updated_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
-    if not updated_team:
-        raise HTTPException(status_code=404, detail="Team not found in session")
+# Activities routes moved to `backend/routes/activities.py` to improve readability and modularity.
+from backend.routes.activities import router as activities_router
+app.include_router(activities_router)
+app.include_router(teams_router)
+app.include_router(players_router)
+from backend.routes.system import router as system_router
+app.include_router(system_router)
 
-    # Emit real-time update for team changes
-    print(f"Emitting team_update event for team update: session_id={session_id}, team_id={team_id}")
-    await sio.emit('team_update', _jsonable({
-        'session_id': session_id,
-        'team_id': team_id,
-        'team': updated_team,
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-
-    return SessionTeamResponse(**updated_team)
-
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}", tags=["Session Teams"], summary="Delete a session team")
-async def delete_session_team(session_id: int, team_id: int):
-    success = SessionTeamRepository.delete_team(team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete team")
-
-    # Emit real-time update for team deletion
-    print(f"Emitting team_update event for team deletion: session_id={session_id}, team_id={team_id}")
-    await sio.emit('team_update', {
-        'session_id': session_id,
-        'team_id': team_id,
-        'action': 'deleted',
-        'timestamp': datetime.now(CET).isoformat()
-    })
-
-    return {"message": "Team deleted successfully"}
-
-# Activities Endpoints
-@app.get(
-    f"{ENDPOINT}/activities",
-    response_model=ActivityListResponse,
-    tags=["Activities"],
-    summary="List global activities"
-)
-async def get_global_activities():
-    activities = ActivityRepository.get_activities_by_session(None)
-    normalized = [_normalize_activity(a) for a in activities]
-    return ActivityListResponse(activities=[ActivityResponse(**a) for a in normalized])
-
-@app.post(
-    f"{ENDPOINT}/activities",
-    response_model=ActivityResponse,
-    tags=["Activities"],
-    summary="Create global activity"
-)
-async def create_global_activity(activity: ActivityCreate):
-    if activity.session_id is not None:
-        raise HTTPException(status_code=400, detail="Use session-specific endpoint for session activities")
-    activity_id = ActivityRepository.create_activity(
-        session_id=None,
-        name=activity.name,
-        sport_type=activity.sport_type,
-        game_type=activity.game_type,
-        scoring_mode=activity.scoring_mode,
-        time_winner=(activity.time_winner or 'lower'),
-        aggregate_player_times=1 if activity.aggregate_player_times else 0,
-        total_rounds=activity.total_rounds,
-        time_limit_per_round=activity.time_limit_per_round,
-        description=activity.description
-    )
-    created = ActivityRepository.get_activity_by_id(activity_id)
-    return ActivityResponse(**created)
-
-@app.get(
-    f"{ENDPOINT}/sessions/{{session_id}}/activities",
-    response_model=ActivityListResponse,
-    tags=["Activities"],
-    summary="List activities in a session"
-)
-async def get_session_activities(session_id: int):
-    activities = ActivityRepository.get_activities_by_session(session_id)
-    normalized = [_normalize_activity(a) for a in activities]
-    return ActivityListResponse(activities=[ActivityResponse(**a) for a in normalized])
-
-@app.post(
-    f"{ENDPOINT}/sessions/{{session_id}}/activities",
-    response_model=ActivityResponse,
-    tags=["Activities"],
-    summary="Create activity in a session"
-)
-async def create_activity_in_session(session_id: int, activity: ActivityCreate):
-    if activity.session_id != session_id:
-        raise HTTPException(status_code=400, detail="Session ID mismatch")
-
-    # Debug log incoming payload
-    try:
-        logger.info(f"Creating session activity for session={session_id}: name={activity.name}, time_limit_per_round={activity.time_limit_per_round}")
-    except Exception:
-        logger.exception("Failed to log incoming activity payload")
-
-    # If caller did not provide a time_limit_per_round, try to copy from a global activity template with the same name
-    time_limit = activity.time_limit_per_round
-    if time_limit is None and activity.name:
-        try:
-            # Prefer a direct lookup for global activity by name for reliability
-            match = ActivityRepository.get_global_activity_by_name(activity.name)
-            if match and match.get('time_limit_per_round') is not None:
-                time_limit = match.get('time_limit_per_round')
-                logger.info(f"Copied time_limit_per_round={time_limit} from global activity template '{match.get('name')}'")
-            else:
-                logger.info(f"No global template match with time_limit found for activity name='{activity.name}'")
-        except Exception as e:
-            logger.exception(f"Failed to lookup global activity for copying time limit: {e}")
-
-    activity_id = ActivityRepository.create_activity(
-        session_id=activity.session_id,
-        name=activity.name,
-        sport_type=activity.sport_type,
-        game_type=activity.game_type,
-        scoring_mode=activity.scoring_mode,
-        time_winner=(activity.time_winner or 'lower'),
-        aggregate_player_times=1 if activity.aggregate_player_times else 0,
-        total_rounds=activity.total_rounds,
-        time_limit_per_round=time_limit,
-        description=activity.description
-    )
-    created = ActivityRepository.get_activity_by_id(activity_id)
-
-    # If we still don't have a time_limit_per_round on the created session activity, try to copy from a global template and update
-    try:
-        if created and created.get('time_limit_per_round') is None and activity.name:
-            template = ActivityRepository.get_global_activity_by_name(activity.name)
-            if template and template.get('time_limit_per_round') is not None:
-                ActivityRepository.update_activity(activity_id, time_limit_per_round=template.get('time_limit_per_round'))
-                created = ActivityRepository.get_activity_by_id(activity_id)
-                logger.info(f"Post-created: copied time_limit_per_round={template.get('time_limit_per_round')} into session activity id={activity_id}")
-    except Exception:
-        logger.exception("Failed to copy time_limit into newly created session activity")
-
-    # Emit real-time update for activity creation
-    try:
-        await sio.emit('activity_created', _jsonable({
-            'activity': created,
-            'timestamp': datetime.now(CET).isoformat()
-        }))
-    except Exception:
-        logger.exception("Failed to emit activity_created event")
-
-    return ActivityResponse(**created)
-
-@app.get(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Get activity by id")
-async def get_activity(activity_id: int):
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return ActivityResponse(**_normalize_activity(activity))
-
-@app.put(f"{ENDPOINT}/activities/{{activity_id}}", response_model=ActivityResponse, tags=["Activities"], summary="Update activity")
-async def update_activity(activity_id: int, activity_update: ActivityUpdate, request: Request):
-    # Debug: log incoming activity update fields
-    try:
-        print(f"Activity update received for id={activity_id}")
-        print(f"  time_winner={activity_update.time_winner} (type: {type(activity_update.time_winner)})")
-        print(f"  aggregate_player_times={activity_update.aggregate_player_times} (type: {type(activity_update.aggregate_player_times)})")
-        print(f"  time_limit_per_round={activity_update.time_limit_per_round} (type: {type(activity_update.time_limit_per_round)})")
-    except Exception as e:
-        print(f"Failed to log activity update: {e}")
-
-    # Log raw request body
-    try:
-        raw = await request.json()
-        print(f"Activity update raw body: {raw}")
-    except Exception as e:
-        print(f"Failed to parse raw request body: {e}")
-
-    # CRITICAL FIX: Explicitly convert aggregate_player_times to integer for SQLite
-    # Keep None if not provided
-    if activity_update.aggregate_player_times is not None:
-        aggregate_as_int = 1 if activity_update.aggregate_player_times else 0
-    else:
-        aggregate_as_int = None
-
-    # CRITICAL FIX: Ensure time_winner is passed through only when provided
-    time_winner_value = activity_update.time_winner if activity_update.time_winner is not None else None
-
-    print(f"  Converted values: aggregate_player_times={aggregate_as_int}, time_winner={time_winner_value}")
-
-    success = ActivityRepository.update_activity(
-        activity_id,
-        name=activity_update.name,
-        sport_type=activity_update.sport_type,
-        game_type=activity_update.game_type,
-        scoring_mode=activity_update.scoring_mode,
-        time_winner=time_winner_value,
-        aggregate_player_times=aggregate_as_int,
-        status=activity_update.status,
-        current_round=activity_update.current_round,
-        total_rounds=activity_update.total_rounds,
-        time_limit_per_round=activity_update.time_limit_per_round,
-        round_status=activity_update.round_status,
-        description=activity_update.description
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update activity")
-
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-
-    # Normalize values for JSON and client consumers
-    try:
-        # Ensure time_winner defaults to 'lower' if missing
-        updated['time_winner'] = updated.get('time_winner') or 'lower'
-        # Convert numeric sqlite stored 0/1 to boolean for JSON
-        updated['aggregate_player_times'] = bool(int(updated.get('aggregate_player_times') or 0))
-    except Exception as e:
-        print(f"Failed to normalize updated activity values: {e}")
-
-    print(f"Activity after update: time_winner={updated.get('time_winner')}, aggregate_player_times={updated.get('aggregate_player_times')}")
-
-    # Emit real-time update for activity change
-    try:
-        await sio.emit('activity_update', _jsonable({
-            'activity': updated,
-            'timestamp': datetime.now(CET).isoformat()
-        }))
-    except Exception:
-        logger.exception("Failed to emit activity_update event")
-
-    return ActivityResponse(**updated)
-
-@app.delete(f"{ENDPOINT}/activities/{{activity_id}}", tags=["Activities"], summary="Delete activity")
-async def delete_activity(activity_id: int):
-    success = ActivityRepository.delete_activity(activity_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete activity")
-
-    # Emit deletion event so clients can refresh
-    try:
-        await sio.emit('activity_deleted', {'activity_id': activity_id, 'timestamp': datetime.now(CET).isoformat()})
-    except Exception:
-        logger.exception("Failed to emit activity_deleted event")
-
-    return {"message": "Activity deleted successfully"}
+# Delete activity endpoint moved to `backend/routes/activities.py` (see `activities_router`)
 
 # ============================================================================
-# Round Control Endpoints
-# ============================================================================
-
-@app.post(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/start",
-    response_model=ActivityResponse,
-    tags=["Activities", "Rounds"],
-    summary="Start the current round"
-)
-async def start_activity_round(activity_id: int):
-    """Start the current round of an activity"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    
-    if activity.get('round_status') == 'active':
-        raise HTTPException(status_code=400, detail="Round is already active")
-    
-    # Start the round
-    now = datetime.now(CET).isoformat()
-    ActivityRepository.update_activity(
-        activity_id,
-        round_status='active',
-        round_start_time=now,
-        round_end_time=None,
-        status='active'  # Also set activity status to active
-    )
-    
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-    
-    # Emit real-time event (include time_remaining for immediate client start)
-    try:
-        time_limit = updated.get('time_limit_per_round')
-        # For a newly started round the remaining time equals the full time limit (if present)
-        time_remaining = int(time_limit) if time_limit is not None else None
-        await sio.emit('round_started', _jsonable({
-            'activity_id': activity_id,
-            'current_round': updated.get('current_round', 1),
-            'round_start_time': now,
-            'round_status': 'active',
-            'time_limit_per_round': time_limit,
-            'time_remaining': time_remaining,
-            'timestamp': now
-        }))
-    except Exception:
-        logger.exception("Failed to emit round_started event")
-    
-    return ActivityResponse(**_normalize_activity(updated))
-
-@app.post(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/end",
-    response_model=ActivityResponse,
-    tags=["Activities", "Rounds"],
-    summary="End the current round"
-)
-async def end_activity_round(activity_id: int):
-    """End the current round of an activity and auto-advance if more rounds remain"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-
-    if activity.get('round_status') != 'active':
-        raise HTTPException(status_code=400, detail="No active round to end")
-
-    now = datetime.now(CET)
-    now_iso = now.isoformat()
-
-    current_round = activity.get('current_round', 1)
-    total_rounds = activity.get('total_rounds', 1)
-
-    if current_round < total_rounds:
-        # End current round and advance to next
-        ActivityRepository.update_activity(
-            activity_id,
-            current_round=current_round + 1,
-            round_status='not_started',
-            round_start_time=None,
-            round_end_time=now_iso
-        )
-        updated = ActivityRepository.get_activity_by_id(activity_id)
-
-        # Emit both round_ended and round_changed events (clients can handle either)
-        try:
-            await sio.emit('round_ended', _jsonable({
-                'activity_id': activity_id,
-                'current_round': current_round,
-                'round_end_time': now_iso,
-                'timestamp': now_iso
-            }))
-            await sio.emit('round_changed', _jsonable({
-                'activity_id': activity_id,
-                'previous_round': current_round,
-                'current_round': current_round + 1,
-                'total_rounds': total_rounds,
-                'timestamp': now_iso
-            }))
-        except Exception:
-            logger.exception("Failed to emit round change events")
-
-        return ActivityResponse(**_normalize_activity(updated))
-    else:
-        # Last round - mark completed
-        ActivityRepository.update_activity(
-            activity_id,
-            round_status='completed',
-            status='completed',
-            round_end_time=now_iso
-        )
-        updated = ActivityRepository.get_activity_by_id(activity_id)
-
-        # Emit real-time event
-        try:
-            await sio.emit('round_ended', _jsonable({
-                'activity_id': activity_id,
-                'current_round': current_round,
-                'round_end_time': now_iso,
-                'timestamp': now_iso
-            }))
-            await sio.emit('activity_completed', _jsonable({
-                'activity_id': activity_id,
-                'total_rounds': total_rounds,
-                'reason': 'manual_end',
-                'timestamp': now_iso
-            }))
-        except Exception:
-            logger.exception("Failed to emit round_ended/activity_completed event")
-
-        return ActivityResponse(**_normalize_activity(updated))
-
-@app.post(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/next",
-    response_model=ActivityResponse,
-    tags=["Activities", "Rounds"],
-    summary="Advance to the next round"
-)
-async def next_activity_round(activity_id: int):
-    """End current round and advance to the next one"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    
-    current_round = activity.get('current_round', 1)
-    total_rounds = activity.get('total_rounds', 1)
-    
-    if current_round >= total_rounds:
-        raise HTTPException(status_code=400, detail="Already at the last round")
-    
-    now = datetime.now(CET).isoformat()
-    
-    # End current round and move to next
-    ActivityRepository.update_activity(
-        activity_id,
-        current_round=current_round + 1,
-        round_status='not_started',
-        round_start_time=None,
-        round_end_time=now
-    )
-    
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-    
-    # Emit real-time event
-    try:
-        await sio.emit('round_changed', _jsonable({
-            'activity_id': activity_id,
-            'previous_round': current_round,
-            'current_round': current_round + 1,
-            'total_rounds': total_rounds,
-            'timestamp': now
-        }))
-    except Exception:
-        logger.exception("Failed to emit round_changed event")
-    
-    return ActivityResponse(**_normalize_activity(updated))
-
-@app.post(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/pause",
-    response_model=ActivityResponse,
-    tags=["Activities", "Rounds"],
-    summary="Pause the current round"
-)
-async def pause_activity_round(activity_id: int):
-    """Pause the current round"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    
-    if activity.get('round_status') != 'active':
-        raise HTTPException(status_code=400, detail="No active round to pause")
-    
-    ActivityRepository.update_activity(activity_id, round_status='paused')
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-    
-    # Emit real-time event
-    try:
-        await sio.emit('round_paused', _jsonable({
-            'activity_id': activity_id,
-            'current_round': updated.get('current_round', 1),
-            'timestamp': datetime.now(CET).isoformat()
-        }))
-    except Exception:
-        logger.exception("Failed to emit round_paused event")
-    
-    return ActivityResponse(**_normalize_activity(updated))
-
-@app.post(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/resume",
-    response_model=ActivityResponse,
-    tags=["Activities", "Rounds"],
-    summary="Resume a paused round"
-)
-async def resume_activity_round(activity_id: int):
-    """Resume a paused round"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    
-    if activity.get('round_status') != 'paused':
-        raise HTTPException(status_code=400, detail="Round is not paused")
-    
-    ActivityRepository.update_activity(activity_id, round_status='active')
-    updated = ActivityRepository.get_activity_by_id(activity_id)
-    
-    # Emit real-time event
-    try:
-        # Compute time_remaining on resume if possible
-        time_limit = updated.get('time_limit_per_round')
-        time_remaining = None
-        if time_limit and updated.get('round_start_time'):
-            try:
-                start_dt = datetime.fromisoformat(updated.get('round_start_time').replace('Z', '+00:00'))
-                elapsed_seconds = (datetime.now(CET) - start_dt).total_seconds()
-                time_remaining = max(0, int(time_limit - elapsed_seconds))
-            except Exception:
-                time_remaining = int(time_limit)
-        await sio.emit('round_resumed', _jsonable({
-            'activity_id': activity_id,
-            'current_round': updated.get('current_round', 1),
-            'round_status': 'active',
-            'time_limit_per_round': time_limit,
-            'time_remaining': time_remaining,
-            'timestamp': datetime.now(CET).isoformat()
-        }))
-    except Exception:
-        logger.exception("Failed to emit round_resumed event")
-    
-    return ActivityResponse(**_normalize_activity(updated))
-
-@app.get(
-    f"{ENDPOINT}/activities/{{activity_id}}/rounds/status",
-    tags=["Activities", "Rounds"],
-    summary="Get current round status and time remaining"
-)
-async def get_round_status(activity_id: int):
-    """Get detailed status of the current round including time remaining"""
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    
-    current_round = activity.get('current_round', 1)
-    total_rounds = activity.get('total_rounds', 1)
-    round_status = activity.get('round_status', 'not_started')
-    round_start_time = activity.get('round_start_time')
-    time_limit_per_round = activity.get('time_limit_per_round')
-    
-    response = {
-        'activity_id': activity_id,
-        'current_round': current_round,
-        'total_rounds': total_rounds,
-        'round_status': round_status,
-        'round_start_time': round_start_time,
-        'time_limit_per_round': time_limit_per_round,
-        'time_remaining': time_limit_per_round,  # Default to full time limit
-        'time_elapsed': None
-    }
-    
-    # Calculate time remaining if round is active and has a time limit
-    if round_status == 'active' and round_start_time and time_limit_per_round:
-        try:
-            start_dt = datetime.fromisoformat(round_start_time.replace('Z', '+00:00'))
-            now = datetime.now(CET)
-            elapsed_seconds = (now - start_dt).total_seconds()
-            remaining_seconds = max(0, time_limit_per_round - elapsed_seconds)
-            
-            response['time_elapsed'] = int(elapsed_seconds)
-            response['time_remaining'] = int(remaining_seconds)
-            response['is_overtime'] = elapsed_seconds > time_limit_per_round
-        except Exception as e:
-            logger.error(f"Error calculating time remaining: {e}")
-    
-    return response
+# Round Control endpoints moved to `backend/routes/activities.py` (see `activities_router`) - start/end/next/pause/resume/status are implemented there.
 
 # ============================================================================
 # End Round Control Endpoints
 # ============================================================================
 
 
-# Activity Teams (opt-in)
-@app.get(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamListResponse, tags=["Activity Teams"], summary="List teams for activity")
-async def get_activity_teams(activity_id: int):
-    teams = ActivityTeamRepository.get_teams(activity_id)
-    return ActivityTeamListResponse(teams=[ActivityTeamResponse(**t) for t in teams])
 
-@app.post(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamResponse, tags=["Activity Teams"], summary="Add team to activity")
-async def add_team_to_activity(activity_id: int, request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    team_id = payload.get('team_id')
-    if not team_id:
-        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
-    ActivityTeamRepository.add_team(activity_id, team_id, 1)
-    # Return joined record
-    teams = ActivityTeamRepository.get_teams(activity_id)
-    team = next((t for t in teams if int(t['id']) == int(team_id)), None)
-    return ActivityTeamResponse(**team) if team else ActivityTeamResponse(activity_id=activity_id, team_id=team_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
+# Activity Teams moved to `backend/routes/activities.py` (see `activities_router`)
 
-@app.delete(f"{ENDPOINT}/activities/{{activity_id}}/teams/{{team_id}}", tags=["Activity Teams"], summary="Remove team from activity")
-async def remove_team_from_activity(activity_id: int, team_id: int):
-    success = ActivityTeamRepository.remove_team(activity_id, team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to remove team from activity")
-    return {"message": "Team removed from activity"}
+# Activity Teams endpoints moved to `backend/routes/activities.py` (see `activities_router`) — add/remove handled there.
 
-# Activity Players (opt-in)
-@app.get(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerListResponse, tags=["Activity Players"], summary="List players for activity")
-async def get_activity_players(activity_id: int):
-    rows = ActivityPlayerRepository.get_players(activity_id)
-    players = []
-    for r in rows:
-        player_obj = {
-            'id': r.get('id', -1),
-            'activity_id': r.get('activity_id', activity_id),
-            'player_id': r.get('player_id'),
-            'opted_in': r.get('opted_in', 1),
-            'joined_at': r.get('joined_at')
-        }
-        players.append(ActivityPlayerResponse(**player_obj))
-    return ActivityPlayerListResponse(players=players)
+# Activity Players moved to `backend/routes/activities.py` (see `activities_router`)
 
-@app.post(f"{ENDPOINT}/activities/{{activity_id}}/players", response_model=ActivityPlayerResponse, tags=["Activity Players"], summary="Add player to activity")
-async def add_player_to_activity(activity_id: int, request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    player_id = payload.get('player_id')
-    if not player_id:
-        raise HTTPException(status_code=422, detail="Field 'player_id' is required")
-    ActivityPlayerRepository.add_player(activity_id, player_id, 1)
-    rows = ActivityPlayerRepository.get_players(activity_id)
-    player_row = next((r for r in rows if int(r.get('player_id')) == int(player_id)), None)
-    if player_row:
-        player_obj = {
-            'id': player_row.get('id', -1),
-            'activity_id': activity_id,
-            'player_id': player_row.get('player_id'),
-            'opted_in': player_row.get('opted_in', 1),
-            'joined_at': player_row.get('joined_at')
-        }
-        return ActivityPlayerResponse(**player_obj)
-    return ActivityPlayerResponse(activity_id=activity_id, player_id=player_id, opted_in=1, id=-1, joined_at=datetime.now(CET))
+# Activity Scores endpoints moved to `backend/routes/activities.py` (see `activities_router`) — scoring handled there.
 
-@app.delete(f"{ENDPOINT}/activities/{{activity_id}}/players/{{player_id}}", tags=["Activity Players"], summary="Remove player from activity")
-async def remove_player_from_activity(activity_id: int, player_id: int):
-    success = ActivityPlayerRepository.remove_player(activity_id, player_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to remove player from activity")
-    return {"message": "Player removed from activity"}
 
-# Activity Scores and Leaderboard
-@app.get(f"{ENDPOINT}/activities/{{activity_id}}/scores", response_model=ActivityScoreListResponse, tags=["Activity Scores"], summary="List scores for activity")
-async def get_activity_scores(activity_id: int):
-    # Always return activity-scoped scores from the activity_scores table; this is the authoritative source
-    scores = ActivityScoreRepository.get_scores_by_activity(activity_id)
-    return ActivityScoreListResponse(scores=[ActivityScoreResponse(**s) for s in scores])
-
-@app.post(f"{ENDPOINT}/activities/{{activity_id}}/scores", response_model=ActivityScoreResponse, tags=["Activity Scores"], summary="Create score for activity")
-async def create_activity_score(activity_id: int, score: ActivityScoreCreate):
-    if score.activity_id != activity_id:
-        raise HTTPException(status_code=400, detail="Activity ID mismatch")
-    score_id = ActivityScoreRepository.create_score(
-        activity_id=score.activity_id,
-        points=score.points,
-        team_id=score.team_id,
-        player_id=score.player_id,
-        reason=score.reason,
-        round_number=score.round_number,
-        timestamp=datetime.now(CET),
-    )
-    created_list = ActivityScoreRepository.get_scores_by_activity(activity_id)
-    created = next((s for s in created_list if s['id'] == score_id), None)
-    response = ActivityScoreResponse(**created) if created else ActivityScoreResponse(activity_id=activity_id, team_id=score.team_id, player_id=score.player_id, points=score.points, reason=score.reason, round_number=score.round_number, id=score_id, score_type='point', timestamp=datetime.now(CET))
-    
-    # Broadcast score update to all connected clients (BigScreen, etc.)
-    # Include both activity_id and session_id when available so clients can filter correctly
-    try:
-        activity_obj = ActivityRepository.get_activity_by_id(activity_id)
-        session_for_activity = activity_obj.get('session_id') if activity_obj else None
-    except Exception:
-        session_for_activity = None
-
-    await sio.emit('session_score_update', _jsonable({
-        'activity_id': activity_id,
-        'session_id': session_for_activity,
-        'team_id': score.team_id,
-        'player_id': score.player_id,
-        'points': score.points,
-        'reason': score.reason,
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-    
-    return response
-
-@app.get(f"{ENDPOINT}/activities/{{activity_id}}/leaderboard", tags=["Activities"], summary="Get activity leaderboard")
-async def get_activity_leaderboard(activity_id: int):
-    # Get activity to find session_id
-    activity = ActivityRepository.get_activity_by_id(activity_id)
-    session = None
-    if activity and activity.get('session_id'):
-        session = SessionRepository.get_session_by_id(activity['session_id'])
-        # For session activities, compute leaderboard from activity_scores and respect activity.time_winner and aggregate_player_times
-        scores = ActivityScoreRepository.get_scores_by_activity(activity_id) or []
-
-        # Build per-team and per-player totals from activity_scores
-        team_level_totals = {}  # team_id -> sum of team-level points (player_id is null)
-        player_totals = {}  # player_id -> { team_id, total }
-        for s in scores:
-            tid = s.get('team_id')
-            pid = s.get('player_id')
-            pts = s.get('points') or 0
-            if pid is None or pid == 0:
-                if tid is not None:
-                    team_level_totals[tid] = team_level_totals.get(tid, 0) + pts
-            else:
-                entry = player_totals.get(pid, {'team_id': tid, 'total': 0})
-                entry['total'] = entry.get('total', 0) + pts
-                entry['team_id'] = tid
-                player_totals[pid] = entry
-
-        # Prepare a lookup of players per team (to include players without scores)
-        teams = SessionTeamRepository.get_teams_by_session(activity['session_id'])
-        players_by_team = {}
-        for team in teams:
-            tid = team['id']
-            players_by_team[tid] = []
-            try:
-                resp = SessionTeamRepository.get_team_players(team_id=tid, session_id=activity['session_id'])
-                # If repository method not available, fallback to API endpoints (frontend will fetch players anyway)
-            except Exception:
-                resp = None
-
-        # Compute leaderboard entries respecting time aggregation rules when relevant
-        leaderboard = []
-        is_time = (activity and activity.get('game_type') == 'team_vs_time')
-        aggregate_player_times = bool(activity.get('aggregate_player_times'))
-        time_winner = (activity.get('time_winner') or 'lower').lower()
-
-        # Map players to teams using player_totals entries or session players if available
-        team_player_values = {}  # team_id -> list of player totals
-        for pid, info in player_totals.items():
-            t = info.get('team_id')
-            if t is None:
-                continue
-            team_player_values.setdefault(t, []).append({'player_id': pid, 'total': info.get('total', 0)})
-
-        for team in teams:
-            tid = team['id']
-            name = team['name']
-            icon = team.get('icon')
-            # Compute team score
-            if is_time:
-                pvals = [p['total'] for p in team_player_values.get(tid, [])]
-                if pvals and len(pvals) > 0:
-                    if aggregate_player_times:
-                        score_val = sum(pvals)
-                    else:
-                        if time_winner == 'higher':
-                            score_val = max(pvals)
-                        else:
-                            score_val = min(pvals)
-                else:
-                    # Fallback to team-level totals
-                    score_val = team_level_totals.get(tid, 0)
-            else:
-                # Non-time activities: sum team-level and player-level points
-                score_val = team_level_totals.get(tid, 0)
-                # include player totals for completeness
-                score_val += sum([p['total'] for p in team_player_values.get(tid, [])])
-
-            leaderboard.append({
-                'team_id': tid,
-                'name': name,
-                'icon': icon,
-                'score': score_val,
-                'team_color': team.get('color'),
-                'players': [],
-                'playerScores': { str(p['player_id']): p['total'] for p in team_player_values.get(tid, []) }
-            })
-        return {"leaderboard": leaderboard, "session": session}
-    else:
-        # Global activity
-        leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
-        return {"leaderboard": leaderboard, "session": session}
+# Activity leaderboard moved to `backend/routes/activities.py` (see `activities_router`)
 
 # Session Scores Endpoints
 @app.get(
@@ -1590,94 +510,15 @@ async def create_session_score(session_id: int, score: SessionScoreCreate):
 
     return SessionScoreResponse(**created_score)
 
-@app.get(f"{ENDPOINT}/sessions/{{session_id}}/participant-leaderboard", tags=["Sessions"], summary="Get session participant leaderboard")
-async def get_session_participant_leaderboard(session_id: int):
-    # Get all activities for the session
-    activities = [_normalize_activity(a) for a in ActivityRepository.get_activities_by_session(session_id)]
-    activity_ids = [a['id'] for a in activities]
-    
-    if not activity_ids:
-        return {"leaderboard": []}
-    
-    # Get all scores for these activities
-    scores = []
-    for activity_id in activity_ids:
-        activity_scores = ActivityScoreRepository.get_scores_by_activity(activity_id)
-        scores.extend(activity_scores)
-    
-    # Group by player
-    from collections import defaultdict
-    player_scores = defaultdict(lambda: {'player_name': '', 'activity_scores': {}, 'total_score': 0})
-    
-    for score in scores:
-        player_id = score['player_id']
-        activity_id = score['activity_id']
-        points = score['points']
-        player_name = score['player_name'] or f'Player {player_id}'
-        
-        player_scores[player_id]['player_name'] = player_name
-        player_scores[player_id]['activity_scores'][activity_id] = points
-        player_scores[player_id]['total_score'] += points
-    
-    # Convert to list and sort by total score
-    leaderboard = []
-    for player_id, data in player_scores.items():
-        leaderboard.append({
-            'player_id': player_id,
-            'player_name': data['player_name'],
-            'activity_scores': data['activity_scores'],
-            'total_score': data['total_score']
-        })
-    
-    leaderboard.sort(key=lambda x: x['total_score'], reverse=True)
-    
-    return {"leaderboard": leaderboard, "activities": activities}
+# Participant leaderboard moved to `backend/routes/sessions.py`
 
-@app.get(
-    f"{ENDPOINT}/live/leaderboard",
-    tags=["Live"],
-    summary="Get live leaderboard",
-    description="Return leaderboard for the currently active session (if any)."
-)
-async def get_live_leaderboard():
-    """Get leaderboard for the currently active session"""
-    session = SessionRepository.get_active_session()
-    if not session:
-        return {"leaderboard": [], "session": None}
-    
-    # For participant-based scoring, return participant leaderboard
-    # Check if session has activities (indicating station-based scoring)
-    activities = [_normalize_activity(a) for a in ActivityRepository.get_activities_by_session(session['id'])]
-    # Ensure activities are attached to the session object for clients that expect session.activities
-    session['activities'] = activities
-    if activities:
-        # Participant-based leaderboard
-        leaderboard_data = await get_session_participant_leaderboard(session['id'])
-        # Keep backwards-compatible top-level activities but also include in session
-        return {"leaderboard": leaderboard_data["leaderboard"], "session": session, "activities": leaderboard_data["activities"]}
-    else:
-        # Fallback to team-based leaderboard
-        summary = SessionScoreRepository.get_session_score_summary(session['id'])
-        return {"leaderboard": summary, "session": session}
 
-@app.delete(f"{ENDPOINT}/sessions/{{session_id}}/scores/{{score_id}}")
-async def delete_session_score(session_id: int, score_id: int):
-    success = SessionScoreRepository.delete_score(score_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete score")
-    return {"message": "Score deleted successfully"}
+# Live leaderboard moved to `backend/routes/sessions.py`
 
-@app.get("/test-socket")
-async def test_socket():
-    """Test endpoint to send a test Socket.IO event"""
-    print(f"Sending test event to {len(connected_clients)} connected clients")
-    await sio.emit('test_event', {
-        'message': 'This is a test event',
-        'timestamp': datetime.now(CET).isoformat(),
-        'connected_clients': len(connected_clients)
-    })
-    return {"message": "Test event sent", "connected_clients": len(connected_clients)}
 
+# Session score delete moved to `backend/routes/sessions.py`
+
+# Test socket endpoint moved to `backend/routes/system.py` (see `system_router`) - use centralized socket manager to send test events.
 # ----------------------------------------------------
 # Standalone Teams Management Endpoints
 # ----------------------------------------------------
@@ -1706,60 +547,9 @@ async def get_standalone_team(team_id: int):
 
 # Standalone team write endpoints removed (POST/PUT/DELETE). The GET endpoints remain to support listing available teams in UIs.
 
-@app.post(
-    f"{ENDPOINT}/sessions/{{session_id}}/add-team",
-    tags=["Session Teams"],
-    summary="Add an existing team to a session"
-)
-async def add_existing_team_to_session(session_id: int, request: Request):
-    """Add an existing team to a session."""
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    team_id = payload.get('team_id')
-    if not team_id:
-        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
-    
-    success = SessionTeamRepository.add_existing_team_to_session(session_id, team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to add team to session (may already be added)")
-    
-    team = SessionTeamRepository.get_team_in_session(team_id, session_id)
-    logger.info(f"Team {team_id} added to session {session_id}, retrieved color: {team.get('color') if team else 'None'}")
-    
-    # Emit real-time update
-    await sio.emit('team_update', _jsonable({
-        'session_id': session_id,
-        'team_id': team_id,
-        'team': team,
-        'action': 'added',
-        'timestamp': datetime.now(CET).isoformat()
-    }))
-    
-    return {"team": team}
+# Add existing team to session moved to `backend/routes/sessions.py`
 
-@app.delete(
-    f"{ENDPOINT}/sessions/{{session_id}}/remove-team/{{team_id}}",
-    tags=["Session Teams"],
-    summary="Remove a team from a session (team stays available)"
-)
-async def remove_team_from_session(session_id: int, team_id: int):
-    """Remove a team from a session without deleting the team itself."""
-    success = SessionTeamRepository.remove_team_from_session(session_id, team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to remove team from session")
-    
-    # Emit real-time update
-    await sio.emit('team_update', {
-        'session_id': session_id,
-        'team_id': team_id,
-        'action': 'removed',
-        'timestamp': datetime.now(CET).isoformat()
-    })
-    
-    return {"message": "Team removed from session"}
+# Remove team from session moved to `backend/routes/sessions.py`
 
 # ----------------------------------------------------
 # Main
@@ -1768,34 +558,7 @@ async def remove_team_from_session(session_id: int, team_id: int):
 # Session templates endpoints removed — not referenced by frontend and removed to reduce API doc clutter.
 
 
-# Health check endpoint (useful for uptime and debugging CORS/network issues)
-@app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
-async def health():
-    return {"status": "ok", "time": datetime.now(CET).isoformat()}
-
-# System control endpoints (require ADMIN_SECRET header 'X-Admin-Secret')
-@app.post(f"{ENDPOINT}/system/shutdown", tags=["System"], summary="Shutdown Raspberry Pi")
-async def system_shutdown(x_admin_secret: Optional[str] = Header(None)):
-    """Trigger an immediate shutdown/poweroff of the host machine.
-
-    Note: The running process must have permission to poweroff (run as root or be allowed via sudoers).
-    Set the ADMIN_SECRET environment variable to secure this endpoint (default: 'changeme').
-    """
-    if x_admin_secret != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    logger.info("Shutdown requested via API")
-    try:
-        # Prefer systemctl when available
-        cmd = ["/bin/systemctl", "poweroff"]
-        if not os.path.exists(cmd[0]):
-            cmd = ["/sbin/shutdown", "-h", "now"]
-        # Start shutdown asynchronously so we can return immediately
-        subprocess.Popen(cmd)
-        return JSONResponse({"message": "Shutdown initiated"}, status_code=202)
-    except Exception as e:
-        logger.exception("Failed to initiate shutdown")
-        raise HTTPException(status_code=500, detail=str(e))
+# Health and system control endpoints moved to `backend/routes/system.py` (see `system_router`) - health and shutdown implemented there.
 
 # Live Leaderboard
 # Duplicate live-leaderboard endpoint (hyphen variant) removed in favor of /api/v1/live/leaderboard.
