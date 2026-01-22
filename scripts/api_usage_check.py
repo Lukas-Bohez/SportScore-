@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKEND_APP = ROOT / 'backend' / 'app.py'
+BACKEND_DIR = ROOT / 'backend'
 REPORT_PATH = ROOT / 'backend' / 'api_usage_report.json'
 
 FRONTEND_GLOBS = [
@@ -21,8 +21,8 @@ FRONTEND_GLOBS = [
 
 API_PREFIX = '/api/v1'
 
-re_decorator = re.compile(r"@app\.(get|post|put|delete|options)\(\s*(?:f?r?)?[\"']([^\"']+)[\"']")
-# also support decorators using f-strings with nested braces, but above will pick the inner string
+re_decorator = re.compile(r"@[\w_]+\.(get|post|put|delete|options)\(\s*(?:f?r?)?[\"']([^\"']+)[\"']")
+# Matches decorators on app or routers (e.g., @app.get, @router.post, @sessions_router.put)
 
 # NOTE: previous complex regex was removed; the script uses an explicit finder in `extract_frontend_usages()`
 
@@ -52,19 +52,26 @@ def normalize(path: str) -> str:
     return path
 
 
-def extract_backend_routes(app_text: str):
+def extract_backend_routes():
     routes = {}
-    for m in re_decorator.finditer(app_text):
-        method = m.group(1).upper()
-        route_raw = m.group(2)
-        route = normalize(route_raw)
-        # store the exact decorator text for possible annotation
-        start = m.start()
-        # capture full line
-        line = app_text[m.start():app_text.find('\n', m.start())]
-        routes.setdefault(route, []).append({'method': method, 'decorator': line})
-    # Additional: find f"{ENDPOINT}/..." occurrences not matched by decorator regex
-    # but this should be sufficient
+    # Scan all Python files under backend/ for route decorators
+    for p in BACKEND_DIR.rglob('*.py'):
+        if p.match('**/__pycache__/**'):
+            continue
+        try:
+            text = p.read_text(encoding='utf-8')
+        except Exception:
+            continue
+        for m in re_decorator.finditer(text):
+            method = m.group(1).upper()
+            route_raw = m.group(2)
+            route = normalize(route_raw)
+            # store the exact decorator text and filename for possible annotation
+            lineno = text[:m.start()].count('\n') + 1
+            # capture the decorator line
+            line_end = text.find('\n', m.start())
+            line = (text[m.start():line_end] if line_end != -1 else text[m.start():])
+            routes.setdefault(route, []).append({'method': method, 'decorator': line, 'file': str(p), 'line': lineno})
     return routes
 
 
@@ -90,8 +97,7 @@ def extract_frontend_usages():
 
 
 def main():
-    app_text = BACKEND_APP.read_text(encoding='utf-8')
-    backend_routes = extract_backend_routes(app_text)
+    backend_routes = extract_backend_routes()
     backend_set = set(backend_routes.keys())
 
     frontend_set = extract_frontend_usages()

@@ -10,17 +10,17 @@ set "ROOT=%SCRIPT_DIR%"
 REM Normalize ROOT by removing a trailing backslash if present
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 
-if exist "%ROOT%\backend\init_database.py" (
+if exist "%ROOT%\backend\scripts\init_database.py" (
     goto :FOUND_ROOT
 )
 set "ROOT=%SCRIPT_DIR%..\..\"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
-if exist "%ROOT%\backend\init_database.py" (
+if exist "%ROOT%\backend\scripts\init_database.py" (
     goto :FOUND_ROOT
 )
 set "ROOT=%SCRIPT_DIR%..\"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
-if exist "%ROOT%\backend\init_database.py" (
+if exist "%ROOT%\backend\scripts\init_database.py" (
     goto :FOUND_ROOT
 )
 echo ⚠️ Could not locate repository root automatically; using script directory as root
@@ -38,9 +38,9 @@ REM Check if database exists
 if not exist "backend\scoreboard.db" (
     echo 🏗️ Database not found. Creating new SQLite database...
     if exist "backend\venv\Scripts\python.exe" (
-        "backend\venv\Scripts\python.exe" backend\init_database.py
+        "backend\venv\Scripts\python.exe" backend\scripts\init_database.py
     ) else (
-        python backend\init_database.py
+        python backend\scripts\init_database.py
     )
     if %errorlevel% neq 0 (
         echo ❌ Failed to create database
