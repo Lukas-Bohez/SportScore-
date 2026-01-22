@@ -1,23 +1,17 @@
 <template>
-  <el-button
+  <button
     :class="['generic-button', `generic-button--${variant}`]"
     @click="$emit('click', $event)"
   >
-    <ChevronLeft v-if="showIcons" />
-    <span class="button">{{ label }}</span>
-    <ChevronRight v-if="showIcons" />
-  </el-button>
+    <slot><ChevronLeft />{{ label }} <ChevronRight /></slot>
+  </button>
 </template>
 
 <script>
-import { ElButton } from "element-plus";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
-import "element-plus/es/components/button/style/css";
-
 export default {
-  name: "GenericButtonNew",
+  name: "GenericButton",
   components: {
-    ElButton,
     ChevronLeft,
     ChevronRight,
   },
@@ -30,11 +24,7 @@ export default {
       type: String,
       default: "primary",
       validator: (value) =>
-        ["primary", "secondary", "tertiary"].includes(value),
-    },
-    showIcons: {
-      type: Boolean,
-      default: true,
+        ["primary", "secondary", "tertiary", "quaternary"].includes(value),
     },
   },
   emits: ["click"],
@@ -43,74 +33,42 @@ export default {
 
 <style scoped>
 .generic-button {
-  border-radius: var(--radius-M) !important;
-  width: fit-content !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: var(--space-5) var(--space-6) !important;
-  cursor: pointer !important;
-  transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease !important;
-  gap: var(--space-4) !important;
-  height: auto !important;
-  font-family: var(--font-family) !important;
-  border: none !important;
+  border-radius: var(--radius-M);
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-6);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  gap: var(--space-4);
 }
 
 .generic-button--primary {
-  background-color: var(--blue-100) !important;
-  color: var(--white) !important;
-  border: none !important;
+  background-color: var(--blue-100);
+  color: var(--white);
 }
 
 .generic-button--primary:hover {
-  background-color: var(--blue-80) !important;
-  border: none !important;
-  color: var(--white) !important;
-}
-
-.generic-button--primary:focus {
-  background-color: var(--blue-100) !important;
-  border: none !important;
-  color: var(--white) !important;
+  background-color: var(--blue-80);
 }
 
 .generic-button--secondary {
-  background-color: transparent !important;
-  border: 1px solid var(--blue-100) !important;
-  color: var(--blue-100) !important;
+  background-color: transparent;
+  border: 1px solid var(--blue-100);
+  color: var(--blue-100);
 }
 
 .generic-button--secondary:hover {
-  background-color: var(--blue-20) !important;
-  border: 1px solid var(--blue-100) !important;
-  color: var(--blue-100) !important;
-}
-
-.generic-button--secondary:focus {
-  background-color: transparent !important;
-  border: 1px solid var(--blue-100) !important;
-  color: var(--blue-100) !important;
+  background-color: var(--blue-20);
 }
 
 .generic-button--tertiary {
-  background-color: transparent !important;
-  border: 2px solid var(--black-40) !important;
-  color: var(--black-100) !important;
-}
-
-.generic-button--tertiary:hover {
-  background-color: var(--black-10) !important;
-  border: 2px solid var(--black-40) !important;
-  color: var(--black-100) !important;
-}
-
-.generic-button--tertiary:focus {
-  background-color: transparent !important;
-  border: 2px solid var(--black-40) !important;
-  color: var(--black-100) !important;
+  background-color: transparent;
+  border: 2px solid var(--black-40);
+  color: var(--black-100);
 }
 
 /* Icon color styles */
@@ -124,5 +82,25 @@ export default {
 
 .generic-button--tertiary :deep(svg) {
   color: var(--black-100);
+}
+
+.generic-button--quaternary {
+  padding: 0 0;
+  color: var(--black-100);
+  background-color: transparent;
+  /* background-color: var(--black-10); */
+}
+
+.generic-button--quaternary:hover {
+  color: var(--black-50);
+  background-color: transparent;
+}
+.generic-button--quaternary:hover :deep(svg) {
+  color: var(--black-50);
+}
+
+.generic-button--quaternary:deep(svg) {
+  color: var(--black-100);
+  transition: all 0.3s ease;
 }
 </style>
