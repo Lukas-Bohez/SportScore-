@@ -136,12 +136,12 @@ h3 {
 }
 
 .form-content::-webkit-scrollbar-thumb {
-  background: var(--blue-100);
+  background: var(--blue-40, #a3d6f6);
   border-radius: var(--radius-S);
 }
 
 .form-content::-webkit-scrollbar-thumb:hover {
-  background: var(--blue-80, #3a7bd5);
+  background: var(--blue-100);
 }
 
 .button-group {

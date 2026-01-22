@@ -3,7 +3,10 @@
     :class="['generic-button', `generic-button--${variant}`]"
     @click="$emit('click', $event)"
   >
-    <slot><ChevronLeft />{{ label }} <ChevronRight /></slot>
+    <slot
+      ><ChevronLeft v-if="showIcons" />{{ label }}
+      <ChevronRight v-if="showIcons"
+    /></slot>
   </button>
 </template>
 

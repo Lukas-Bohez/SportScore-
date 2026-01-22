@@ -56,13 +56,24 @@ const screenWidth = ref(window.innerWidth);
 // Activities data with individual checked state
 const activities = ref([
   { id: 1, label: "Rood ", checked: false },
-  { id: 2, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 3, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 4, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 5, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 6, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 7, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
-  { id: 8, label: "Rood hhhhhhhhhhhhhhhhhhhhhh", checked: false },
+  { id: 2, label: "Rood ", checked: false },
+  { id: 3, label: "Rood ", checked: false },
+  { id: 4, label: "Rood ", checked: false },
+  { id: 5, label: "Rood ", checked: false },
+  { id: 6, label: "Rood ", checked: false },
+  { id: 7, label: "Rood ", checked: false },
+  { id: 8, label: "Rood ", checked: false },
+]);
+
+const teams = ref([
+  { id: 1, label: "Rood ", checked: false },
+  { id: 2, label: "Rood ", checked: false },
+  { id: 3, label: "Rood ", checked: false },
+  { id: 4, label: "Rood ", checked: false },
+  { id: 5, label: "Rood ", checked: false },
+  { id: 6, label: "Rood ", checked: false },
+  { id: 7, label: "Rood ", checked: false },
+  { id: 8, label: "Rood ", checked: false },
 ]);
 
 function next() {
@@ -77,6 +88,13 @@ function updateActivityChecked(id, newValue) {
   const activity = activities.value.find((a) => a.id === id);
   if (activity) {
     activity.checked = newValue;
+  }
+}
+
+function updateTeamChecked(id, newValue) {
+  const team = teams.value.find((t) => t.id === id);
+  if (team) {
+    team.checked = newValue;
   }
 }
 
@@ -189,6 +207,7 @@ onUnmounted(() => {
                     :key="activity.id"
                     :label="truncateLabel(activity.label)"
                     :checked="activity.checked"
+                    deleteMessage="Bent u zeker dat u deze activiteit wilt verwijderen?"
                     @update:checked="updateActivityChecked(activity.id, $event)"
                     @edit="handleEdit(activity.id)"
                     @delete="handleDelete(activity.id)"
@@ -209,30 +228,57 @@ onUnmounted(() => {
 
           <div class="step-content" v-else-if="step === 3">
             <div>
-              <h3><span>Deelnemers</span> toevoegen</h3>
-              <div class="stap-3-input-container">
-                <div class="input-stap-3">
-                  <GenericInput
-                    label="Team naam"
-                    placeholder="Voer team naam in"
-                  />
-                  <FeaturePicker></FeaturePicker>
+              <div class="section-teams-toevoegen">
+                <h3><span>Deelnemers</span> toevoegen</h3>
+                <div class="stap-3-input-container">
+                  <div class="input-stap-3">
+                    <GenericInput
+                      label="Team naam"
+                      placeholder="Voer team naam in"
+                    />
+                    <FeaturePicker></FeaturePicker>
+                  </div>
+                  <div class="input-stap-3">
+                    <GenericInput
+                      label="Speler naam"
+                      placeholder="Voer speler naam in"
+                    />
+                    <FeaturePicker></FeaturePicker>
+                  </div>
                 </div>
-                <div class="input-stap-3">
-                  <GenericInput
-                    label="Speler naam"
-                    placeholder="Voer speler naam in"
-                  />
-                  <FeaturePicker></FeaturePicker>
+                <div>
+                  <GenericButton
+                    class="button-add-team"
+                    variant="primary"
+                    @click="notificationMessage()"
+                    >Deelnemer toevoegen</GenericButton
+                  >
                 </div>
               </div>
               <div>
-                <GenericButton
-                  class="button-add-team"
-                  variant="primary"
-                  @click="notificationMessage()"
-                  >Deelnemer toevoegen</GenericButton
-                >
+                <h4>Of selecteer een bestaande Deelnemers</h4>
+                <!-- <GenericDropdown
+                  :options="[
+                    { label: 'Activiteit 1', value: 1 },
+                    { label: 'Activiteit 2', value: 2 },
+                    { label: 'Activiteit 3', value: 3 },
+                  ]"
+                  label="Selecteer activiteit"
+                  placeholder="Kies een activiteit"
+                /> -->
+                <div class="checkbox-list checkbox-list-teams">
+                  <GenericCheckbox
+                    v-for="team in teams"
+                    :key="team.id"
+                    :label="truncateLabel(team.label)"
+                    :checked="team.checked"
+                    @update:checked="updateTeamChecked(team.id, $event)"
+                    deleteMessage="Bent u zeker dat u deze team wilt verwijderen?"
+                    @edit="handleEdit(team.id)"
+                    @delete="handleDelete(team.id)"
+                    :id="`checkbox-${team.id}`"
+                  />
+                </div>
               </div>
             </div>
             <div class="button-group">
@@ -309,7 +355,7 @@ onUnmounted(() => {
               <GenericButton @click="openSuccessModal" variant="primary"
                 >Opslaan</GenericButton
               >
-              <GenericModel
+              <!-- <GenericModel
                 ref="successModalRef"
                 icon="circle-check"
                 iconColor="var(--green-100)"
@@ -318,6 +364,15 @@ onUnmounted(() => {
                 :showCancel="false"
                 @confirm="handleConfirm"
                 @cancel="handleCancel"
+              /> -->
+              <GenericModel
+                ref="successModalRef"
+                icon="circle-check"
+                iconColor="var(--green-100)"
+                message="Sessie is opgeslaan! Wilt u de sessie starten?"
+                confirmText="Ja"
+                :showCancel="false"
+                @confirm="handleConfirm"
               />
             </div>
           </div>
@@ -369,6 +424,10 @@ h4 {
   height: 100%;
 }
 
+.section-teams-toevoegen {
+  margin-bottom: var(--space-5);
+}
+
 .step-content {
   display: flex;
   flex-direction: column;
@@ -402,11 +461,12 @@ h4 {
   gap: var(--space-4);
   overflow-y: auto;
   max-height: calc(100vh - 30rem);
-  padding: var(--space-4);
+  padding: 0 var(--space-4) 0 0;
   border: 1px solid var(--black-20, #e0e0e0);
-  border-radius: var(--radius-M);
-  background-color: var(--blue-10);
-  border-radius: var(--radius-M);
+}
+
+.checkbox-list-teams {
+  max-height: calc(100vh - 39rem);
 }
 
 /* Custom scrollbar styling */
@@ -420,18 +480,18 @@ h4 {
 }
 
 .checkbox-list::-webkit-scrollbar-thumb {
-  background: var(--blue-100);
+  background: var(--blue-40, #a3d6f6);
   border-radius: var(--radius-S);
 }
 
 .checkbox-list::-webkit-scrollbar-thumb:hover {
-  background: var(--blue-80, #3a7bd5);
+  background: var(--blue-100);
 }
 
 /* Firefox scrollbar styling */
 .checkbox-list {
   scrollbar-width: thin;
-  scrollbar-color: var(--blue-100) var(--black-20, #e0e0e0);
+  scrollbar-color: var(--blue-40, #a3d6f6) var(--black-20, #e0e0e0);
 }
 
 .section-new-activity {
@@ -512,11 +572,21 @@ h4 {
 }
 
 .section-overview-content::-webkit-scrollbar-thumb {
-  background: var(--blue-100);
+  background: var(--blue-40, #a3d6f6);
   border-radius: var(--radius-S);
 }
 
 .section-overview-content::-webkit-scrollbar-thumb:hover {
-  background: var(--blue-80, #3a7bd5);
+  background: var(--blue-100);
+}
+
+@media (width <= 26.5625rem) {
+  .checkbox-list-teams {
+    max-height: calc(100vh - 10rem);
+  }
+
+  .checkbox-list {
+    max-height: calc(100vh - 32rem);
+  }
 }
 </style>

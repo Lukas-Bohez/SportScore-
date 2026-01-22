@@ -35,7 +35,7 @@
         <Pencil :size="20" />
       </button>
       <button
-        @click="$emit('delete')"
+        @click="showDeleteModal"
         class="icon-button hover-opacity delete-button"
         type="button"
       >
@@ -43,11 +43,24 @@
       </button>
     </div>
   </label>
+
+  <!-- Delete confirmation modal -->
+  <GenericModel
+    ref="modalRef"
+    icon="triangle-alert"
+    iconColor="var(--red-100)"
+    :message="deleteMessage"
+    confirmText="Ja"
+    cancelText="Nee"
+    @confirm="handleDeleteConfirm"
+    @cancel="handleDeleteCancel"
+  />
 </template>
 
 <script setup>
 import { ref, watch } from "vue";
 import { Check, Pencil, Trash2 } from "lucide-vue-next";
+import GenericModel from "./GenericModel.vue";
 
 const props = defineProps({
   label: {
@@ -70,11 +83,16 @@ const props = defineProps({
     type: String,
     default: "#EE1313",
   },
+  deleteMessage: {
+    type: String,
+    default: "Bent u zeker dat u dit item wilt verwijderen?",
+  },
 });
 
 const emit = defineEmits(["update:modelValue", "edit", "delete"]);
 
 const checked4 = ref(props.modelValue);
+const modalRef = ref(null);
 
 watch(
   () => props.modelValue,
@@ -82,6 +100,22 @@ watch(
     checked4.value = newVal;
   },
 );
+
+// Show delete confirmation modal
+function showDeleteModal() {
+  modalRef.value?.open();
+}
+
+// Handle delete confirmation
+function handleDeleteConfirm() {
+  // Emit delete event so parent can handle API call
+  emit("delete");
+}
+
+// Handle delete cancellation
+function handleDeleteCancel() {
+  // Modal will close automatically, no action needed
+}
 
 defineOptions({
   name: "GenericCheckbox",
@@ -210,5 +244,25 @@ defineOptions({
 
 .icon-button:active {
   transform: scale(0.95);
+}
+
+.el-checkboxinput.is-checked .el-checkboxinner:after {
+  /* border-color: var(--el-checkbox-checked-icon-color);*/
+  transform: translate(-45%, -60%) rotate(45deg) scaleY(1);
+}
+.el-checkbox__inner:after {
+  border: none;
+  border-left: 0;
+  border-top: 0;
+  box-sizing: content-box;
+  content: "";
+  height: 7px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-45%, -60%) rotate(45deg) scaleY(0);
+  transform-origin: center;
+  transition: transform 0.15s ease-in 0.05s;
+  width: 3px;
 }
 </style>
