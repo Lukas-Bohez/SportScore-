@@ -1,4 +1,3 @@
-
 /**
  * Big Screen Display - Session Leaderboard System
  * 
@@ -11,7 +10,7 @@
  * - Theming based on sport type
  * 
  * @author SportScore Team
- * @version 2.0.1
+ * @version 2.0.2
  */
 
 // ============================================================================
@@ -19,7 +18,7 @@
 // ============================================================================
 
 const CONFIG = {
-  UPDATE_INTERVAL: 30000, // 30 seconds backup polling
+  UPDATE_INTERVAL: 30000,  // 30 seconds - reduced refresh rate
   FLASH_DURATION: 500,    // Score update animation duration
   DEFAULT_COLOR: '#333333',
   DEFAULT_ICON: '🏆'
@@ -41,7 +40,7 @@ const EMOJI_MAP = {
   monkey: '🐵', gorilla: '🦍', orangutan: '🦧', horse: '🐴', unicorn: '🦄',
   zebra: '🦓', deer: '🦌', cow: '🐮', ox: '🐂', water_buffalo: '🐃',
   pig: '🐷', boar: '🐗', pig_nose: '🐽', ram: '🐏', sheep: '🐑',
-  goat: '🐐', camel: '🪪', llama: '🦙', giraffe: '🦒', elephant: '🐘',
+  goat: '🐐', camel: '🐪', llama: '🦙', giraffe: '🦒', elephant: '🐘',
   rhinoceros: '🦏', hippopotamus: '🦛', rat: '🐀', chipmunk: '🐿️',
   beaver: '🦫', hedgehog: '🦔', bat: '🦇', polar_bear: '🐻‍❄️',
   sloth: '🦥', otter: '🦦', skunk: '🦨', kangaroo: '🦘', badger: '🦡',
@@ -159,8 +158,13 @@ function parsePoints(raw, isTimeActivity) {
   const n = Number(raw);
   if (!isNaN(n)) return n;
   
-  const ms = SharedUtils.parseTimeToMs(String(raw));
-  return isNaN(ms) ? 0 : ms;
+  // Use SharedUtils if available, otherwise just return the number
+  if (typeof SharedUtils !== 'undefined' && SharedUtils.parseTimeToMs) {
+    const ms = SharedUtils.parseTimeToMs(String(raw));
+    return isNaN(ms) ? 0 : ms;
+  }
+  
+  return 0;
 }
 
 /**
@@ -181,6 +185,7 @@ class BigScreenDisplay {
     this.activeActivity = null;
     this.activeActivityId = null;
     this.lastUpdate = null;
+    this.api = typeof api !== 'undefined' ? api : null;
     
     // Flags
     this.listenersSet = false;
@@ -196,6 +201,8 @@ class BigScreenDisplay {
     this.timeLimitPerRound = null;
     this.roundTimeRemaining = 0;
     this.roundTimerInterval = null;
+    this.roundStartTime = null;
+    this.selectedActivityId = null;
     
     // DOM Elements (bound in bindElements)
     this.sessionTitle = null;
@@ -245,7 +252,7 @@ class BigScreenDisplay {
   }
 
   setupEventListeners() {
-    if (typeof api !== 'undefined' && api.socket && !this.listenersSet) {
+    if (this.api && this.api.socket && !this.listenersSet) {
       console.log('BigScreen: Setting up socket event listeners');
       this.setupSocketListeners();
       this.listenersSet = true;
@@ -254,9 +261,9 @@ class BigScreenDisplay {
 
   initializeQRCode() {
     this.showQR();
-    if (api?.socket?.connected) {
+    if (this.api?.socket?.connected) {
       console.log('BigScreen: Emitting initial qr-state:', this.isQRVisible());
-      api.socket.emit('qr-state', this.isQRVisible());
+      this.api.socket.emit('qr-state', this.isQRVisible());
     }
   }
 
@@ -317,6 +324,11 @@ class BigScreenDisplay {
   // ==========================================================================
 
   setupSocketListeners() {
+    if (!this.api || !this.api.on) {
+      console.warn('API object not available for socket listeners');
+      return;
+    }
+
     const events = {
       'session_score_update': this.handleScoreUpdate.bind(this),
       'score_update': this.handleScoreUpdate.bind(this),
@@ -324,6 +336,7 @@ class BigScreenDisplay {
       'team_update': this.handleTeamUpdate.bind(this),
       'session_update': () => this.loadInitialData(),
       'session_created': () => this.loadInitialData(),
+      'session_ended': () => this.handleSessionEnded(),
       'set_active_activity': this.handleSetActiveActivity.bind(this),
       'welcome': this.handleWelcome.bind(this),
       'test_event': this.handleTestEvent.bind(this),
@@ -343,7 +356,7 @@ class BigScreenDisplay {
     };
 
     Object.entries(events).forEach(([event, handler]) => {
-      api.on(event, handler);
+      this.api.on(event, handler);
     });
   }
 
@@ -356,13 +369,15 @@ class BigScreenDisplay {
       return;
     }
 
-    // Fully refresh all data instead of just updating the score
+    // Always do a full refresh to ensure all data is up-to-date
+    console.log('BigScreen: Performing full data refresh for score update');
     this.loadInitialData();
   }
 
   handleTeamUpdate(data) {
     console.log('BigScreen: Received team update:', data);
-    this.updateTeam(data);
+    // Full refresh to ensure all team data is current
+    this.loadInitialData();
   }
 
   handleSetActiveActivity(data) {
@@ -390,14 +405,25 @@ class BigScreenDisplay {
     alert('Test event received: ' + JSON.stringify(data));
   }
 
+  handleSessionEnded() {
+    console.log('BigScreen: Session ended, clearing active session');
+    this.currentSession = null;
+    this.activeActivity = null;
+    this.activeActivityId = null;
+    this.stopRoundTimer();
+    localStorage?.removeItem('activeActivityId');
+    // Immediately load last session
+    this.loadLastSession();
+  }
+
   handleConnected() {
     console.log('BigScreen: Socket.IO connected');
     this.showConnectionStatus('Connected', 'success');
     this.loadInitialData();
     
-    if (!this.initialQREmitted) {
+    if (!this.initialQREmitted && this.api?.socket) {
       console.log('BigScreen: Emitting qr-state on connect:', this.isQRVisible());
-      api.socket.emit('qr-state', this.isQRVisible());
+      this.api.socket.emit('qr-state', this.isQRVisible());
       this.initialQREmitted = true;
     }
   }
@@ -458,7 +484,13 @@ class BigScreenDisplay {
     console.log('BigScreen: Setting QR visibility to (normalized):', isVisible, 'raw:', visible);
     isVisible ? this.showQR() : this.hideQR();
 
-    try { api.socket?.emit('qr-state', isVisible); } catch (e) { console.warn('Failed to emit qr-state:', e); }
+    try { 
+      if (this.api?.socket) {
+        this.api.socket.emit('qr-state', isVisible);
+      }
+    } catch (e) { 
+      console.warn('Failed to emit qr-state:', e); 
+    }
   }
 
   toggleQR() {
@@ -474,33 +506,186 @@ class BigScreenDisplay {
     try {
       const liveData = await this.fetchLeaderboardData();
       
-      if (liveData?.session) {
+      if (liveData?.session && liveData.session.is_active !== false) {
         await this.processSessionData(liveData);
         this.updateDisplay(liveData);
       } else {
-        this.showNoSessionMessage();
+        await this.loadLastSession();
       }
     } catch (error) {
-      api.handleError(error, 'loading initial data');
+      if (this.api?.handleError) {
+        this.api.handleError(error, 'loading initial data');
+      } else {
+        console.error('Error loading initial data:', error);
+      }
       this.showNoSessionMessage();
     }
   }
 
+  async loadLastSession() {
+    try {
+      console.log('BigScreen: Loading last completed session');
+      
+      // Clear current session state immediately
+      this.currentSession = null;
+      this.activeActivity = null;
+      this.activeActivityId = null;
+      this.stopRoundTimer();
+      
+      // Hide session info elements immediately
+      const sessionInfo = document.querySelector('.session-info');
+      if (sessionInfo) {
+        sessionInfo.style.display = 'none';
+      }
+      if (this.roundInfo) {
+        this.roundInfo.style.display = 'none';
+      }
+      if (this.timer) {
+        this.timer.style.display = 'none';
+      }
+
+      if (!this.api) {
+        throw new Error('API not available');
+      }
+
+      // Make API call for all session data
+      const response = await this.api.getSessions();
+      const sessions = this.api.extractArray(response, 'sessions');
+      const completedSessions = sessions.filter(s => !s.is_active);
+
+      if (completedSessions.length > 0) {
+        const lastSession = completedSessions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        
+        console.log('BigScreen: Found last session:', lastSession.name);
+        
+        // Display the last session info
+        if (this.sessionTitle) {
+          this.sessionTitle.textContent = `Laatste Sessie: ${lastSession.name}`;
+        }
+        if (this.sessionStatus) {
+          this.sessionStatus.textContent = 'Voltooid';
+          this.sessionStatus.className = 'game-status status-completed';
+        }
+        
+        // Show session info again for completed session
+        if (sessionInfo) {
+          sessionInfo.style.display = 'flex';
+        }
+        
+        // Load and display the last session's leaderboard
+        await this.loadSessionLeaderboard(lastSession);
+      } else {
+        // No completed sessions
+        if (this.sessionTitle) {
+          this.sessionTitle.textContent = 'SportScore';
+        }
+        if (this.sessionStatus) {
+          this.sessionStatus.textContent = 'Geen sessies gevonden';
+          this.sessionStatus.className = 'game-status status-inactive';
+        }
+        if (this.teamsContainer) {
+          this.teamsContainer.innerHTML = `
+            <div class="no-session">
+              Geen sessies gevonden.<br>
+              Start een nieuwe sessie via de admin interface.
+            </div>
+          `;
+        }
+      }
+    } catch (error) {
+      if (this.api?.handleError) {
+        this.api.handleError(error, 'loading last session');
+      } else {
+        console.error('Error loading last session:', error);
+      }
+      this.showNoSessionMessage();
+    }
+  }
+
+  async loadSessionLeaderboard(session) {
+    try {
+      if (!this.api) {
+        throw new Error('API not available');
+      }
+
+      // Get session details
+      const sessionData = await this.api.getSession(session.id);
+      const activities = sessionData.activities || [];
+      
+      if (activities.length === 0) {
+        if (this.teamsContainer) {
+          this.teamsContainer.innerHTML = '<div>Geen activiteiten in deze sessie.</div>';
+        }
+        return;
+      }
+
+      // Use the last activity or the one with most scores
+      const activity = activities[activities.length - 1];
+      
+      // Get leaderboard for the activity
+      const leaderboardResponse = await this.api.getActivityLeaderboard(activity.id);
+      const leaderboard = this.api.extractArray(leaderboardResponse, 'leaderboard');
+      
+      // Process and display
+      const effective = activity;
+      const lowerIsBetter = this.isLowerBetter(effective);
+      
+      if (leaderboard.length > 0) {
+        // Load players if needed
+        await this.loadPlayersForLeaderboard(session.id, leaderboard, activity.id);
+        
+        // Display
+        this.updateTeamLeaderboard(leaderboard, { lowerIsBetter });
+      } else {
+        if (this.teamsContainer) {
+          this.teamsContainer.innerHTML = '<div>Geen scores in deze activiteit.</div>';
+        }
+      }
+    } catch (error) {
+      if (this.api?.handleError) {
+        this.api.handleError(error, 'loading session leaderboard');
+      } else {
+        console.error('Error loading session leaderboard:', error);
+      }
+      if (this.teamsContainer) {
+        this.teamsContainer.innerHTML = '<div>Fout bij laden van scores.</div>';
+      }
+    }
+  }
+
   async fetchLeaderboardData() {
+    if (!this.api) {
+      throw new Error('API not available');
+    }
+
     if (this.activeActivityId) {
-      const data = await api.getActivityLeaderboard(this.activeActivityId);
+      const data = await this.api.getActivityLeaderboard(this.activeActivityId);
       await this.loadActiveActivityDetails(this.activeActivityId);
       return data;
     }
     
     this.activeActivity = null;
-    return await api.getLiveLeaderboard();
+    return await this.api.getLiveLeaderboard();
   }
 
   async loadActiveActivityDetails(activityId) {
     try {
-      let fetched = await api.getActivity(activityId);
+      if (!this.api) {
+        throw new Error('API not available');
+      }
+
+      let fetched = await this.api.getActivity(activityId);
       this.activeActivity = fetched?.activity || fetched;
+      
+      console.log('BigScreen: Loaded activity details:', {
+        id: this.activeActivity?.id,
+        name: this.activeActivity?.name,
+        current_round: this.activeActivity?.current_round,
+        total_rounds: this.activeActivity?.total_rounds,
+        time_limit_per_round: this.activeActivity?.time_limit_per_round,
+        round_status: this.activeActivity?.round_status
+      });
+      
       this.updateRoundDisplay(this.activeActivity); // Update round display
     } catch (error) {
       console.warn('BigScreen: Unable to load active activity details:', error);
@@ -508,14 +693,29 @@ class BigScreenDisplay {
     }
   }
 
+  async loadRoundStatus() {
+    try {
+      if (!this.activeActivityId || !this.api) return;
+      
+      const fetched = await this.api.getActivity(this.activeActivityId);
+      const activity = fetched?.activity || fetched;
+      
+      if (activity) {
+        this.updateRoundDisplay(activity);
+      }
+    } catch (error) {
+      console.warn('BigScreen: Unable to load round status:', error);
+    }
+  }
+
   async processSessionData(liveData) {
-    // Check if session is active; if not, show no session message
+    // Check if session is active; if not, load last session
     if (!liveData.session || liveData.session.status !== 'active' || liveData.session.is_active === false) {
       // Clear active activity since session is inactive
       this.activeActivity = null;
       this.activeActivityId = null;
       localStorage.removeItem('activeActivityId');
-      this.showNoSessionMessage();
+      await this.loadLastSession();
       return;
     }
 
@@ -555,12 +755,14 @@ class BigScreenDisplay {
   }
 
   async normalizeLeaderboardData(liveData) {
+    if (!this.api) return;
+
     const lb = liveData.leaderboard || [];
     const isParticipantData = lb.length > 0 && 'player_name' in lb[0];
     
     if (isParticipantData) {
       try {
-        const teamsResp = await api.getSessionTeams(liveData.session.id);
+        const teamsResp = await this.api.getSessionTeams(liveData.session.id);
         const teams = teamsResp?.teams || [];
         
         liveData.leaderboard = teams.map(t => ({
@@ -591,23 +793,6 @@ class BigScreenDisplay {
     const aggregatePlayerTimes = activity?.aggregate_player_times || false;
     const timeWinner = (activity?.time_winner || 'lower').toLowerCase();
     
-    console.warn('BigScreen: loadPlayersForLeaderboard - Activity Settings', {
-      activityId,
-      activity: activity ? {
-        id: activity.id,
-        name: activity.name,
-        game_type: activity.game_type,
-        time_winner: activity.time_winner,
-        aggregate_player_times: activity.aggregate_player_times
-      } : null,
-      derived: {
-        isTimeActivity,
-        aggregatePlayerTimes,
-        timeWinner
-      },
-      allScoresCount: allScores.length
-    });
-    
     const teamTotals = this.calculateTeamTotals(allScores, isTimeActivity);
     
     for (const team of leaderboard) {
@@ -631,9 +816,13 @@ class BigScreenDisplay {
 
   async fetchAllScores(sessionId, activityId) {
     try {
+      if (!this.api) {
+        throw new Error('API not available');
+      }
+
       const response = activityId
-        ? await api.getActivityScores(activityId)
-        : await api.get(`/api/v1/sessions/${sessionId}/scores`);
+        ? await this.api.getActivityScores(activityId)
+        : await this.api.get(`/api/v1/sessions/${sessionId}/scores`);
       return response.scores || [];
     } catch (error) {
       console.warn('Could not load scores for player stats:', error);
@@ -648,9 +837,9 @@ class BigScreenDisplay {
       this.activeActivity.aggregate_player_times === undefined ||
       this.activeActivity.time_winner === undefined;
 
-    if (activityId && needsFreshFetch) {
+    if (activityId && needsFreshFetch && this.api) {
       try {
-        this.activeActivity = await api.getActivity(activityId);
+        this.activeActivity = await this.api.getActivity(activityId);
       } catch (error) {
         console.warn('Failed to load activity details:', error);
       }
@@ -673,7 +862,11 @@ class BigScreenDisplay {
 
   async loadTeamPlayers(sessionId, team, allScores, isTimeActivity, aggregatePlayerTimes, timeWinner, teamTotals) {
     try {
-      const resp = await api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
+      if (!this.api) {
+        throw new Error('API not available');
+      }
+
+      const resp = await this.api.get(`/api/v1/sessions/${sessionId}/teams/${team.team_id}/players`);
       team.players = (resp?.players || []).sort((a, b) =>
         (a.name || a.player_name || '').localeCompare(b.name || b.player_name || '')
       );
@@ -717,17 +910,6 @@ class BigScreenDisplay {
   calculateTimeActivityTeamScore(team, aggregatePlayerTimes, timeWinner, teamTotals) {
     const playerVals = Object.values(team.playerScores).map(v => Number(v) || 0);
     
-    console.debug('BigScreen: time activity calculation', {
-      team_id: team.team_id,
-      team_name: team.team_name || team.name,
-      current_total_score: team.total_score,
-      aggregatePlayerTimes,
-      timeWinner,
-      playerVals,
-      playerScores: team.playerScores,
-      players: team.players?.map(p => ({id: p.id, name: p.name}))
-    });
-    
     if (playerVals.length > 0) {
       if (aggregatePlayerTimes) {
         team.total_score = playerVals.reduce((a, b) => a + b, 0);
@@ -736,13 +918,6 @@ class BigScreenDisplay {
           ? Math.max(...playerVals)
           : Math.min(...playerVals);
       }
-      
-      console.debug('BigScreen: computed team score', {
-        team_id: team.team_id,
-        team_name: team.team_name || team.name,
-        new_total_score: team.total_score,
-        calculation_method: aggregatePlayerTimes ? 'sum' : (timeWinner === 'higher' ? 'max' : 'min')
-      });
     } else if (teamTotals[team.team_id] !== undefined) {
       team.total_score = teamTotals[team.team_id];
     }
@@ -751,9 +926,9 @@ class BigScreenDisplay {
   async handlePlayerLoadError(error, team) {
     const is405 = error?.status === 405 || error?.message?.includes('405');
     
-    if (is405 && team.team_id) {
+    if (is405 && team.team_id && this.api) {
       try {
-        const fallback = await api.get(`/api/v1/players?team_id=${team.team_id}`);
+        const fallback = await this.api.get(`/api/v1/players?team_id=${team.team_id}`);
         team.players = (fallback?.players || []).sort((a, b) =>
           (a.name || '').localeCompare(b.name || '')
         );
@@ -776,6 +951,12 @@ class BigScreenDisplay {
     if (liveData.session && liveData.session.is_active !== false) {
       this.currentSession = liveData.session;
       this.updateSessionInfo(liveData.session);
+      
+      // Make sure session info is visible for active sessions
+      const sessionInfo = document.querySelector('.session-info');
+      if (sessionInfo) {
+        sessionInfo.style.display = 'flex';
+      }
     }
     
     if (liveData.leaderboard && liveData.session && liveData.session.is_active !== false) {
@@ -827,19 +1008,21 @@ class BigScreenDisplay {
   updateLeaderboard(leaderboard) {
     if (!this.teamsContainer) return;
     
-    this.teamsContainer.innerHTML = '';
-    
     if (!leaderboard?.length) {
-      this.teamsContainer.innerHTML = '<div class="no-teams">Geen deelnemers in sessie</div>';
+      if (this.teamsContainer.innerHTML !== '<div class="no-teams">Geen deelnemers in sessie</div>') {
+        this.teamsContainer.innerHTML = '<div class="no-teams">Geen deelnemers in sessie</div>';
+      }
       return;
     }
     
     const effective = this.getEffectiveActivity();
-    const lowerIsBetter = SharedUtils.isLowerBetter(effective);
+    const lowerIsBetter = this.isLowerBetter(effective);
     
     // If no active activity, clear the leaderboard
     if (!effective) {
-      this.teamsContainer.innerHTML = '';
+      if (this.teamsContainer.innerHTML !== '') {
+        this.teamsContainer.innerHTML = '';
+      }
       return;
     }
     
@@ -851,15 +1034,6 @@ class BigScreenDisplay {
     
     const scoringMode = this.getScoringMode();
     const isParticipantData = 'player_name' in leaderboard[0];
-    
-    console.debug('BigScreen: updateLeaderboard', {
-      effective: effective ? {
-        id: effective.id,
-        game_type: effective.game_type,
-        time_winner: effective.time_winner,
-        aggregate_player_times: effective.aggregate_player_times
-      } : null
-    });
     
     if (scoringMode === 'player') {
       this.updatePlayerLeaderboard(leaderboard, { lowerIsBetter });
@@ -878,11 +1052,13 @@ class BigScreenDisplay {
 
   async refreshActivityAndRerender(leaderboard) {
     try {
+      if (!this.api) return;
+
       const currentActivity = this.getEffectiveActivity();
       const aid = this.activeActivityId || currentActivity?.id;
       
       if (aid) {
-        let fetched = await api.getActivity(aid);
+        let fetched = await this.api.getActivity(aid);
         this.activeActivity = fetched?.activity || fetched;
       }
     } catch (error) {
@@ -913,23 +1089,102 @@ class BigScreenDisplay {
       return lowerIsBetter ? (scoreA - scoreB) : (scoreB - scoreA);
     });
     
+    // Check if we need to rebuild the DOM or just update scores
+    const shouldRebuildDOM = this.shouldRebuildTeamLeaderboard(leaderboard);
+    
+    if (!shouldRebuildDOM) {
+      // Just update the scores and player data without rebuilding
+      this.updateExistingTeamElements(leaderboard);
+      return;
+    }
+    
     // Apply layout class
     this.teamsContainer.className = 'leaderboard-container';
     if (leaderboard.length === 2) {
       this.teamsContainer.classList.add('two-teams');
     }
     
-    console.debug('BigScreen: rendering teams', leaderboard.map(t => ({
-      team_id: t.team_id || t.id,
-      name: t.name,
-      score: t.total_score || t.score || 0,
-      color: t.team_color || t.color
-    })));
-    
-    // Render teams
+    // Clear and render teams
+    this.teamsContainer.innerHTML = '';
     leaderboard.forEach((team, index) => {
       const teamElement = this.createTeamElement(team, index + 1);
       this.teamsContainer.appendChild(teamElement);
+    });
+  }
+
+  shouldRebuildTeamLeaderboard(leaderboard) {
+    // Check if current DOM structure matches the leaderboard
+    const currentTeams = this.teamsContainer.querySelectorAll('.leaderboard-team');
+    
+    // Different number of teams = rebuild
+    if (currentTeams.length !== leaderboard.length) {
+      return true;
+    }
+    
+    // Check if team IDs and order match
+    for (let i = 0; i < leaderboard.length; i++) {
+      const teamId = String(leaderboard[i].team_id || leaderboard[i].id || '');
+      const currentTeamId = currentTeams[i].getAttribute('data-team-id');
+      
+      if (teamId !== currentTeamId) {
+        return true; // Order changed or different teams
+      }
+    }
+    
+    return false; // Same teams in same order, just update scores
+  }
+
+  updateExistingTeamElements(leaderboard) {
+    const currentTeams = this.teamsContainer.querySelectorAll('.leaderboard-team');
+    
+    leaderboard.forEach((team, index) => {
+      const teamElement = currentTeams[index];
+      if (!teamElement) return;
+      
+      // Update position
+      const positionEl = teamElement.querySelector('.team-position');
+      if (positionEl) positionEl.textContent = index + 1;
+      
+      // Update score
+      const scoreEl = teamElement.querySelector('.team-score');
+      if (scoreEl) {
+        const newScore = team.total_score ?? team.score ?? 0;
+        scoreEl.setAttribute('data-team-score-ms', String(newScore));
+        const isTimeMode = this.isTimeMode();
+        scoreEl.textContent = isTimeMode ? this.formatMs(newScore) : newScore;
+      }
+      
+      // Update player scores if present
+      if (team.players && team.playerScores) {
+        this.updatePlayerBadgesInTeam(teamElement, team);
+      }
+    });
+  }
+
+  updatePlayerBadgesInTeam(teamElement, team) {
+    const isTimeMode = this.isTimeMode();
+    
+    // Update each player badge
+    team.players.forEach(player => {
+      const playerBadge = teamElement.querySelector(`[data-player-id="${player.id}"]`);
+      if (!playerBadge) return;
+      
+      const score = team.playerScores[player.id] || 0;
+      playerBadge.setAttribute('data-player-score-ms', String(score));
+      
+      const scorePart = playerBadge.querySelector('.player-score-part');
+      const displayScore = isTimeMode ? this.formatMs(score) : score;
+      
+      if (scorePart) {
+        scorePart.textContent = displayScore;
+      } else if (score !== 0 || isTimeMode) {
+        // Add score part if it doesn't exist but should
+        const span = document.createElement('span');
+        span.className = 'player-score-part';
+        span.textContent = displayScore;
+        playerBadge.appendChild(span);
+        playerBadge.classList.add('with-score');
+      }
     });
   }
 
@@ -995,14 +1250,6 @@ class BigScreenDisplay {
     // Normalize team data
     const teamData = this.normalizeTeamData(team);
     
-    console.debug('BigScreen: createTeamElement', {
-      team_id: teamData.id,
-      team_name: teamData.name,
-      original_total_score: team.total_score,
-      original_score: team.score,
-      normalized_score: teamData.score
-    });
-    
     teamDiv.style.borderLeftColor = teamData.color;
     
     if (teamData.id) {
@@ -1020,7 +1267,7 @@ class BigScreenDisplay {
     });
     
     const displayScore = isTimeMode 
-      ? SharedUtils.formatMs(teamData.score)
+      ? this.formatMs(teamData.score)
       : teamData.score;
     
     teamDiv.innerHTML = `
@@ -1064,7 +1311,7 @@ class BigScreenDisplay {
       s: teamData.playerScores[p.id] || 0
     }));
     
-    const lowerIsBetter = SharedUtils.isLowerBetter(this.getEffectiveActivity());
+    const lowerIsBetter = this.isLowerBetter(this.getEffectiveActivity());
     entries.sort((a, b) => lowerIsBetter ? (a.s - b.s) : (b.s - a.s));
     
     const isTimeModeLocal = isTimeMode || looksLikeTimeData(entries.map(e => e.s));
@@ -1080,7 +1327,7 @@ class BigScreenDisplay {
     const playerBadges = entries.map(({ p, s }) => {
       const name = p.position ? `${p.name} (${p.position})` : p.name;
       const hasScore = s !== undefined && s !== null && (s !== 0 || isTimeMode);
-      const displayScore = isTimeMode ? SharedUtils.formatMs(s) : s;
+      const displayScore = isTimeMode ? this.formatMs(s) : s;
       const scoreClass = hasScore ? 'with-score' : 'no-score';
       
       return `
@@ -1103,7 +1350,7 @@ class BigScreenDisplay {
     const playerBadges = entries.map(({ p, s }) => {
       const name = p.position ? `${p.name} (${p.position})` : p.name;
       const hasScore = s !== undefined && s !== null && (s !== 0 || isTimeMode);
-      const displayScore = isTimeMode ? SharedUtils.formatMs(s) : s;
+      const displayScore = isTimeMode ? this.formatMs(s) : s;
       const topClass = (bestScore !== null && s === bestScore) ? 'top-player' : '';
       const scoreClass = hasScore ? 'with-score' : 'no-score';
       
@@ -1131,7 +1378,7 @@ class BigScreenDisplay {
     const activityScoresHtml = this.renderActivityScores(participant.activity_scores);
     const isTimeMode = this.isTimeMode();
     const displayTotal = isTimeMode 
-      ? SharedUtils.formatMs(participant.total_score || 0)
+      ? this.formatMs(participant.total_score || 0)
       : `${participant.total_score} punten`;
     
     participantDiv.innerHTML = `
@@ -1158,253 +1405,6 @@ class BigScreenDisplay {
   }
 
   // ==========================================================================
-  // Score Updates
-  // ==========================================================================
-
-  updateScore(data) {
-    try {
-      console.log('Score update received:', data);
-      
-      if (!this.currentSession || !this.teamsContainer) {
-        this.loadInitialData();
-        return;
-      }
-      
-      // Check if full refresh needed
-      if (this.needsFullRefresh(data)) {
-        console.debug('BigScreen: Performing full refresh');
-        this.loadInitialData();
-        return;
-      }
-      
-      // Handle player-specific update
-      if (data.player_id) {
-        this.updatePlayerScore(data);
-        return;
-      }
-      
-      // Handle team-level update
-      this.updateTeamScore(data);
-    } catch (error) {
-      console.error('BigScreen.updateScore failed:', error, data);
-      this.loadInitialData();
-    }
-  }
-
-  needsFullRefresh(data) {
-    const scoringMode = this.getScoringMode();
-    const isTimeMode = this.isTimeMode();
-    
-    return isTimeMode || 
-           scoringMode === 'player' || 
-           (!data.player_id && scoringMode === 'team_with_players');
-  }
-
-  updatePlayerScore(data) {
-    const scoringMode = this.getScoringMode();
-    const isTimeMode = this.isTimeMode();
-    
-    if (!isTimeMode && scoringMode !== 'team_with_players') {
-      console.log('Player update in player mode, refreshing');
-      this.loadInitialData();
-      return;
-    }
-    
-    const teamElement = this.findTeamElement(data.team_id);
-    if (!teamElement) {
-      console.log('Could not find team element, doing full refresh');
-      this.loadInitialData();
-      return;
-    }
-    
-    this.updatePlayerBadge(teamElement, data, isTimeMode);
-    this.updateTeamScoreFromPlayers(teamElement, isTimeMode);
-    this.sortLeaderboard();
-  }
-
-  updatePlayerBadge(teamElement, data, isTimeMode) {
-    const playerBadge = teamElement.querySelector(`[data-player-id="${data.player_id}"]`);
-    if (!playerBadge) return;
-    
-    const currentMs = parseInt(playerBadge.getAttribute('data-player-score-ms')) || 0;
-    const newMs = currentMs + (data.points || 0);
-    
-    playerBadge.setAttribute('data-player-score-ms', String(newMs));
-    
-    const scorePart = playerBadge.querySelector('.player-score-part');
-    const displayScore = isTimeMode ? SharedUtils.formatMs(newMs) : newMs;
-    
-    if (scorePart) {
-      scorePart.textContent = displayScore;
-    } else if (isTimeMode || newMs > 0) {
-      const span = document.createElement('span');
-      span.className = 'player-score-part';
-      span.textContent = displayScore;
-      playerBadge.appendChild(span);
-    }
-    
-    playerBadge.classList.add('player-score-flash');
-    setTimeout(() => playerBadge.classList.remove('player-score-flash'), CONFIG.FLASH_DURATION);
-  }
-
-  updateTeamScoreFromPlayers(teamElement, isTimeMode) {
-    const scoreElement = teamElement.querySelector('.team-score');
-    if (!scoreElement) return;
-    
-    const activity = this.activeActivity;
-    const aggregatePlayerTimes = activity?.aggregate_player_times || false;
-    const timeWinner = (activity?.time_winner || 'lower').toLowerCase();
-    
-    const playerBadges = teamElement.querySelectorAll('[data-player-score-ms]');
-    const playerScores = Array.from(playerBadges)
-      .map(pb => parseInt(pb.getAttribute('data-player-score-ms')) || 0);
-    
-    let newTeamScore;
-    if (aggregatePlayerTimes) {
-      newTeamScore = playerScores.reduce((a, b) => a + b, 0);
-    } else if (playerScores.length > 0) {
-      newTeamScore = timeWinner === 'higher'
-        ? Math.max(...playerScores)
-        : Math.min(...playerScores);
-    } else {
-      const currentScore = parseInt(scoreElement.getAttribute('data-team-score-ms')) || 0;
-      newTeamScore = currentScore;
-    }
-    
-    scoreElement.setAttribute('data-team-score-ms', String(newTeamScore));
-    scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(newTeamScore) : newTeamScore;
-    scoreElement.classList.add('score-flash');
-    setTimeout(() => scoreElement.classList.remove('score-flash'), CONFIG.FLASH_DURATION);
-  }
-
-  updateTeamScore(data) {
-    const teamElement = this.findTeamElement(data.team_id);
-    
-    if (!teamElement) {
-      console.log('Could not find team element, doing full refresh');
-      this.loadInitialData();
-      return;
-    }
-    
-    const scoreElement = teamElement.querySelector('.team-score');
-    if (!scoreElement) return;
-    
-    const isTimeMode = this.isTimeMode();
-    const currentScore = parseInt(scoreElement.getAttribute('data-team-score-ms')) || 0;
-    const newScore = currentScore + (data.points || 0);
-    
-    scoreElement.setAttribute('data-team-score-ms', String(newScore));
-    scoreElement.textContent = isTimeMode ? SharedUtils.formatMs(newScore) : newScore;
-    scoreElement.classList.add('score-flash');
-    setTimeout(() => scoreElement.classList.remove('score-flash'), CONFIG.FLASH_DURATION);
-    
-    this.sortTeams();
-  }
-
-  findTeamElement(teamId) {
-    const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
-    for (const element of teamElements) {
-      const teamIdAttr = element.getAttribute('data-team-id');
-      if (teamIdAttr && parseInt(teamIdAttr) === parseInt(teamId)) {
-        return element;
-      }
-    }
-    return null;
-  }
-
-  updateTeam(data) {
-    if (!this.currentSession || !this.teamsContainer) {
-      this.loadInitialData();
-      return;
-    }
-    
-    const teamData = this.normalizeTeamUpdateData(data);
-    
-    if (data.action === 'deleted') {
-      this.removeTeamElement(teamData.team_name);
-    } else {
-      this.updateOrAddTeam(teamData);
-    }
-    
-    this.updateLastUpdateTime();
-  }
-
-  normalizeTeamUpdateData(data) {
-    return {
-      team_name: data.team.name,
-      team_icon: data.team.icon,
-      team_color: data.team.color,
-      total_score: data.team.total_score || data.team.score || 0,
-      is_eliminated: data.team.is_eliminated || false
-    };
-  }
-
-  removeTeamElement(teamName) {
-    const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
-    for (const element of teamElements) {
-      const nameElement = element.querySelector('.team-name');
-      if (nameElement?.textContent === teamName) {
-        element.remove();
-        break;
-      }
-    }
-  }
-
-  updateOrAddTeam(teamData) {
-    const teamElement = this.findTeamElementByName(teamData.team_name);
-    
-    if (teamElement) {
-      this.updateExistingTeam(teamElement, teamData);
-    } else {
-      this.addNewTeam(teamData);
-    }
-    
-    this.sortLeaderboard();
-  }
-
-  findTeamElementByName(teamName) {
-    const teamElements = this.teamsContainer.querySelectorAll('.leaderboard-team');
-    for (const element of teamElements) {
-      const nameElement = element.querySelector('.team-name');
-      if (nameElement?.textContent === teamName) {
-        return element;
-      }
-    }
-    return null;
-  }
-
-  updateExistingTeam(teamElement, teamData) {
-    const iconElement = teamElement.querySelector('.team-icon');
-    const scoreElement = teamElement.querySelector('.team-score');
-    
-    if (iconElement) {
-      iconElement.textContent = getEmojiFromName(teamData.team_icon);
-    }
-    
-    if (scoreElement) {
-      const isTimeMode = this.isTimeMode();
-      scoreElement.setAttribute('data-team-score-ms', String(teamData.total_score || 0));
-      scoreElement.textContent = isTimeMode 
-        ? SharedUtils.formatMs(teamData.total_score || 0)
-        : (teamData.total_score || 0);
-    }
-    
-    teamElement.style.borderLeftColor = teamData.team_color || CONFIG.DEFAULT_COLOR;
-    
-    if (teamData.is_eliminated) {
-      teamElement.classList.add('eliminated');
-    } else {
-      teamElement.classList.remove('eliminated');
-    }
-  }
-
-  addNewTeam(teamData) {
-    const position = this.teamsContainer.querySelectorAll('.leaderboard-team').length + 1;
-    const newTeamElement = this.createTeamElement(teamData, position);
-    this.teamsContainer.appendChild(newTeamElement);
-  }
-
-  // ==========================================================================
   // Sorting
   // ==========================================================================
 
@@ -1412,7 +1412,7 @@ class BigScreenDisplay {
     if (!this.teamsContainer) return;
     
     const teamElements = Array.from(this.teamsContainer.querySelectorAll('.leaderboard-team'));
-    const lowerIsBetter = SharedUtils.isLowerBetter(this.getEffectiveActivity());
+    const lowerIsBetter = this.isLowerBetter(this.getEffectiveActivity());
     
     teamElements.sort((a, b) => {
       const scoreA = parseInt(a.querySelector('.team-score')?.getAttribute('data-team-score-ms')) || 0;
@@ -1472,6 +1472,26 @@ class BigScreenDisplay {
     return activity && String(activity.game_type) === 'team_vs_time';
   }
 
+  isLowerBetter(activity) {
+    if (typeof SharedUtils !== 'undefined' && SharedUtils.isLowerBetter) {
+      return SharedUtils.isLowerBetter(activity);
+    }
+    // Fallback: time-based activities typically want lower scores
+    return activity && String(activity.game_type) === 'team_vs_time';
+  }
+
+  formatMs(ms) {
+    if (typeof SharedUtils !== 'undefined' && SharedUtils.formatMs) {
+      return SharedUtils.formatMs(ms);
+    }
+    // Fallback formatting
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const milliseconds = ms % 1000;
+    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+  }
+
   updateLastUpdateTime() {
     if (this.lastUpdateTime) {
       const now = new Date();
@@ -1482,6 +1502,20 @@ class BigScreenDisplay {
   showNoSessionMessage() {
     if (this.sessionTitle) {
       this.sessionTitle.textContent = 'SportScore';
+    }
+    
+    // Hide session info elements
+    const sessionInfo = document.querySelector('.session-info');
+    if (sessionInfo) {
+      sessionInfo.style.display = 'none';
+    }
+    
+    if (this.roundInfo) {
+      this.roundInfo.style.display = 'none';
+    }
+    
+    if (this.timer) {
+      this.timer.style.display = 'none';
     }
     
     if (this.sessionStatus) {
@@ -1649,69 +1683,85 @@ class BigScreenDisplay {
   }
 
   updateRoundDisplay(activity) {
-    if (!activity) return;
+    if (!activity) {
+      console.log('BigScreen: No activity provided to updateRoundDisplay');
+      return;
+    }
+    
+    console.log('BigScreen: updateRoundDisplay called with:', {
+      id: activity.id,
+      name: activity.name,
+      current_round: activity.current_round,
+      total_rounds: activity.total_rounds,
+      time_limit_per_round: activity.time_limit_per_round,
+      round_status: activity.round_status,
+      time_remaining: activity.time_remaining
+    });
     
     this.currentRound = activity.current_round || 1;
     this.totalRounds = activity.total_rounds || 1;
     this.roundStatus = activity.round_status || 'not_started';
     this.timeLimitPerRound = activity.time_limit_per_round;
     
-    // Show round info if multiple rounds or time limit
-    const hasRounds = this.totalRounds > 1 || this.timeLimitPerRound;
+    // Show round info if multiple rounds
+    const hasMultipleRounds = this.totalRounds > 1;
     
     if (this.roundInfo) {
-      if (hasRounds) {
+      if (hasMultipleRounds) {
         this.roundInfo.textContent = `Ronde ${this.currentRound}/${this.totalRounds}`;
         this.roundInfo.style.display = 'block';
+        console.log('BigScreen: Showing round info:', this.roundInfo.textContent);
       } else {
         this.roundInfo.style.display = 'none';
+        console.log('BigScreen: Hiding round info (single round)');
       }
+    } else {
+      console.warn('BigScreen: roundInfo element not found');
     }
     
-    // Start or stop timer based on round state
-    if (activity.time_remaining !== null && activity.time_remaining !== undefined) {
-      this.updateRoundTimerDisplay(activity.time_remaining);
-      if (this.roundStatus === 'active' && activity.time_remaining > 0) {
-        this.startRoundTimer(activity.time_remaining);
-      } else if (this.roundStatus !== 'active') {
+    // Handle timer display
+    if (this.timer) {
+      if (this.timeLimitPerRound && this.timeLimitPerRound > 0) {
+        console.log('BigScreen: Activity has time limit, showing timer');
+        this.timer.style.display = 'block';
+        
+        // Start or stop timer based on round state
+        if (activity.time_remaining !== null && activity.time_remaining !== undefined) {
+          this.updateRoundTimerDisplay(activity.time_remaining);
+          if (this.roundStatus === 'active' && activity.time_remaining > 0) {
+            this.startRoundTimer(activity.time_remaining);
+          } else if (this.roundStatus !== 'active') {
+            this.stopRoundTimer();
+          }
+        } else {
+          // No explicit remaining time; if activity has a time limit show that as the default
+          let secondsToShow = this.timeLimitPerRound;
+          if (this.roundStatus === 'active' && activity.round_start_time) {
+            try {
+              const start = new Date(activity.round_start_time);
+              if (!isNaN(start.getTime())) {
+                const elapsed = Math.floor((Date.now() - start.getTime()) / 1000);
+                secondsToShow = Math.max(0, Math.floor(this.timeLimitPerRound - elapsed));
+              }
+            } catch (e) {
+              console.warn('Failed to compute elapsed time from round_start_time:', e);
+            }
+          }
+
+          this.updateRoundTimerDisplay(secondsToShow);
+
+          // If round is active, start a client-side countdown if one isn't already running
+          if (this.roundStatus === 'active' && secondsToShow > 0 && !this.roundTimerInterval) {
+            this.startRoundTimer(secondsToShow);
+          }
+        }
+      } else {
+        console.log('BigScreen: No time limit, hiding timer');
+        this.timer.style.display = 'none';
         this.stopRoundTimer();
       }
     } else {
-      // No explicit remaining time; if activity has a time limit show that as the default
-      if (this.timeLimitPerRound) {
-        // If round is active and we have a start timestamp, attempt to compute remaining time
-        let secondsToShow = this.timeLimitPerRound;
-        if (this.roundStatus === 'active' && activity.round_start_time) {
-          try {
-            const start = new Date(activity.round_start_time);
-            if (!isNaN(start.getTime())) {
-              const elapsed = Math.floor((Date.now() - start.getTime()) / 1000);
-              secondsToShow = Math.max(0, Math.floor(this.timeLimitPerRound - elapsed));
-            }
-          } catch (e) {
-            console.warn('Failed to compute elapsed time from round_start_time:', e);
-          }
-        }
-
-        this.updateRoundTimerDisplay(secondsToShow);
-
-        // If round is active, start a client-side countdown if one isn't already running
-        if (this.roundStatus === 'active' && secondsToShow > 0 && !this.roundTimerInterval) {
-          this.startRoundTimer(secondsToShow);
-        }
-      } else if (this.timer) {
-        // Clear/hide timer text when there is truly no limit
-        this.updateRoundTimerDisplay(null);
-      }
-    }
-
-    // Show timer if there's a time limit
-    if (this.timer) {
-      if (this.timeLimitPerRound) {
-        this.timer.style.display = 'block';
-      } else {
-        this.timer.style.display = 'none';
-      }
+      console.warn('BigScreen: timer element not found');
     }
   }
 
@@ -1765,6 +1815,7 @@ class BigScreenDisplay {
 
   destroy() {
     this.stopAutoUpdate();
+    this.stopRoundTimer();
     // Clean up any other resources if needed
   }
 }
@@ -1800,9 +1851,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.bigScreenDisplay = new BigScreenDisplay();
   } catch (error) {
     console.error('Failed to initialize BigScreenDisplay:', error);
-    window.showGlobalFatalError?.(
-      `Fout bij initialisatie BigScreen: ${error?.message || String(error)}`
-    );
+    if (typeof window.showGlobalFatalError === 'function') {
+      window.showGlobalFatalError(
+        `Fout bij initialisatie BigScreen: ${error?.message || String(error)}`
+      );
+    }
   }
 });
 

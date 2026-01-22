@@ -159,13 +159,15 @@
                 }
             </style>
             <style>
-                /* Prefer system emoji fonts where emoji glyphs are shown to avoid square placeholders */
+                /* Use standard system fonts for consistent rendering */
                 body,
                 .team-icon,
                 .participant-medal,
                 .participant-total,
                 .player-badge-bigscreen {
-                    font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                    -webkit-font-smoothing: antialiased;
+                    -moz-osx-font-smoothing: grayscale;
                 }
 
                 /* Remove excessive spacing and ensure clean typography for BigScreen */

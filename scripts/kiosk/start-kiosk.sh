@@ -55,10 +55,10 @@ BASE_FLAGS=(
 
 # Raspberry Pi specific flags (improves rendering on Pi 3/4)
 RPI_FLAGS=()
-if [ "$ON_RPI" -eq 1 ]; then
-  RPI_FLAGS=(--disable-gpu --use-gl=egl)
-  echo "Detected Raspberry Pi: adding RPI flags: ${RPI_FLAGS[*]}" >> /tmp/sportscore-kiosk.log
-fi
+# if [ "$ON_RPI" -eq 1 ]; then
+#   RPI_FLAGS=(--use-gl=egl)
+#   echo "Detected Raspberry Pi: adding RPI flags: ${RPI_FLAGS[*]}" >> /tmp/sportscore-kiosk.log
+# fi
 
 # Wayland flags (if running in Wayland session)
 WAYLAND_FLAGS=()
