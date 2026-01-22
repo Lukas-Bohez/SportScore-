@@ -6,6 +6,7 @@ import GenericInput from "@/components/Generic/GenericInput.vue";
 import GenericToggle from "@/components/Generic/GenericToggle.vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericStepBar from "@/components/Generic/GenericStepBar.vue";
+import { ref } from "vue";
 
 const router = useRouter();
 
@@ -18,6 +19,7 @@ function saveActivity() {
   console.log("Activity saved");
   router.back();
 }
+const selectedDropdownValue = ref("");
 </script>
 
 <template>
@@ -41,21 +43,25 @@ function saveActivity() {
           <GenericToggle label="Activiteit bewerken" />
         </div>
         <GenericDropdown
-          :options="[
-            { label: 'Categorie 1', value: 1 },
-            { label: 'Categorie 2', value: 2 },
-            { label: 'Categorie 3', value: 3 },
-          ]"
           label="Game type (modus)"
+          v-model="selectedDropdownValue"
+          :options="[
+            { label: 'Quiz', value: 'quiz' },
+            { label: 'Sport Challenge', value: 'sport-challenge' },
+            { label: 'Elimination Mode', value: 'elimination-mode' },
+            { label: 'Team vs Time', value: 'team-vs-time' },
+          ]"
           placeholder="Selecteer een Game type"
         />
         <GenericDropdown
-          :options="[
-            { label: 'Categorie 1', value: 1 },
-            { label: 'Categorie 2', value: 2 },
-            { label: 'Categorie 3', value: 3 },
-          ]"
           label="Stijl (sport type)"
+          v-model="selectedDropdownValue"
+          :options="[
+            { label: 'Quiz', value: 'quiz' },
+            { label: 'Sport Challenge', value: 'sport-challenge' },
+            { label: 'Elimination Mode', value: 'elimination-mode' },
+            { label: 'Team vs Time', value: 'team-vs-time' },
+          ]"
           placeholder="Selecteer een sport stijl"
         />
         <div class="input-next-row">
