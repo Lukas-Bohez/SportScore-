@@ -64,8 +64,8 @@ Er zijn meerdere manieren om frontend/back-end te starten. Gebruik de optie die 
 - Backend status: `sudo systemctl status sportscore-backend`
 - Apache status: `sudo systemctl status apache2`
 - Backend logs: `sudo journalctl -u sportscore-backend -f` (of bekijk de terminal waar `app.py` draait)
-- Database initialiseren: `python3 backend/init_database.py` (indien aanwezig voor installatie)
-- Migraties: `python3 backend/run_migration.py`
+- Database initialiseren: `python3 backend/scripts/init_database.py` (indien aanwezig voor installatie)
+- Migraties: `python3 backend/scripts/run_migration.py`
 
 Probleem: frontend niet bereikbaar → controleer of Apache draait of of je dev server/serve_frontend.py op de juiste poort draait. Firewall/poorten (80, 3000, 5173, 8000) moeten open zijn voor clients.
 
