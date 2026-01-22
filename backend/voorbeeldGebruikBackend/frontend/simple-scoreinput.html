@@ -325,17 +325,17 @@
                 <!-- Time Controls (visible for team_vs_time activities) -->
                 <div id="time-controls" class="form-group" style="display: none;">
                     <label>Tijd invoer (Team vs Time)</label>
-                    <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+                    <div class="time-input-container">
                         <div style="display:flex; gap:6px; align-items:center;">
                             <div style="font-weight:600; margin-bottom:6px; width:100%;">Tijd</div>
-                            <input type="number" id="set-minutes" placeholder="min" min="0" style="width:68px;" />
+                            <input type="number" id="set-minutes" class="time-input" placeholder="min" min="0" />
                             <span>:</span>
-                            <input type="number" id="set-seconds" placeholder="sec" min="0" max="59"
-                                style="width:68px;" />
+                            <input type="number" id="set-seconds" class="time-input" placeholder="sec" min="0"
+                                max="59" />
                             <span>.</span>
-                            <input type="number" id="set-ms" placeholder="ms" min="0" max="999" style="width:90px;" />
-                            <button id="set-time-btn" class="control-btn" type="button">Set</button>
-                            <button id="add-time-btn" class="control-btn" type="button">Add</button>
+                            <input type="number" id="set-ms" class="time-input" placeholder="ms" min="0" max="999" />
+                            <button id="set-time-btn" class="control-btn time-btn" type="button">Set</button>
+                            <button id="add-time-btn" class="control-btn time-btn" type="button">Add</button>
                         </div>
 
                         <!-- removed redundant record button - Set/Add will submit immediately -->

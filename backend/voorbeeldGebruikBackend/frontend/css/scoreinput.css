@@ -352,6 +352,41 @@ h2::after {
     .leaderboard-item .score {
         font-size: 1.2rem;
     }
+
+    .time-input-container {
+        padding: 10px;
+        gap: 6px;
+    }
+
+    .time-input {
+        width: 50px;
+        padding: 10px;
+        font-size: 16px;
+    }
+
+    .time-btn {
+        padding: 10px 12px;
+        font-size: 16px;
+        min-height: 44px;
+    }
+
+    .activities-container {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 15px;
+    }
+
+    .station-card {
+        padding: 15px;
+    }
+
+    .score-form {
+        padding: 15px;
+    }
+
+    .leaderboard,
+    .recent-scores {
+        padding: 15px;
+    }
 }
 
 /* Points Controls */
@@ -399,6 +434,34 @@ h2::after {
     width: 80px;
     text-align: center;
     font-weight: bold;
+}
+
+/* Time Input Styles */
+.time-input-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.time-input {
+    width: 55px;
+    padding: 8px;
+    font-size: 14px;
+    text-align: center;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+}
+
+.time-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-height: 36px;
+    border-radius: 4px;
 }
 
 /* Submit Button */
