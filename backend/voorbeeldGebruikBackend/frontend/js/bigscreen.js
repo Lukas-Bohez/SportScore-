@@ -356,7 +356,8 @@ class BigScreenDisplay {
       return;
     }
 
-    this.updateScore(data);
+    // Fully refresh all data instead of just updating the score
+    this.loadInitialData();
   }
 
   handleTeamUpdate(data) {
@@ -508,6 +509,16 @@ class BigScreenDisplay {
   }
 
   async processSessionData(liveData) {
+    // Check if session is active; if not, show no session message
+    if (!liveData.session || liveData.session.status !== 'active' || liveData.session.is_active === false) {
+      // Clear active activity since session is inactive
+      this.activeActivity = null;
+      this.activeActivityId = null;
+      localStorage.removeItem('activeActivityId');
+      this.showNoSessionMessage();
+      return;
+    }
+
     this.applyTheme(liveData.session.sport_type || 'custom');
     await this.resolveActiveActivity(liveData);
     await this.normalizeLeaderboardData(liveData);
@@ -762,12 +773,12 @@ class BigScreenDisplay {
   // ==========================================================================
 
   updateDisplay(liveData) {
-    if (liveData.session) {
+    if (liveData.session && liveData.session.is_active !== false) {
       this.currentSession = liveData.session;
       this.updateSessionInfo(liveData.session);
     }
     
-    if (liveData.leaderboard) {
+    if (liveData.leaderboard && liveData.session && liveData.session.is_active !== false) {
       this.updateLeaderboard(liveData.leaderboard);
     }
     
@@ -825,6 +836,12 @@ class BigScreenDisplay {
     
     const effective = this.getEffectiveActivity();
     const lowerIsBetter = SharedUtils.isLowerBetter(effective);
+    
+    // If no active activity, clear the leaderboard
+    if (!effective) {
+      this.teamsContainer.innerHTML = '';
+      return;
+    }
     
     // Check for incomplete activity details and refresh if needed
     if (this.needsActivityRefresh(effective)) {
