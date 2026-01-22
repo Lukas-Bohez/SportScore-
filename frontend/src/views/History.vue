@@ -1,29 +1,33 @@
 <template>
-  <div class="history-page">
-    <GenericButton class="generic-button--quaternary" @click="goBack">
-      <ChevronLeft class="icon--quaternary" />Terug
-    </GenericButton>
-    <h3><strong>Geschiedenis</strong></h3>
-    <GenericInput
-      label="Datum"
-      placeholder="01/01/2025"
-      v-model="searchQuery"
-    />
-    <div class="history-page-content">
-      <GenericCard
-        v-for="(card, index) in filteredCards"
-        :key="index"
-        :title="card.title"
-        :date="card.date"
-      />
-    </div>
+  <div class="app-container">
+    <div class="layout-app-pages">
+      <div class="history-page">
+        <GenericButton class="generic-button--quaternary" @click="goBack">
+          <ChevronLeft class="icon--quaternary" />Terug
+        </GenericButton>
+        <h3><strong>Geschiedenis</strong></h3>
+        <GenericInput
+          label="Datum"
+          placeholder="01/01/2025"
+          v-model="searchQuery"
+        />
+        <div class="history-page-content">
+          <GenericCard
+            v-for="(card, index) in filteredCards"
+            :key="index"
+            :title="card.title"
+            :date="card.date"
+          />
+        </div>
 
-    <p v-if="filteredCards.length === 0" class="no-results">
-      Geen resultaten gevonden
-    </p>
-  </div>
-  <div class="nav-container">
-    <GenericNav />
+        <p v-if="filteredCards.length === 0" class="no-results">
+          Geen resultaten gevonden
+        </p>
+      </div>
+      <div class="nav-container">
+        <GenericNav />
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
@@ -74,6 +78,7 @@ h3 {
 }
 .history-page-content {
   overflow: auto;
+  margin-top: var(--space-6);
 }
 .back-button {
   display: flex;
