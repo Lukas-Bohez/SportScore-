@@ -320,41 +320,7 @@ async def startup_event():
 # API Routes
 # ----------------------------------------------------
 
-# Sports endpoints
-@app.get(f"{ENDPOINT}/sports", response_model=SportListResponse)
-async def get_sports():
-    sports = SportRepository.get_all_sports()
-    return {"sports": [SportResponse(**sport) for sport in sports]}
-
-@app.post(f"{ENDPOINT}/sports", response_model=SportResponse)
-async def create_sport(sport: SportCreate):
-    sport_id = SportRepository.create_sport(sport.name, sport.description)
-    if not sport_id:
-        raise HTTPException(status_code=400, detail="Failed to create sport")
-    created_sport = SportRepository.get_sport_by_id(sport_id)
-    return SportResponse(**created_sport)
-
-@app.get(f"{ENDPOINT}/sports/{{sport_id}}", response_model=SportResponse)
-async def get_sport(sport_id: int):
-    sport = SportRepository.get_sport_by_id(sport_id)
-    if not sport:
-        raise HTTPException(status_code=404, detail="Sport not found")
-    return SportResponse(**sport)
-
-@app.put(f"{ENDPOINT}/sports/{{sport_id}}", response_model=SportResponse)
-async def update_sport(sport_id: int, sport_update: SportUpdate):
-    success = SportRepository.update_sport(sport_id, sport_update.name, sport_update.description)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update sport")
-    updated_sport = SportRepository.get_sport_by_id(sport_id)
-    return SportResponse(**updated_sport)
-
-@app.delete(f"{ENDPOINT}/sports/{{sport_id}}")
-async def delete_sport(sport_id: int):
-    success = SportRepository.delete_sport(sport_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete sport")
-    return {"message": "Sport deleted successfully"}
+# (Sports endpoints removed) — unused by frontend and removed to declutter API docs
 
 # Teams endpoints
 @app.get(f"{ENDPOINT}/teams", response_model=TeamListResponse)
@@ -543,156 +509,12 @@ async def get_session_team_players(session_id: int, team_id: int):
     return {"players": players}
 
 
-@app.put(f"{ENDPOINT}/players/{{player_id}}/team", response_model=PlayerResponse)
-async def set_player_default_team(player_id: int, payload: PlayerUpdate):
-    # Update player's default team
-    success = PlayerRepository.update_player(player_id, None, payload.team_id, None)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update player's default team")
-    updated = PlayerRepository.get_player_by_id(player_id)
-    return PlayerResponse(**updated)
+# Removed: /players/{player_id}/team endpoint (unused). Use player update flows via /players/{id} instead.
 
-# Score Types endpoints
-@app.get(f"{ENDPOINT}/score-types", response_model=ScoreTypeListResponse)
-async def get_score_types():
-    score_types = ScoreTypeRepository.get_all_score_types()
-    return {"score_types": [ScoreTypeResponse(**st) for st in score_types]}
+# Score Types endpoints removed — not referenced by frontend and removed to simplify API surface.
 
-@app.post(f"{ENDPOINT}/score-types", response_model=ScoreTypeResponse)
-async def create_score_type(score_type: ScoreTypeCreate):
-    st_id = ScoreTypeRepository.create_score_type(score_type.name, score_type.description)
-    if not st_id:
-        raise HTTPException(status_code=400, detail="Failed to create score type")
-    created_st = ScoreTypeRepository.get_score_type_by_id(st_id)
-    return ScoreTypeResponse(**created_st)
-
-@app.get(f"{ENDPOINT}/score-types/{{score_type_id}}", response_model=ScoreTypeResponse)
-async def get_score_type(score_type_id: int):
-    st = ScoreTypeRepository.get_score_type_by_id(score_type_id)
-    if not st:
-        raise HTTPException(status_code=404, detail="Score type not found")
-    return ScoreTypeResponse(**st)
-
-@app.put(f"{ENDPOINT}/score-types/{{score_type_id}}", response_model=ScoreTypeResponse)
-async def update_score_type(score_type_id: int, st_update: ScoreTypeUpdate):
-    success = ScoreTypeRepository.update_score_type(score_type_id, st_update.name, st_update.description)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update score type")
-    updated_st = ScoreTypeRepository.get_score_type_by_id(score_type_id)
-    return ScoreTypeResponse(**updated_st)
-
-@app.delete(f"{ENDPOINT}/score-types/{{score_type_id}}")
-async def delete_score_type(score_type_id: int):
-    success = ScoreTypeRepository.delete_score_type(score_type_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete score type")
-    return {"message": "Score type deleted successfully"}
-
-# Games endpoints
-@app.get(f"{ENDPOINT}/games", response_model=GameListResponse)
-async def get_games(sport_id: Optional[int] = Query(None)):
-    if sport_id:
-        games = GameRepository.get_games_by_sport(sport_id)
-    else:
-        games = GameRepository.get_all_games()
-    return {"games": [GameResponse(**game) for game in games]}
-
-@app.post(f"{ENDPOINT}/games", response_model=GameResponse)
-async def create_game(game: GameCreate):
-    game_id = GameRepository.create_game(game.sport_id, game.team1_id, game.team2_id, game.start_time, game.status)
-    if not game_id:
-        raise HTTPException(status_code=400, detail="Failed to create game")
-    created_game = GameRepository.get_game_by_id(game_id)
-    return GameResponse(**created_game)
-
-@app.get(f"{ENDPOINT}/games/{{game_id}}", response_model=GameResponse)
-async def get_game(game_id: int):
-    game = GameRepository.get_game_by_id(game_id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-    return GameResponse(**game)
-
-@app.put(f"{ENDPOINT}/games/{{game_id}}", response_model=GameResponse)
-async def update_game(game_id: int, game_update: GameUpdate):
-    success = GameRepository.update_game(
-        game_id, game_update.sport_id, game_update.team1_id, game_update.team2_id,
-        game_update.start_time, game_update.end_time, game_update.status
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update game")
-    updated_game = GameRepository.get_game_by_id(game_id)
-    return GameResponse(**updated_game)
-
-@app.delete(f"{ENDPOINT}/games/{{game_id}}")
-async def delete_game(game_id: int):
-    success = GameRepository.delete_game(game_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete game")
-    return {"message": "Game deleted successfully"}
-
-# Scores endpoints
-@app.get(f"{ENDPOINT}/scores", response_model=ScoreListResponse)
-async def get_scores(game_id: Optional[int] = Query(None), team_id: Optional[int] = Query(None)):
-    if game_id:
-        scores = ScoreRepository.get_scores_by_game(game_id)
-    elif team_id:
-        scores = ScoreRepository.get_scores_by_team(team_id)
-    else:
-        scores = ScoreRepository.get_all_scores()
-    return {"scores": [ScoreResponse(**score) for score in scores]}
-
-@app.post(f"{ENDPOINT}/scores", response_model=ScoreResponse)
-async def create_score(score: ScoreCreate):
-    score_id = ScoreRepository.create_score(score.game_id, score.team_id, score.score_type_id, score.value, score.player_id)
-    if not score_id:
-        raise HTTPException(status_code=400, detail="Failed to create score")
-    created_score = ScoreRepository.get_score_by_id(score_id)
-
-    # Emit real-time update
-    score_type = ScoreTypeRepository.get_score_type_by_id(score.score_type_id)
-    player_name = None
-    if score.player_id:
-        player = PlayerRepository.get_player_by_id(score.player_id)
-        player_name = player['name'] if player else None
-
-    update_message = ScoreUpdateMessage(
-        game_id=score.game_id,
-        team_id=score.team_id,
-        score_type=score_type['name'] if score_type else 'Unknown',
-        value=score.value,
-        player_name=player_name,
-        timestamp=datetime.now(CET)
-    )
-    await sio.emit('score_update', update_message.dict())
-
-    return ScoreResponse(**created_score)
-
-@app.get(f"{ENDPOINT}/scores/{{score_id}}", response_model=ScoreResponse)
-async def get_score(score_id: int):
-    score = ScoreRepository.get_score_by_id(score_id)
-    if not score:
-        raise HTTPException(status_code=404, detail="Score not found")
-    return ScoreResponse(**score)
-
-@app.put(f"{ENDPOINT}/scores/{{score_id}}", response_model=ScoreResponse)
-async def update_score(score_id: int, score_update: ScoreUpdate):
-    success = ScoreRepository.update_score(score_id, score_update.value)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update score")
-    updated_score = ScoreRepository.get_score_by_id(score_id)
-    return ScoreResponse(**updated_score)
-
-@app.delete(f"{ENDPOINT}/scores/{{score_id}}")
-async def delete_score(score_id: int):
-    success = ScoreRepository.delete_score(score_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete score")
-    return {"message": "Score deleted successfully"}
-
-@app.get(f"{ENDPOINT}/games/{{game_id}}/score-summary")
-async def get_game_score_summary(game_id: int):
-    summary = ScoreRepository.get_game_score_summary(game_id)
-    return {"summary": summary}
+# Games endpoints removed — not used by frontend. Reintroduced only if required by external integrations.
+# (Game score summary removed along with game CRUD.)
 
 # ===========================================
 # Session Endpoints (Teambuilding)
@@ -1474,13 +1296,6 @@ async def get_round_status(activity_id: int):
 # End Round Control Endpoints
 # ============================================================================
 
-# Temporary debug endpoint to inspect raw DB values for an activity
-@app.get(f"{ENDPOINT}/debug/activity/{{activity_id}}")
-async def debug_activity(activity_id: int):
-    from database.database import Database
-    sql = "SELECT * FROM activities WHERE id = ?"
-    row = Database.get_one_row(sql, [activity_id])
-    return {"raw_db_row": row}
 
 # Activity Teams (opt-in)
 @app.get(f"{ENDPOINT}/activities/{{activity_id}}/teams", response_model=ActivityTeamListResponse, tags=["Activity Teams"], summary="List teams for activity")
@@ -1889,79 +1704,7 @@ async def get_standalone_team(team_id: int):
         raise HTTPException(status_code=404, detail="Team not found")
     return {"team": team}
 
-@app.post(
-    f"{ENDPOINT}/standalone-teams",
-    tags=["Standalone Teams"],
-    summary="Create a new standalone team"
-)
-async def create_standalone_team(request: Request):
-    """Create a new team that can be reused in multiple sessions."""
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    name = (payload.get('name') or '').strip()
-    color = payload.get('color') or '#3B82F6'
-    icon = payload.get('icon') or 'team'
-    description = payload.get('description') or None
-    
-    if not name:
-        raise HTTPException(status_code=422, detail="Field 'name' is required")
-    
-    # Create team zonder sessie koppeling
-    # We gebruiken een dummy session_id 0 en verwijderen later de koppeling
-    from database.database import Database
-    
-    # Check of team al bestaat
-    existing = Database.get_one_row("SELECT id FROM teams WHERE name = ?", [name])
-    if existing:
-        raise HTTPException(status_code=400, detail="Team with this name already exists")
-    
-    sql = "INSERT INTO teams (name, color, icon, description) VALUES (?, ?, ?, ?)"
-    team_id = Database.execute_sql(sql, [name, color, icon, description])
-    
-    team = SessionTeamRepository.get_team_by_id(team_id)
-    return {"team": team}
-
-@app.put(
-    f"{ENDPOINT}/standalone-teams/{{team_id}}",
-    tags=["Standalone Teams"],
-    summary="Update a standalone team"
-)
-async def update_standalone_team(team_id: int, request: Request):
-    """Update team properties (affects all sessions using this team)."""
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    name = payload.get('name')
-    color = payload.get('color')
-    icon = payload.get('icon')
-    description = payload.get('description')
-    
-    success = SessionTeamRepository.update_team(
-        team_id, name=name, color=color, icon=icon, description=description
-    )
-    
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update team")
-    
-    team = SessionTeamRepository.get_team_by_id(team_id)
-    return {"team": team}
-
-@app.delete(
-    f"{ENDPOINT}/standalone-teams/{{team_id}}",
-    tags=["Standalone Teams"],
-    summary="Delete a standalone team"
-)
-async def delete_standalone_team(team_id: int):
-    """Permanently delete a team (removes from all sessions)."""
-    success = SessionTeamRepository.delete_team(team_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete team")
-    return {"message": "Team deleted successfully"}
+# Standalone team write endpoints removed (POST/PUT/DELETE). The GET endpoints remain to support listing available teams in UIs.
 
 @app.post(
     f"{ENDPOINT}/sessions/{{session_id}}/add-team",
@@ -2022,60 +1765,8 @@ async def remove_team_from_session(session_id: int, team_id: int):
 # Main
 # ----------------------------------------------------
 
-# Session Templates Endpoints
-@app.get(f"{ENDPOINT}/session-templates", tags=["Session Templates"], summary="List all session templates")
-async def get_session_templates():
-    templates = SessionTemplateRepository.get_all_templates()
-    return {"templates": templates}
+# Session templates endpoints removed — not referenced by frontend and removed to reduce API doc clutter.
 
-@app.post(f"{ENDPOINT}/session-templates", tags=["Session Templates"], summary="Create a new session template")
-async def create_session_template(request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    name = payload.get('name')
-    template_data = payload.get('template_data')
-    
-    if not name or not template_data:
-        raise HTTPException(status_code=422, detail="Name and template_data are required")
-    
-    template_id = SessionTemplateRepository.create_template(name, template_data)
-    if not template_id:
-        raise HTTPException(status_code=400, detail="Failed to create template")
-    
-    return {"template_id": template_id}
-
-@app.get(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Get a session template by ID")
-async def get_session_template(template_id: int):
-    template = SessionTemplateRepository.get_template_by_id(template_id)
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return template
-
-@app.put(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Update a session template")
-async def update_session_template(template_id: int, request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    name = payload.get('name')
-    template_data = payload.get('template_data')
-    
-    success = SessionTemplateRepository.update_template(template_id, name, template_data)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to update template")
-    
-    return {"message": "Template updated"}
-
-@app.delete(f"{ENDPOINT}/session-templates/{{template_id}}", tags=["Session Templates"], summary="Delete a session template")
-async def delete_session_template(template_id: int):
-    success = SessionTemplateRepository.delete_template(template_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to delete template")
-    return {"message": "Template deleted"}
 
 # Health check endpoint (useful for uptime and debugging CORS/network issues)
 @app.get(f"{ENDPOINT}/health", tags=["Health"], summary="Backend health check")
@@ -2107,38 +1798,7 @@ async def system_shutdown(x_admin_secret: Optional[str] = Header(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Live Leaderboard
-@app.get(f"{ENDPOINT}/live-leaderboard", tags=["Live"])
-async def get_live_leaderboard():
-    active_session = SessionRepository.get_active_session()
-    if not active_session:
-        raise HTTPException(status_code=404, detail="No active session")
-    
-    # Get teams for the session
-    teams = SessionTeamRepository.get_teams_by_session(active_session['id'])
-    
-    # Get scores for the session
-    scores = SessionScoreRepository.get_scores_by_session(active_session['id'])
-    
-    # Sum scores per team
-    team_scores = {}
-    for score in scores:
-        tid = score['team_id']
-        if tid not in team_scores:
-            team_scores[tid] = 0
-        team_scores[tid] += score.get('points', 0) or 0
-    
-    leaderboard = []
-    for team in teams:
-        leaderboard.append({
-            'team_id': team['id'],
-            'name': team['name'],
-            'icon': team.get('icon'),
-            'score': team_scores.get(team['id'], 0),
-            'players': [],  # Will be loaded by frontend
-            'playerScores': {}
-        })
-    
-    return {'session': active_session, 'leaderboard': leaderboard}
+# Duplicate live-leaderboard endpoint (hyphen variant) removed in favor of /api/v1/live/leaderboard.
 
 # Explicit CORS preflight handler (helps when running behind the Socket.IO ASGI wrapper)
 @app.options("/{full_path:path}")
