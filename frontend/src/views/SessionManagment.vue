@@ -63,6 +63,12 @@
           variant="primary"
           label="Score toevoegen"
         />
+        <GenericButton
+          style="margin-top: var(--space-7)"
+          variant="primary"
+          label="Sessie Beëindigen"
+          class="score-section-button"
+        />
       </div>
 
       <!-- Score Overview - Only show when activity is selected -->
