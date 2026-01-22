@@ -42,7 +42,7 @@
 
 <script>
 import { TriangleAlert, CircleCheck, X } from "lucide-vue-next";
-import GenericButtonNew from "./GenericButtonNew.vue";
+import GenericButtonNew from "./GenericButton.vue";
 
 export default {
   name: "GenericModel",

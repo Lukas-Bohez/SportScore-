@@ -1,91 +1,60 @@
 <template>
-  <div class="generic-checkbox">
-    <label :for="id" class="checkbox-content">
-      <div class="checkbox-wrapper">
-        <input
-          type="checkbox"
-          :id="id"
-          :checked="checked"
-          @change="$emit('update:checked', $event.target.checked)"
-          class="checkbox-input"
-        />
-        <div class="checkbox-custom circle-base">
-          <Check class="generic-checkbox-icon" :stroke-width="3" />
-        </div>
-      </div>
-      <div class="label-wrapper">
-        <span class="label-text">{{ label }}</span>
-        <!-- <div
-          v-if="showDot"
-          class="color-dot circle-base"
-          :style="{ backgroundColor: dotColor }"
-        ></div> -->
-      </div>
-    </label>
-    <div class="actions">
+  <label class="generic-checkbox">
+    <div class="checkbox-content">
+      <span class="el-checkbox">
+        <span class="el-checkbox__input" :class="{ 'is-checked': checked4 }">
+          <input
+            type="checkbox"
+            :id="id"
+            v-model="checked4"
+            @change="$emit('update:modelValue', checked4)"
+            class="el-checkbox__original"
+          />
+          <span class="el-checkbox__inner">
+            <Check :size="16" :stroke-width="3" />
+          </span>
+        </span>
+        <span class="el-checkbox__label">
+          <span class="text">{{ label }}</span>
+          <div
+            v-if="showDot"
+            class="color-dot circle-base"
+            :style="{ backgroundColor: dotColor }"
+          />
+        </span>
+      </span>
+    </div>
+
+    <!-- Acties mogen NIET togglen -->
+    <div class="actions" @click.stop>
       <button
-        @click="($emit('edit'), (showModel = true))"
+        @click="$emit('edit')"
         class="icon-button hover-opacity edit-button"
         type="button"
       >
-        <Pencil class="generic-checkbox-icon" />
+        <Pencil :size="20" />
       </button>
       <button
-        @click="openModal"
+        @click="$emit('delete')"
         class="icon-button hover-opacity delete-button"
         type="button"
       >
-        <Trash2 class="generic-checkbox-icon" />
+        <Trash2 :size="20" />
       </button>
-
-      <GenericModel
-        ref="modalRef"
-        icon="triangle-alert"
-        iconColor="var(--red-100)"
-        message="Bent u zeker dat u deze activiteit wilt verwijderen?"
-        confirmText="Ja"
-        cancelText="Nee"
-        @confirm="handleConfirm"
-        @cancel="handleCancel"
-      />
     </div>
-  </div>
+  </label>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { Check, Pencil, Trash2 } from "lucide-vue-next";
-import GenericModel from "../Generic/GenericModel.vue";
 
-const modalRef = ref(null);
-const successModalRef = ref(null);
-
-const openModal = () => {
-  modalRef.value.open();
-};
-
-const openSuccessModal = () => {
-  successModalRef.value.open();
-};
-
-const handleConfirm = () => {
-  console.log("Bevestigd!");
-};
-
-const handleCancel = () => {
-  console.log("Geannuleerd!");
-};
-
-const handleSuccess = () => {
-  console.log("Success!");
-};
-
-defineProps({
+const props = defineProps({
   label: {
     type: String,
     required: true,
   },
-  checked: {
+  modelValue: {
     type: Boolean,
     default: false,
   },
@@ -97,13 +66,22 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  // dotColor: {
-  //   type: String,
-  //   default: "#EE1313",
-  // },
+  dotColor: {
+    type: String,
+    default: "#EE1313",
+  },
 });
 
-defineEmits(["update:checked", "edit", "delete"]);
+const emit = defineEmits(["update:modelValue", "edit", "delete"]);
+
+const checked4 = ref(props.modelValue);
+
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    checked4.value = newVal;
+  },
+);
 
 defineOptions({
   name: "GenericCheckbox",
@@ -113,7 +91,7 @@ defineOptions({
 <style scoped>
 .generic-checkbox {
   width: 100%;
-  min-height: 2.8125rem;
+  height: 2.8125rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -123,6 +101,7 @@ defineOptions({
   box-sizing: border-box;
   transition: border-color 0.3s ease;
   font-family: var(--font-family);
+  cursor: pointer;
 }
 
 .generic-checkbox:focus-within {
@@ -133,25 +112,36 @@ defineOptions({
   display: flex;
   align-items: center;
   gap: var(--space-5);
-  flex: 1;
+}
+
+/* Element Plus checkbox structure with custom styling */
+.el-checkbox {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
   cursor: pointer;
 }
 
-.checkbox-wrapper {
-  position: relative;
-  display: flex;
+.el-checkbox__input {
+  display: inline-flex;
   align-items: center;
+  position: relative;
+  cursor: pointer;
 }
 
-.checkbox-input {
+.el-checkbox__original {
   position: absolute;
   opacity: 0;
   cursor: pointer;
   width: 0;
   height: 0;
+  z-index: -1;
 }
 
-.checkbox-custom {
+.el-checkbox__inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
   border: 1px solid var(--black-40);
@@ -159,45 +149,34 @@ defineOptions({
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-sizing: border-box;
 }
 
-.generic-checkbox-icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.checkbox-custom .generic-checkbox-icon {
+.el-checkbox__inner svg {
   opacity: 0;
   transition: opacity 0.2s ease;
   color: var(--blue-100);
 }
 
-.checkbox-input:checked + .checkbox-custom {
+.el-checkbox__input.is-checked .el-checkbox__inner {
   background-color: var(--white);
   border-color: var(--blue-100);
 }
 
-.checkbox-input:checked + .checkbox-custom .generic-checkbox-icon {
+.el-checkbox__input.is-checked .el-checkbox__inner svg {
   opacity: 1;
+  color: var(--blue-100);
 }
 
-.checkbox-input:focus + .checkbox-custom {
+.el-checkbox__original:focus + .el-checkbox__inner {
   border-color: var(--blue-100);
 }
 
-.label-wrapper {
+.el-checkbox__label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.label-text {
-  font-size: 1.125rem;
-  line-height: 1.5rem;
-  color: var(--black-100);
+  padding-left: var(--space-3);
 }
 
 .color-dot {

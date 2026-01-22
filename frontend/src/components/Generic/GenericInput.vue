@@ -26,6 +26,20 @@ export default {
     type: {
       type: String,
       default: "text",
+      validator: (value) => {
+        // Valideer dat alleen geldige input types worden gebruikt
+        return [
+          "text",
+          "number",
+          "email",
+          "password",
+          "tel",
+          "url",
+          "date",
+          "time",
+          "datetime-local",
+        ].includes(value);
+      },
     },
     modelValue: {
       type: [String, Number],
@@ -35,14 +49,17 @@ export default {
   emits: ["update:modelValue"],
 };
 </script>
-
 <style scoped>
-.generic-input__field {
+.generic-input {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: 2rem;
 }
 
-.generic-input__field[type="number"] {
-  text-align: center;
+.generic-input__field {
+  width: 100%;
 }
 
 /* Remove spinner arrows from number input */
