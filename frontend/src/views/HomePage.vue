@@ -6,29 +6,46 @@ import { Plus } from "lucide-vue-next";
 </script>
 
 <template>
-  <div class="layout-home-page">
-    <div class="home-content">
-      <h1>Welkom bij</h1>
-      <h3>SportScore!</h3>
-      <div class="vector-container">
-        <img src="/homevector.svg" alt="home vector" class="home-vector" />
-      </div>
-      <p>Scoreboard voor team building activiteiten</p>
-      <GenericButton variant="primary">
-        <RouterLink class="router-link" to="/nieuwesessie">
-          <Plus />
-          Nieuwe sessie
-        </RouterLink>
-      </GenericButton>
-      <div>
-        <RouterLink class="router-link" to="/bigscreen/qrscreen">
-          QR Code Scannen
-        </RouterLink>
+  <div class="app-container">
+    <div class="layout-home-page">
+      <RouterLink class="back-to-active-sessions" to="/sessionmanagment">
+        <span></span> Terug naar actieve sessies
+      </RouterLink>
+      <div class="home-content">
+        <h1>Welkom bij</h1>
+        <h3>SportScore!</h3>
+        <div class="vector-container">
+          <img src="/homevector.svg" alt="home vector" class="home-vector" />
+        </div>
+        <p>Scoreboard voor team building activiteiten</p>
+        <GenericButton variant="primary">
+          <RouterLink class="router-link" to="/nieuwesessie">
+            <Plus />
+            Nieuwe sessie
+          </RouterLink>
+        </GenericButton>
+        <div>
+          <RouterLink class="router-link" to="/bigscreen/qrscreen">
+            QR Code Scannen
+          </RouterLink>
+          <RouterLink class="router-link" to="/bigscreen/countdownscreen">
+            Countdown
+          </RouterLink>
+          <RouterLink class="router-link" to="/bigscreen/loadingScreen">
+            Loading Screen
+          </RouterLink>
+          <RouterLink class="router-link" to="/bigscreen/podiumscreen">
+            Podium
+          </RouterLink>
+          <RouterLink class="router-link" to="/bigscreen/scorescreen">
+            ScoreScreen
+          </RouterLink>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="nav-container">
-    <GenericNav />
+    <div class="nav-container">
+      <GenericNav />
+    </div>
   </div>
 </template>
 

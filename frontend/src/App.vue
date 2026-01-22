@@ -6,9 +6,7 @@ import Home from "@/views/HomePage.vue";
 
 <template>
   <main class="background-effect">
-    <div class="app-container">
-      <RouterView />
-    </div>
+    <RouterView />
   </main>
 </template>
 

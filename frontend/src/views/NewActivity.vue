@@ -84,6 +84,7 @@ function saveActivity() {
 
 <style scoped>
 .layout-page-new-activity {
+  position: relative;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -105,7 +106,7 @@ h3 {
 .form-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-7);
+  gap: var(--space-6);
   overflow-y: auto;
   max-height: calc(100vh - 22rem);
   /* padding: var(--space-4); */

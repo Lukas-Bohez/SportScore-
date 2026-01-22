@@ -93,7 +93,7 @@ main {
   width: 100%;
 }
 .layout-app-pages {
-  position: relative;
+  /* position: relative; */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -114,6 +114,9 @@ main {
   justify-content: center;
   position: fixed;
   bottom: 0;
+}
+.scorescreen-container {
+  width: 100%;
 }
 
 /* -------------------Utility Classes---------------------- */
@@ -172,6 +175,13 @@ button {
   font-size: 0.813rem; /* 13px */
   line-height: 1rem; /* 16px */
   letter-spacing: 0;
+}
+
+.generic-input {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .router-link {
@@ -266,6 +276,48 @@ strong {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.back-to-active-sessions {
+  text-decoration: none;
+  position: absolute;
+  top: var(--space-4);
+  display: flex;
+  right: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  font-weight: 500;
+  background-color: var(--green-100);
+  color: var(--white);
+  z-index: 1000;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-M);
+  transition: background-color 0.2s ease;
+}
+
+.back-to-active-sessions:hover {
+  background-color: var(--green-80, #2ea043);
+}
+
+.back-to-active-sessions span {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background-color: var(--red-100);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
 }
 
 /* ------------- Ipad Screens (768px - 1024px) ------------- */

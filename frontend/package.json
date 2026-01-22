@@ -16,7 +16,8 @@
     "lucide": "^0.562.0",
     "lucide-vue-next": "^0.562.0",
     "vue": "^3.5.26",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "vue3-emoji-picker": "^1.1.8"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",

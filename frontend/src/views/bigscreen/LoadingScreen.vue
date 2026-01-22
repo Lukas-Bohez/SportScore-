@@ -1,5 +1,5 @@
 <template>
-  <div class="background-effect">
+  <div class="">
     <div class="spinner-container">
       <div class="spinner"></div>
     </div>
@@ -13,14 +13,14 @@
 <style scoped>
 .loading-screen {
   text-align: center;
+}
+h2 {
+  text-align: center;
+  margin-top: var(--space-8);
+}
 
-  h2 {
-    margin-top: var(--space-10);
-  }
-
-  h4 {
-    margin-top: var(--space-8);
-  }
+h4 {
+  margin-top: var(--space-6);
 }
 
 .spinner-container {

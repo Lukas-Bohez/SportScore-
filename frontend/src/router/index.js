@@ -41,6 +41,31 @@ const router = createRouter({
       name: "qrscreen",
       component: () => import("../views/bigscreen/QrScreen.vue"),
     },
+    {
+      path: "/bigscreen/countdownscreen",
+      name: "countdown",
+      component: () => import("../views/bigscreen/CountdownScreen.vue"),
+    },
+    {
+      path: "/bigscreen/loadingScreen",
+      name: "loadingScreen",
+      component: () => import("../views/bigscreen/LoadingScreen.vue"),
+    },
+    {
+      path: "/bigscreen/podiumscreen",
+      name: "podiumscreen",
+      component: () => import("../views/bigscreen/PodiumScreen.vue"),
+    },
+    {
+      path: "/bigscreen/scorescreen",
+      name: "scorescreen",
+      component: () => import("../views/bigscreen/ScoreScreen.vue"),
+    },
+    {
+      path: "/sessionmanagment",
+      name: "sessionmanagment",
+      component: () => import("../views/SessionManagment.vue"),
+    },
   ],
 });
 
