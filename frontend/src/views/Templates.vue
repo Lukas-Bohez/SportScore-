@@ -20,12 +20,14 @@
         </div>
 
         <div class="templates-page-content">
-          <GenericCard
+          <RouterLink
             v-for="(card, index) in filteredCards"
             :key="index"
-            :title="card.title"
-            :date="card.date"
-          />
+            :to="{ name: 'SessionOverview', params: { id: card.id } }"
+            class="router-link"
+          >
+            <GenericCard :title="card.title" :date="card.date" />
+          </RouterLink>
         </div>
 
         <p v-if="filteredCards.length === 0" class="no-results">
@@ -58,20 +60,20 @@ const searchQueryName = ref("");
 const searchQueryDate = ref("");
 
 const cards = ref([
-  { title: "Team Blue", date: "12/02/2025" },
-  { title: "Team Red", date: "15/03/2025" },
-  { title: "Team Green", date: "12/02/2025" },
-  { title: "Team Yellow", date: "20/01/2025" },
-  { title: "Team Purple", date: "12/02/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
-  { title: "Team Orange", date: "18/04/2025" },
+  { id: "1", title: "Team Blue", date: "12/02/2025" },
+  { id: "2", title: "Team Red", date: "15/03/2025" },
+  { id: "3", title: "Team Green", date: "12/02/2025" },
+  { id: "4", title: "Team Yellow", date: "20/01/2025" },
+  { id: "5", title: "Team Purple", date: "12/02/2025" },
+  { id: "6", title: "Team Orange", date: "18/04/2025" },
+  { id: "7", title: "Team Orange", date: "18/04/2025" },
+  { id: "8", title: "Team Orange", date: "18/04/2025" },
+  { id: "9", title: "Team Orange", date: "18/04/2025" },
+  { id: "10", title: "Team Orange", date: "18/04/2025" },
+  { id: "11", title: "Team Orange", date: "18/04/2025" },
+  { id: "12", title: "Team Orange", date: "18/04/2025" },
+  { id: "13", title: "Team Orange", date: "18/04/2025" },
+  { id: "14", title: "Team Orange", date: "18/04/2025" },
 ]);
 
 const filteredCards = computed(() => {
@@ -139,5 +141,10 @@ h3 {
   color: var(--black-50);
   margin-top: var(--space-8);
   font-style: italic;
+}
+.router-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 </style>

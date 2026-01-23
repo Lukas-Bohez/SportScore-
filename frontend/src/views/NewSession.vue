@@ -292,7 +292,7 @@ onUnmounted(() => {
           </div>
           <div class="step-content" v-else-if="step === 4">
             <div>
-              <h3><span>Sessie</span> overzicht</h3>
+              <h2><span>Sessie</span> overzicht</h2>
               <h4 class="stap4-subtitle">
                 Sessie naam: <span>Team Building Dag 2025</span>
               </h4>
@@ -300,48 +300,57 @@ onUnmounted(() => {
                 <div>
                   <h4 class="stap4-subtitle">Activiteiten:</h4>
                   <div class="activity-container">
-                    <p class="activity-item">Voetbal ⚽️</p>
-                    <p class="activity-item">Basketbal 🏀</p>
-                    <p class="activity-item">Tennis 🎾</p>
+                    <p class="activity-container-item">Voetbal ⚽️</p>
+                    <p class="activity-container-item">Basketbal 🏀</p>
+                    <p class="activity-container-item">Tennis 🎾</p>
                   </div>
                 </div>
                 <div>
                   <h4 class="stap4-subtitle">Deelnemers:</h4>
-                  <div class="teams-ocntainer">
+                  <div class="teams-container">
                     <div class="team-container">
-                      <p class="activity-item">Team A 😑</p>
+                      <p class="activity-item">Team A😑</p>
                       <div class="activity-container">
-                        <p class="activity-item">speler A 😁</p>
-                        <p class="activity-item">speler B 🤣</p>
-                        <p class="activity-item">speler C 🤣</p>
-                        <p class="activity-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler A 😁</p>
+                        <p class="activity-container-item">speler Bart 🤣</p>
+                        <p class="activity-container-item">speler Cedrick 🤣</p>
+                        <p class="activity-container-item">speler Dylen 🤣</p>
+                        <p class="activity-container-item">
+                          speler Dylanorenzo 🤣
+                        </p>
+                        <p class="activity-container-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
                       </div>
                     </div>
                     <div class="team-container">
                       <p class="activity-item">Team B 😂</p>
                       <div class="activity-container">
-                        <p class="activity-item">speler A 😁</p>
-                        <p class="activity-item">speler B 🤣</p>
-                        <p class="activity-item">speler C 🤣</p>
-                        <p class="activity-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler A 😁</p>
+                        <p class="activity-container-item">speler B 🤣</p>
+                        <p class="activity-container-item">speler C 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
                       </div>
                     </div>
                     <div class="team-container">
                       <p class="activity-item">Team B 😂</p>
                       <div class="activity-container">
-                        <p class="activity-item">speler A 😁</p>
-                        <p class="activity-item">speler B 🤣</p>
-                        <p class="activity-item">speler C 🤣</p>
-                        <p class="activity-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler A 😁</p>
+                        <p class="activity-container-item">speler B 🤣</p>
+                        <p class="activity-container-item">speler C 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
                       </div>
                     </div>
                     <div class="team-container">
                       <p class="activity-item">Team B 😂</p>
                       <div class="activity-container">
-                        <p class="activity-item">speler A 😁</p>
-                        <p class="activity-item">speler B 🤣</p>
-                        <p class="activity-item">speler C 🤣</p>
-                        <p class="activity-item">speler D 🤣</p>
+                        <p class="activity-container-item">speler A 😁</p>
+                        <p class="activity-container-item">speler B 🤣</p>
+                        <p class="activity-container-item">speler C 🤣</p>
+                        <p class="activity-container-item">speler D 🤣</p>
                       </div>
                     </div>
                   </div>
@@ -386,21 +395,35 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.teams-ocntainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-.team-container {
+.teams-container {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  & p {
-    display: inline-block;
-  }
-  & div {
+}
+
+.team-container {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-4);
+  align-items: stretch;
+  padding-bottom: var(--space-4);
+
+  & > p {
+    flex-shrink: 0;
     display: flex;
+  }
+
+  & .activity-container {
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
+    flex: 1;
+
+    & p {
+      flex: 1 1 calc(45%);
+      min-width: 120px;
+      box-sizing: border-box;
+    }
   }
 }
 .main-container {
@@ -409,7 +432,7 @@ onUnmounted(() => {
   align-items: center;
 }
 
-h3 {
+h2 {
   & span {
     color: var(--blue-100);
   }
@@ -518,17 +541,17 @@ h4 {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
-
-  &P {
-    padding: var(--space-4);
-    border: 1px solid var(--black-100);
-    border-radius: var(--radius-M);
-  }
 }
-
 .activity-item {
   padding: var(--space-4);
   border: 1px solid var(--blue-100);
+  border-radius: var(--radius-M);
+  width: fit-content;
+  background-color: var(--blue-20);
+}
+.activity-container-item {
+  padding: var(--space-4);
+  border: 1px solid var(--black-40);
   border-radius: var(--radius-M);
   width: fit-content;
 }
