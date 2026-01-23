@@ -70,6 +70,11 @@ const router = createRouter({
       path: '/session/:id',
       name: 'SessionOverview',
       component: () => import('@/views/SessionOverview.vue')
+    },
+    {
+      path: '/game/:id',
+      name: 'GameOverview',
+      component: () => import('@/views/GameOverview.vue')
     }
   ],
 });

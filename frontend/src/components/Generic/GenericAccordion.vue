@@ -95,8 +95,7 @@ const toggleAccordion = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-5) var(--space-6);
-  background-color: var(--white);
+  padding: var(--space-3) var(--space-2);
   cursor: pointer;
   transition: background-color 0.2s;
   user-select: none;
