@@ -20,19 +20,15 @@
     async function doShutdown() {
         if (!confirm('Weet je het zeker? Hiermee wordt de Raspberry Pi uitgeschakeld.')) return;
 
-        const secret = prompt('Voer admin secret in om uit te schakelen:');
-        if (!secret) return;
-
+        // No-admin-secret mode: send shutdown request without prompting for a password.
         setBusy(true);
         try {
-            const res = await fetch('/api/v1/system/shutdown', {
-                method: 'POST',
-                headers: {
-                    'X-Admin-Secret': secret
-                }
+            const backend = `${location.protocol}//${location.hostname}:8000`;
+            const res = await fetch(`${backend}/api/v1/system/shutdown`, {
+                method: 'POST'
             });
 
-            if (res.status === 202) {
+            if (res.status === 202 || res.status === 200) {
                 alert('Shutdown gestart. De Raspberry Pi zal nu afsluiten.');
                 // Keep the UI in disabled state
             } else if (res.status === 403) {
