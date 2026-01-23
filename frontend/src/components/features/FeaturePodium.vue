@@ -5,21 +5,24 @@
       title="Lukas"
       :emoji="selectedEmoji"
       :score="18"
-      class="podium-second"
+      class="podium-second animate-podium-item"
+      style="animation-delay: 0.4s"
     />
     <FeaturePodiumItem
       :position="1"
       title="Abdullah"
       :emoji="selectedEmoji"
       :score="20"
-      class="podium-first"
+      class="podium-first animate-podium-item"
+      style="animation-delay: 0.8s"
     />
     <FeaturePodiumItem
       :position="3"
       title="Maarten"
       :emoji="selectedEmoji"
       :score="17"
-      class="podium-third"
+      class="podium-third animate-podium-item"
+      style="animation-delay: 0s"
     />
   </div>
 </template>
@@ -43,15 +46,32 @@ defineProps({
   align-items: flex-end;
 }
 
+/* Podium Item Animation */
+.animate-podium-item {
+  opacity: 0;
+  animation: podium-rise 0.6s ease-out forwards;
+}
+
+@keyframes podium-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(150px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(var(--final-position));
+  }
+}
+
 .podium-first {
-  transform: translateY(calc(var(--space-5) * -2));
+  --final-position: calc(var(--space-5) * -2);
 }
 
 .podium-second {
-  transform: translateY(0);
+  --final-position: 0px;
 }
 
 .podium-third {
-  transform: translateY(var(--space-7));
+  --final-position: var(--space-7);
 }
 </style>
