@@ -6,11 +6,11 @@
         <h2><span>Sessie</span> overzicht</h2>
         <div class="session-overview-head">
           <div class="session-overview-head-content">
-            <p><strong>Sessie naam:</strong></p>
+            <h4 class="stap4-subtitle">Sessie naam:</h4>
             <P class="text">Team Building Dag 2025</P>
           </div>
           <div class="session-overview-head-content">
-            <p><strong>Aantal rondes per game:</strong></p>
+            <h4 class="stap4-subtitle">Aantal rondes per game:</h4>
             <p class="text">3</p>
           </div>
         </div>
@@ -19,19 +19,56 @@
           <div>
             <h4 class="stap4-subtitle">Activiteiten:</h4>
             <div class="activity-container">
-              <p class="activity-item">Voetbal ⚽️</p>
-              <p class="activity-item">Basketbal 🏀</p>
-              <p class="activity-item">Tennis 🎾</p>
+              <p class="activity-container-item">Voetbal ⚽️</p>
+              <p class="activity-container-item">Basketbal 🏀</p>
+              <p class="activity-container-item">Tennis 🎾</p>
             </div>
           </div>
           <div>
             <h4 class="stap4-subtitle">Deelnemers:</h4>
             <div class="teams-container">
               <div class="team-container">
-                <p class="activity-item">Team A 😑</p>
+                <p class="activity-item">Team A😑</p>
+                <div class="activity-container">
+                  <p class="activity-container-item">speler A 😁</p>
+                  <p class="activity-container-item">speler Bart 🤣</p>
+                  <p class="activity-container-item">speler Cedrick 🤣</p>
+                  <p class="activity-container-item">speler Dylen 🤣</p>
+                  <p class="activity-container-item">speler Dylanorenzo 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                </div>
               </div>
               <div class="team-container">
                 <p class="activity-item">Team B 😂</p>
+                <div class="activity-container">
+                  <p class="activity-container-item">speler A 😁</p>
+                  <p class="activity-container-item">speler B 🤣</p>
+                  <p class="activity-container-item">speler C 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                </div>
+              </div>
+              <div class="team-container">
+                <p class="activity-item">Team B 😂</p>
+                <div class="activity-container">
+                  <p class="activity-container-item">speler A 😁</p>
+                  <p class="activity-container-item">speler B 🤣</p>
+                  <p class="activity-container-item">speler C 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                </div>
+              </div>
+              <div class="team-container">
+                <p class="activity-item">Team B 😂</p>
+                <div class="activity-container">
+                  <p class="activity-container-item">speler A 😁</p>
+                  <p class="activity-container-item">speler B 🤣</p>
+                  <p class="activity-container-item">speler C 🤣</p>
+                  <p class="activity-container-item">speler D 🤣</p>
+                </div>
               </div>
             </div>
           </div>
@@ -83,20 +120,34 @@ const back = () => {
 
 .teams-container {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.team-container {
+  display: flex;
   flex-direction: row;
   gap: var(--space-4);
-  & p {
-    display: inline-block;
-  }
-  & div {
+  align-items: stretch;
+  padding-bottom: var(--space-4);
+
+  & > p {
+    flex-shrink: 0;
     display: flex;
-    gap: var(--space-3);
   }
-}
-.main-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+
+  & .activity-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    flex: 1;
+
+    & p {
+      flex: 1 1 calc(45%);
+      min-width: 120px;
+      box-sizing: border-box;
+    }
+  }
 }
 
 h2 {
@@ -106,54 +157,17 @@ h2 {
   margin-bottom: var(--space-6);
 }
 
-.layout-page-new-session {
-  width: 100%;
-  height: 100%;
-}
-
-.section-teams-toevoegen {
-  margin-bottom: var(--space-5);
-}
-
-.step-content {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: calc(100vh - 10.5rem);
-  /* padding-bottom: var(--space-8); */
-}
-
-.step-content--step1 {
-  height: calc(100vh - 12rem);
-}
 .button-group {
   display: flex;
   gap: var(--space-6);
   margin-top: 1.5rem;
   margin-bottom: 0.7rem;
 }
-.button-group--step1 {
-  justify-content: flex-end;
-}
 
 .button-back-container {
   /* min-height: 2rem;  */
   display: flex;
   align-items: center;
-}
-
-.checkbox-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  overflow-y: auto;
-  max-height: calc(100vh - 30rem);
-  padding: 0 var(--space-4) 0 0;
-  border: 1px solid var(--black-20, #e0e0e0);
-}
-
-.checkbox-list-teams {
-  max-height: calc(100vh - 39rem);
 }
 
 /* Custom scrollbar styling */
@@ -180,67 +194,27 @@ h2 {
   scrollbar-width: thin;
   scrollbar-color: var(--blue-40, #a3d6f6) var(--black-20, #e0e0e0);
 }
-
-.section-new-activity {
-  margin-bottom: var(--space-5);
-}
-
-.input-stap-3 {
-  display: flex;
-  gap: var(--space-5);
-  align-items: end;
-}
-
-.input-stap-3 :deep(.generic-input:nth-child(2)) {
-  flex: 0 0 25%;
-}
-
-.session-name-overview {
-  font-size: var(--font-size-M);
-  font-size: 1.25rem;
-  margin-bottom: 2rem;
-}
-
 .activity-container {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
-
-  &P {
-    padding: var(--space-4);
-    border: 1px solid var(--black-100);
-    border-radius: var(--radius-M);
-  }
 }
-
 .activity-item {
   padding: var(--space-4);
   border: 1px solid var(--blue-100);
   border-radius: var(--radius-M);
   width: fit-content;
+  background-color: var(--blue-20);
 }
-
-/* @media (width >= 64rem) {
-  .checkbox-list {
-    max-height: 25rem;
-  }
-} */
-
-.stap-3-input-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+.activity-container-item {
+  padding: var(--space-4);
+  border: 1px solid var(--black-40);
+  border-radius: var(--radius-M);
+  width: fit-content;
 }
-
-.button-add-team {
-  margin-top: var(--space-5);
-}
-
 .stap4-subtitle {
   font-size: var(--font-size-L);
-  margin-bottom: var(--space-3);
 }
-
 .section-overview-content {
   display: flex;
   flex-direction: column;
@@ -265,15 +239,5 @@ h2 {
 
 .section-overview-content::-webkit-scrollbar-thumb:hover {
   background: var(--blue-100);
-}
-
-@media (width <= 26.5625rem) {
-  .checkbox-list-teams {
-    max-height: calc(100vh - 10rem);
-  }
-
-  .checkbox-list {
-    max-height: calc(100vh - 32rem);
-  }
 }
 </style>

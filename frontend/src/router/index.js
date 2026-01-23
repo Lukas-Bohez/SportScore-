@@ -67,10 +67,10 @@ const router = createRouter({
       component: () => import("../views/SessionManagment.vue"),
     },
     {
-      path: "/sessionoverview",
-      name: "sessionoverview",
-      component: () => import("../views/SessionOverview.vue"),
-    },
+      path: '/session/:id',
+      name: 'SessionOverview',
+      component: () => import('@/views/SessionOverview.vue')
+    }
   ],
 });
 
