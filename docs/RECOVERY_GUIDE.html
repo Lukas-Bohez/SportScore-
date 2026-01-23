@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SportScore — Herstelgids</title>
+  <link rel="stylesheet" href="recovery.css">
+</head>
+<body>
+
+  <div class="no-print">
+    <a href="javascript:window.print()" class="btn">Handleiding Afdrukken</a>
+  </div>
+
+  <div class="page">
+    <header>
+      <div>
+        <h1>SportScore</h1>
+        <div class="subtitle">Herstelgids</div>
+      </div>
+    </header>
+
+    <div class="section">
+      <h2><span class="step-num">1</span> Inleiding</h2>
+      <p>Deze gids helpt je bij het herstellen van SportScore als de Raspberry Pi of SD-kaart beschadigd is. Zorg ervoor dat je een backup hebt van belangrijke gegevens voordat je begint.</p>
+      <div class="highlight-box">
+        <strong>GitHub Repository:</strong> <a href="https://github.com/Lukas-Bohez/SportScore-" target="_blank">https://github.com/Lukas-Bohez/SportScore-</a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="step-num">2</span> Benodigdheden</h2>
+      <ul class="steps">
+        <li>Een nieuwe of lege SD-kaart (minimaal 16GB, Class 10).</li>
+        <li>Raspberry Pi Imager software (download van <a href="https://www.raspberrypi.com/software/" target="_blank">raspberrypi.com</a>).</li>
+        <li>Een computer met SD-kaartlezer.</li>
+        <li>Internetverbinding voor downloads.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2><span class="step-num">3</span> SD-Kaart Flasheren</h2>
+      <ol class="steps">
+        <li><strong>Raspberry Pi Imager Downloaden:</strong> Download en installeer Raspberry Pi Imager van <a href="https://www.raspberrypi.com/software/" target="_blank">raspberrypi.com/software</a>.</li>
+        <li><strong>OS Selecteren:</strong> Kies "Raspberry Pi OS (other)" > "Raspberry Pi OS Lite (64-bit)". Selecteer je SD-kaart en klik op "Write". Wacht tot het flashen klaar is.</li>
+        <li><strong>SSH Inschakelen:</strong> Na flashen, plaats de SD-kaart in je computer. In de boot-partitie, maak een leeg bestand genaamd 'ssh' (geen extensie).</li>
+        <li><strong>WiFi Configureren:</strong> Maak een bestand 'wpa_supplicant.conf' in de boot-partitie met de volgende inhoud:</li>
+      </ol>
+      <div class="code-block">
+        <pre>country=BE
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="jouw_wifi_ssid"
+    psk="jouw_wifi_wachtwoord"
+}</pre>
+      </div>
+      <p>Vervang 'jouw_wifi_ssid' en 'jouw_wifi_wachtwoord' met je eigen WiFi-gegevens. Verwijder de SD-kaart veilig.</p>
+    </div>
+
+    <div class="section page-break-before">
+      <h2><span class="step-num">4</span> Raspberry Pi Opstarten</h2>
+      <ol class="steps">
+        <li><strong>SD-Kaart Invoegen:</strong> Plaats de geflashte SD-kaart in de Raspberry Pi en sluit stroom aan.</li>
+        <li><strong>IP-Adres Vinden:</strong> Gebruik je router of een tool zoals 'arp -a' om het IP-adres van de Pi te vinden (meestal 192.168.x.x).</li>
+        <li><strong>SSH Verbinden:</strong> Open een terminal en verbind via SSH: <code>ssh pi@&lt;ip-adres&gt;</code> (standaard wachtwoord: raspberry).</li>
+        <li><strong>Updates Uitvoeren:</strong> Voer de volgende commando's uit:</li>
+      </ol>
+      <div class="code-block">
+        <pre>sudo apt update
+sudo apt upgrade -y</pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="step-num">5</span> SportScore Installeren</h2>
+      <ol class="steps">
+        <li><strong>Repository Clonen:</strong> Clone de GitHub repository:</li>
+      </ol>
+      <div class="code-block">
+        <pre>git clone https://github.com/Lukas-Bohez/SportScore-.git
+cd SportScore-</pre>
+      </div>
+      <ol class="steps" start="2">
+        <li><strong>Backend Installeren:</strong> Ga naar de backend map en installeer afhankelijkheden:</li>
+      </ol>
+      <div class="code-block">
+        <pre>cd backend
+pip install -r requirements.txt</pre>
+      </div>
+      <ol class="steps" start="3">
+        <li><strong>Database Initialiseren:</strong> Voer het database script uit:</li>
+      </ol>
+      <div class="code-block">
+        <pre>python init_database.py</pre>
+      </div>
+      <ol class="steps" start="4">
+        <li><strong>Frontend Bouwen:</strong> Ga naar de frontend map en bouw de app:</li>
+      </ol>
+      <div class="code-block">
+        <pre>cd ../frontend
+npm install
+npm run build</pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="step-num">6</span> Hotspot en Services Configureren</h2>
+      <ol class="steps">
+        <li><strong>Hostapd en Dnsmasq Installeren:</strong> Installeer de benodigde pakketten:</li>
+      </ol>
+      <div class="code-block">
+        <pre>sudo apt install hostapd dnsmasq -y</pre>
+      </div>
+      <ol class="steps" start="2">
+        <li><strong>Hostapd Configureren:</strong> Bewerk /etc/hostapd/hostapd.conf (maak aan indien nodig):</li>
+      </ol>
+      <div class="code-block">
+        <pre>interface=wlan0
+driver=nl80211
+ssid=pihotspot
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=raspberry
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP</pre>
+      </div>
+      <ol class="steps" start="3">
+        <li><strong>Dnsmasq Configureren:</strong> Bewerk /etc/dnsmasq.conf:</li>
+      </ol>
+      <div class="code-block">
+        <pre>interface=wlan0
+dhcp-range=10.42.0.10,10.42.0.50,255.255.255.0,24h</pre>
+      </div>
+      <ol class="steps" start="4">
+        <li><strong>Statisch IP:</strong> Bewerk /etc/dhcpcd.conf om een statisch IP in te stellen voor wlan0:</li>
+      </ol>
+      <div class="code-block">
+        <pre>interface wlan0
+    static ip_address=10.42.0.1/24
+    nohook wpa_supplicant</pre>
+      </div>
+      <ol class="steps" start="5">
+        <li><strong>Services Starten:</strong> Start de services en backend:</li>
+      </ol>
+      <div class="code-block">
+        <pre>sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+sudo systemctl start hostapd
+sudo systemctl enable dnsmasq
+sudo systemctl start dnsmasq
+cd SportScore-/backend
+python app.py &
+cd ../frontend/dist
+python -m http.server 3000 &</pre>
+      </div>
+      <ol class="steps" start="6">
+        <li><strong>Autostart:</strong> Gebruik de launch scripts in de repository voor automatische opstart bij boot.</li>
+      </ol>
+      <div class="highlight-box" style="background: #fef3c7; border-left-color: #f59e0b; color: #92400e;">
+        <strong>Tip:</strong> Raadpleeg de README.md en scripts in de repository voor volledige configuratie. Test de hotspot door te verbinden met 'pihotspot' en ga naar http://10.42.0.1.
+      </div>
+    </div>
+
+    <footer>
+      SportScore Herstelgids &copy; 2026 — sportscore.local
+    </footer>
+  </div>
+
+</body>
+</html>
