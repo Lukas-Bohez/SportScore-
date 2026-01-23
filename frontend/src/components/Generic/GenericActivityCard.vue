@@ -6,7 +6,7 @@
   >
     <div class="activity-status-indicator"></div>
     <div class="activity-card-content">
-      <h4 class="activity-card-title">{{ title }}</h4>
+      <h4 class="activity-card-title">{{ truncatedTitle }}</h4>
       <p class="activity-card-info">{{ activitiesCount }} Activiteiten</p>
       <p class="activity-card-info">{{ teamsCount }} teams</p>
     </div>
@@ -14,7 +14,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue";
+
+const props = defineProps({
   title: {
     type: String,
     required: true,
@@ -34,19 +36,31 @@ defineProps({
 });
 
 defineEmits(["select"]);
+
+const truncatedTitle = computed(() => {
+  if (props.title.length > 20) {
+    return props.title.substring(0, 20) + "...";
+  }
+  return props.title;
+});
 </script>
 
 <style scoped>
 .activity-card {
   position: relative;
-  display: inline-block;
-  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* max-width: 13rem; */
+  min-width: 13rem;
+  min-height: 10rem;
   padding: var(--space-6) var(--space-5);
   border: 1px solid var(--blue-100);
   border-radius: var(--radius-L);
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: var(--white);
+  box-sizing: border-box;
 }
 
 .activity-card:hover {
@@ -71,6 +85,9 @@ defineEmits(["select"]);
 
 .activity-card-content {
   padding-left: var(--space-4);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .activity-card-title {
