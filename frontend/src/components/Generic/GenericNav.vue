@@ -40,11 +40,11 @@ export default {
       <Swords :size="22" class="icon" />
       <span class="caption">Geschiedenis</span>
     </RouterLink>
-
+    <!-- 
     <RouterLink to="/actief" class="generic-nav-item">
       <MonitorCheck :size="22" class="icon" />
       <span class="caption">Actief</span>
-    </RouterLink>
+    </RouterLink> -->
   </nav>
 </template>
 
@@ -61,6 +61,7 @@ export default {
   padding: 0 var(--space-6);
 }
 .generic-nav-item {
+  width: 4.375rem;
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -78,7 +78,7 @@ export default {
 <style scoped>
 .feature-counter {
   position: relative;
-  width: 100%;
+  /* width: 100%; */
   display: flex;
   align-items: center;
   gap: var(--space-3);
