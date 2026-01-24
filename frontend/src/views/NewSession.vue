@@ -6,15 +6,32 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import GenericStepBar from "@/components/Generic/GenericStepBar.vue";
 import GenericInput from "@/components/Generic/GenericInput.vue";
-import { ref, computed, onMounted, onUnmounted, h } from "vue";
+import { ref, computed, onMounted, onUnmounted, h, watch } from "vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericCheckbox from "@/components/Generic/GenericCheckbox.vue";
 import FeaturePicker from "@/components/features/FeaturePicker.vue";
 import { ElNotification } from "element-plus";
 import GenericModel from "@/components/Generic/GenericModel.vue";
+import { useActivities, useSessions } from "@/composables";
+import { useRoute } from "vue-router";
 
 const modalRef = ref(null);
 const successModalRef = ref(null);
+const route = useRoute();
+
+// Session data
+const sessionName = ref("");
+const sessionGameType = ref("custom");
+const sessionSportType = ref("custom");
+const sessionScoringMode = ref("team");
+const sessionTotalRounds = ref(1);
+const sessionTimeLimit = ref(null);
+const sessionShowPlayers = ref(false);
+
+// Validation errors
+const sessionNameError = ref("");
+const sessionGameTypeError = ref("");
+const sessionSportTypeError = ref("");
 
 const openSuccessModal = () => {
   successModalRef.value.open();
@@ -53,41 +70,68 @@ const router = useRouter();
 const step = ref(1);
 const screenWidth = ref(window.innerWidth);
 
-// Activities data with individual checked state
-const activities = ref([
-  { id: 1, label: "Rood ", checked: false },
-  { id: 2, label: "Rood ", checked: false },
-  { id: 3, label: "Rood ", checked: false },
-  { id: 4, label: "Rood ", checked: false },
-  { id: 5, label: "Rood ", checked: false },
-  { id: 6, label: "Rood ", checked: false },
-  { id: 7, label: "Rood ", checked: false },
-  { id: 8, label: "Rood ", checked: false },
-]);
+// Use composables
+const {
+  activities: apiActivities,
+  fetchActivities,
+  deleteActivity,
+  loading,
+} = useActivities();
+
+const { createSession, loading: sessionLoading } = useSessions();
+
+// Transform API activities to checkbox format
+const activities = computed(() => {
+  return apiActivities.value.map((activity) => ({
+    id: activity.id,
+    label: activity.name,
+    checked: selectedActivities.value.includes(activity.id),
+  }));
+});
+
+// Track selected activities
+const selectedActivities = ref([]);
 
 const teams = ref([
-  { id: 1, label: "Rood ", checked: false },
-  { id: 2, label: "Rood ", checked: false },
-  { id: 3, label: "Rood ", checked: false },
-  { id: 4, label: "Rood ", checked: false },
-  { id: 5, label: "Rood ", checked: false },
-  { id: 6, label: "Rood ", checked: false },
-  { id: 7, label: "Rood ", checked: false },
-  { id: 8, label: "Rood ", checked: false },
+  { id: 1, label: "Team Rood 🔴", checked: false },
+  { id: 2, label: "Team Blauw 🔵", checked: false },
+  { id: 3, label: "Team Groen 🟢", checked: false },
+  { id: 4, label: "Team Geel 🟡", checked: false },
+  { id: 5, label: "Team Oranje 🟠", checked: false },
+  { id: 6, label: "Team Paars 🟣", checked: false },
+  { id: 7, label: "Team Zwart ⚫", checked: false },
+  { id: 8, label: "Team Wit ⚪", checked: false },
 ]);
 
 function next() {
+  // Validate based on current step
+  if (step.value === 1) {
+    // Validate session name
+    sessionNameError.value = "";
+    if (!sessionName.value.trim()) {
+      sessionNameError.value = "Sessie naam is verplicht";
+      return;
+    }
+  }
+
   step.value++;
 }
 
 function back() {
+  // Clear validation errors when going back
+  sessionNameError.value = "";
+  sessionGameTypeError.value = "";
+  sessionSportTypeError.value = "";
   step.value--;
 }
 
 function updateActivityChecked(id, newValue) {
-  const activity = activities.value.find((a) => a.id === id);
-  if (activity) {
-    activity.checked = newValue;
+  if (newValue) {
+    selectedActivities.value.push(id);
+  } else {
+    selectedActivities.value = selectedActivities.value.filter(
+      (actId) => actId !== id,
+    );
   }
 }
 
@@ -98,19 +142,98 @@ function updateTeamChecked(id, newValue) {
   }
 }
 
+// Fetch activities on mount
+onMounted(async () => {
+  try {
+    await fetchActivities();
+
+    // Check if we just created a new activity
+    if (route.query.newActivityId) {
+      const newActivityId = parseInt(route.query.newActivityId);
+      if (!selectedActivities.value.includes(newActivityId)) {
+        selectedActivities.value.push(newActivityId);
+      }
+
+      // Clear the query parameter
+      router.replace({ path: route.path, query: {} });
+    }
+  } catch (e) {
+    ElNotification({
+      title: "Fout",
+      message: "Kon activiteiten niet ophalen",
+      type: "error",
+    });
+  }
+});
+
+// Watch for route query changes (when coming back from NewActivity)
+watch(
+  () => route.query.newActivityId,
+  async (newActivityId) => {
+    if (newActivityId) {
+      // Refresh activities list
+      await fetchActivities();
+
+      // Auto-select the new activity (without showing notification since NewActivity already showed one)
+      const activityId = parseInt(newActivityId);
+      if (!selectedActivities.value.includes(activityId)) {
+        selectedActivities.value.push(activityId);
+      }
+
+      // Clear the query parameter
+      router.replace({ path: route.path, query: {} });
+    }
+  },
+);
+
+// Watch for route changes (detect when coming back from edit)
+watch(
+  () => route.path,
+  async (newPath, oldPath) => {
+    // If we're returning to /nieuwesessie from /nieuwesessie/nieuwe-activiteit
+    if (
+      oldPath?.includes("/nieuwe-activiteit") &&
+      newPath === "/nieuwesessie"
+    ) {
+      // Refresh activities list to show any updates
+      await fetchActivities();
+    }
+  },
+);
+
 function handleEdit(id) {
   console.log("Edit clicked for activity:", id);
-  // Navigate to edit page - je kan dit later aanpassen naar je edit route
-  // Bijvoorbeeld: router.push(`/nieuwesessie/edit-activiteit/${id}`);
+  // Navigate to edit page
   router.push({
     path: "/nieuwesessie/nieuwe-activiteit",
     query: { edit: id },
   });
 }
 
-function handleDelete(id) {
-  console.log("Delete clicked for activity:", id);
-  // Implement delete logic here
+async function handleDelete(id) {
+  try {
+    await deleteActivity(id);
+
+    ElNotification({
+      title: "Succes!",
+      message: "Activiteit is verwijderd",
+      type: "success",
+    });
+
+    // Remove from selected activities if it was selected
+    selectedActivities.value = selectedActivities.value.filter(
+      (actId) => actId !== id,
+    );
+
+    // Refresh activities list
+    await fetchActivities();
+  } catch (e) {
+    ElNotification({
+      title: "Fout",
+      message: "Kon activiteit niet verwijderen",
+      type: "error",
+    });
+  }
 }
 
 // Function to truncate label text based on screen size
@@ -138,6 +261,69 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("resize", updateScreenWidth);
 });
+
+// Save session with selected activities
+async function saveSession() {
+  // Clear previous errors
+  sessionNameError.value = "";
+  sessionGameTypeError.value = "";
+  sessionSportTypeError.value = "";
+
+  // Validate all required fields
+  let hasError = false;
+
+  if (!sessionName.value.trim()) {
+    sessionNameError.value = "Sessie naam is verplicht";
+    hasError = true;
+  }
+
+  if (!sessionGameType.value || sessionGameType.value === "custom") {
+    sessionGameTypeError.value = "Game type is verplicht";
+    hasError = true;
+  }
+
+  if (!sessionSportType.value || sessionSportType.value === "custom") {
+    sessionSportTypeError.value = "Sport type is verplicht";
+    hasError = true;
+  }
+
+  if (hasError) {
+    return;
+  }
+
+  if (selectedActivities.value.length === 0) {
+    ElNotification({
+      title: "Waarschuwing",
+      message: "Geen activiteiten geselecteerd",
+      type: "warning",
+    });
+  }
+
+  try {
+    // Create session with selected activities
+    await createSession(
+      {
+        name: sessionName.value,
+        game_type: sessionGameType.value,
+        sport_type: sessionSportType.value,
+        scoring_mode: sessionScoringMode.value,
+        total_rounds: sessionTotalRounds.value,
+        time_limit: sessionTimeLimit.value,
+        show_players: sessionShowPlayers.value,
+      },
+      selectedActivities.value, // Pass selected activity IDs
+    );
+
+    // Open success modal
+    openSuccessModal();
+  } catch (e) {
+    ElNotification({
+      title: "Fout",
+      message: "Kon sessie niet opslaan: " + (e.message || "Onbekende fout"),
+      type: "error",
+    });
+  }
+}
 </script>
 
 <template>
@@ -162,8 +348,10 @@ onUnmounted(() => {
             <div>
               <h3><span>Sessie</span> instellen</h3>
               <GenericInput
+                v-model="sessionName"
                 label="Sessie naam"
                 placeholder="Voer sessie naam in"
+                :error="sessionNameError"
               />
             </div>
             <div class="button-group button-group--step1">
@@ -192,23 +380,28 @@ onUnmounted(() => {
               </div>
               <div>
                 <h4>Of selecteer een bestaande activiteit</h4>
-                <!-- <GenericDropdown
-                  :options="[
-                    { label: 'Activiteit 1', value: 1 },
-                    { label: 'Activiteit 2', value: 2 },
-                    { label: 'Activiteit 3', value: 3 },
-                  ]"
-                  label="Selecteer activiteit"
-                  placeholder="Kies een activiteit"
-                /> -->
-                <div class="checkbox-list">
+
+                <!-- Loading state -->
+                <div v-if="loading" class="loading-message">
+                  <p>Activiteiten laden...</p>
+                </div>
+
+                <!-- Empty state -->
+                <div v-else-if="activities.length === 0" class="empty-message">
+                  <p>Geen activiteiten gevonden. Maak er een aan!</p>
+                </div>
+
+                <!-- Activities list -->
+                <div v-else class="checkbox-list">
                   <GenericCheckbox
                     v-for="activity in activities"
                     :key="activity.id"
                     :label="truncateLabel(activity.label)"
-                    :checked="activity.checked"
+                    :modelValue="activity.checked"
                     deleteMessage="Bent u zeker dat u deze activiteit wilt verwijderen?"
-                    @update:checked="updateActivityChecked(activity.id, $event)"
+                    @update:modelValue="
+                      updateActivityChecked(activity.id, $event)
+                    "
                     @edit="handleEdit(activity.id)"
                     @delete="handleDelete(activity.id)"
                     :id="`checkbox-${activity.id}`"
@@ -294,86 +487,68 @@ onUnmounted(() => {
             <div>
               <h2><span>Sessie</span> overzicht</h2>
               <h4 class="stap4-subtitle">
-                Sessie naam: <span>Team Building Dag 2025</span>
+                Sessie naam: <span>{{ sessionName || "Geen naam" }}</span>
               </h4>
               <div class="section-overview-content">
                 <div>
                   <h4 class="stap4-subtitle">Activiteiten:</h4>
                   <div class="activity-container">
-                    <p class="activity-container-item">Voetbal ⚽️</p>
-                    <p class="activity-container-item">Basketbal 🏀</p>
-                    <p class="activity-container-item">Tennis 🎾</p>
+                    <template v-if="selectedActivities.length > 0">
+                      <p
+                        v-for="activityId in selectedActivities"
+                        :key="activityId"
+                        class="activity-container-item"
+                      >
+                        {{
+                          apiActivities.find((a) => a.id === activityId)
+                            ?.name || "Onbekend"
+                        }}
+                      </p>
+                    </template>
+                    <p v-else class="activity-container-item">
+                      Geen activiteiten geselecteerd
+                    </p>
                   </div>
                 </div>
                 <div>
                   <h4 class="stap4-subtitle">Deelnemers:</h4>
                   <div class="teams-container">
-                    <div class="team-container">
-                      <p class="activity-item">Team A😑</p>
+                    <div
+                      v-for="team in teams.filter((t) => t.checked)"
+                      :key="team.id"
+                      class="team-container"
+                    >
+                      <p class="activity-item">{{ team.label }}</p>
                       <div class="activity-container">
-                        <p class="activity-container-item">speler A 😁</p>
-                        <p class="activity-container-item">speler Bart 🤣</p>
-                        <p class="activity-container-item">speler Cedrick 🤣</p>
-                        <p class="activity-container-item">speler Dylen 🤣</p>
                         <p class="activity-container-item">
-                          speler Dylanorenzo 🤣
+                          Nog geen spelers toegevoegd
                         </p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
                       </div>
                     </div>
-                    <div class="team-container">
-                      <p class="activity-item">Team B 😂</p>
-                      <div class="activity-container">
-                        <p class="activity-container-item">speler A 😁</p>
-                        <p class="activity-container-item">speler B 🤣</p>
-                        <p class="activity-container-item">speler C 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                      </div>
-                    </div>
-                    <div class="team-container">
-                      <p class="activity-item">Team B 😂</p>
-                      <div class="activity-container">
-                        <p class="activity-container-item">speler A 😁</p>
-                        <p class="activity-container-item">speler B 🤣</p>
-                        <p class="activity-container-item">speler C 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                      </div>
-                    </div>
-                    <div class="team-container">
-                      <p class="activity-item">Team B 😂</p>
-                      <div class="activity-container">
-                        <p class="activity-container-item">speler A 😁</p>
-                        <p class="activity-container-item">speler B 🤣</p>
-                        <p class="activity-container-item">speler C 🤣</p>
-                        <p class="activity-container-item">speler D 🤣</p>
-                      </div>
-                    </div>
+                    <p
+                      v-if="!teams.some((t) => t.checked)"
+                      class="activity-container-item"
+                    >
+                      Geen teams geselecteerd
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
             <div class="button-group">
-              <GenericButton variant="secondary" @click="back"
+              <GenericButton
+                variant="secondary"
+                @click="back"
+                :disabled="sessionLoading"
                 ><ChevronLeft /> Vorige</GenericButton
               >
-              <GenericButton @click="openSuccessModal" variant="primary"
-                >Opslaan</GenericButton
+              <GenericButton
+                @click="saveSession"
+                variant="primary"
+                :disabled="sessionLoading"
               >
-              <!-- <GenericModel
-                ref="successModalRef"
-                icon="circle-check"
-                iconColor="var(--green-100)"
-                message="Sessie is opgeslaan! Wilt u de sessie starten?"
-                confirmText="Ja"
-                :showCancel="false"
-                @confirm="handleConfirm"
-                @cancel="handleCancel"
-              /> -->
+                {{ sessionLoading ? "Bezig..." : "Opslaan" }}
+              </GenericButton>
               <GenericModel
                 ref="successModalRef"
                 icon="circle-check"
@@ -432,7 +607,7 @@ onUnmounted(() => {
   align-items: center;
 }
 
-h2 {
+h3 {
   & span {
     color: var(--blue-100);
   }
@@ -518,7 +693,7 @@ h4 {
 }
 
 .section-new-activity {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-7);
 }
 
 .input-stap-3 {
@@ -601,6 +776,19 @@ h4 {
 
 .section-overview-content::-webkit-scrollbar-thumb:hover {
   background: var(--blue-100);
+}
+
+.loading-message,
+.empty-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--black-70);
+  border: 1px solid var(--black-20);
+  border-radius: var(--radius-L);
+  min-height: 10rem;
 }
 
 @media (width <= 26.5625rem) {

@@ -13,6 +13,7 @@
     >
       <div
         class="input-base generic-input__field generic-dropdown__select"
+        :class="{ 'generic-input__field--error': error }"
         ref="triggerRef"
       >
         <span class="generic-dropdown__selected">
@@ -37,6 +38,7 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <span v-if="error" class="generic-input__error">{{ error }}</span>
   </div>
 </template>
 
@@ -68,6 +70,10 @@ export default {
     },
     modelValue: {
       type: [String, Number],
+      default: "",
+    },
+    error: {
+      type: String,
       default: "",
     },
   },
@@ -127,6 +133,16 @@ export default {
   cursor: pointer;
   width: 100%;
   user-select: none;
+}
+
+.generic-input__field--error {
+  border-color: var(--red-100, #ff0000);
+}
+
+.generic-input__error {
+  color: var(--red-100, #ff0000);
+  font-size: 0.875rem;
+  margin-top: -0.5rem;
 }
 
 .generic-dropdown__selected {

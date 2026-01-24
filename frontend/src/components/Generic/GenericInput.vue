@@ -3,11 +3,13 @@
     <label v-if="label" class="text">{{ label }}</label>
     <input
       class="input-base generic-input__field text"
+      :class="{ 'generic-input__field--error': error }"
       :type="type"
       :placeholder="placeholder"
       :value="modelValue"
       @input="$emit('update:modelValue', $event.target.value)"
     />
+    <span v-if="error" class="generic-input__error">{{ error }}</span>
   </div>
 </template>
 
@@ -45,6 +47,10 @@ export default {
       type: [String, Number],
       default: "",
     },
+    error: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["update:modelValue"],
 };
@@ -62,6 +68,16 @@ export default {
   width: 100%;
 }
 
+.generic-input__field--error {
+  border-color: var(--red-100, #ff0000);
+}
+
+.generic-input__error {
+  color: var(--red-100, #ff0000);
+  font-size: 0.875rem;
+  margin-top: 0.1rem;
+}
+
 /* Remove spinner arrows from number input */
 .generic-input__field::-webkit-inner-spin-button,
 .generic-input__field::-webkit-outer-spin-button {
@@ -71,5 +87,6 @@ export default {
 
 .generic-input__field[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 </style>

@@ -18,27 +18,25 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import GenericButton from "./GenericButton.vue";
+import { computed } from "vue";
 
-export default {
-  name: "GenericToggle",
-  components: {
-    GenericButton,
+const props = defineProps({
+  modelValue: {
+    type: String,
+    default: "teams",
   },
-  data() {
-    return {
-      activeButton: "teams", // Default actieve knop
-    };
-  },
-  methods: {
-    selectButton(button) {
-      this.activeButton = button;
-      this.$emit("toggle", button);
-    },
-  },
-  emits: ["toggle"],
-};
+});
+
+const emit = defineEmits(["toggle", "update:modelValue"]);
+
+const activeButton = computed(() => props.modelValue);
+
+function selectButton(button) {
+  emit("update:modelValue", button);
+  emit("toggle", button);
+}
 </script>
 
 <style scoped>
