@@ -18,14 +18,14 @@ import { Plus } from "lucide-vue-next";
           <img src="/homevector.svg" alt="home vector" class="home-vector" />
         </div>
         <p>Scoreboard voor team building activiteiten</p>
-        <GenericButton variant="primary">
-          <RouterLink class="router-link" to="/nieuwesessie">
+        <RouterLink class="router-link" to="/nieuwesessie">
+          <GenericButton variant="primary">
             <Plus />
             Nieuwe sessie
-          </RouterLink>
-        </GenericButton>
+          </GenericButton>
+        </RouterLink>
         <div>
-          <RouterLink class="router-link" to="/bigscreen/qrscreen">
+          <!-- <RouterLink class="router-link" to="/bigscreen/qrscreen">
             QR Code Scannen
           </RouterLink>
           <RouterLink class="router-link" to="/bigscreen/countdownscreen">
@@ -39,7 +39,7 @@ import { Plus } from "lucide-vue-next";
           </RouterLink>
           <RouterLink class="router-link" to="/bigscreen/scorescreen">
             ScoreScreen
-          </RouterLink>
+          </RouterLink> -->
         </div>
       </div>
     </div>

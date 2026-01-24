@@ -125,7 +125,7 @@ defineOptions({
 <style scoped>
 .generic-checkbox {
   width: 100%;
-  height: 2.8125rem;
+  min-height: 2.8125rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
