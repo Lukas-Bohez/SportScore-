@@ -10,7 +10,7 @@ Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/%i/.Xauthority
 # Set any extra chromium flags via EXTRA_CHROMIUM_FLAGS
 Environment=EXTRA_CHROMIUM_FLAGS=
-ExecStart=/home/%i/.local/bin/start-kiosk.sh http://localhost/bigscreen/scorescreen
+ExecStart=/home/%i/.local/bin/start-kiosk.sh http://localhost/bigscreen/qrscreen
 Restart=on-failure
 RestartSec=5
 
