@@ -38,7 +38,7 @@ const handleNewSession = () => {
             Nieuwe sessie
           </GenericButton>
         </RouterLink>
-        <div>
+        <!-- <div>
           <RouterLink class="router-link" to="/bigscreen/qrscreen">
             QR Code Scannen
           </RouterLink>
@@ -54,7 +54,7 @@ const handleNewSession = () => {
           <RouterLink class="router-link" to="/bigscreen/scorescreen">
             ScoreScreen
           </RouterLink>
-        </div>
+        </div> -->
       </div>
     </div>
   </div>
