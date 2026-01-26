@@ -8,8 +8,13 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "sync:watch": "chokidar \"dist/**\" -c \"sudo rsync -av --delete dist/ /var/www/sportscore/ && sudo chown -R www-data:www-data /var/www/sportscore/\"",
+    "watch-deploy": "concurrently \"npm:build:watch\" \"npm:sync:watch\"",
+    "link:sportscore": "sh -c \"sudo rm -rf /var/www/sportscore && sudo ln -s \"$(pwd)/dist\" /var/www/sportscore && sudo chown -R www-data:www-data /var/www/sportscore\""
   },
   "dependencies": {
     "element-plus": "^2.13.1",
@@ -22,6 +27,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^8.2.2",
     "vite": "^7.3.0",
     "vite-plugin-vue-devtools": "^8.0.5"
   }

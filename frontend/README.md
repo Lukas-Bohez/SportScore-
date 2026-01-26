@@ -25,11 +25,13 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Compile and Hot-Reload for Development (fast iteration)
 
-```sh
-npm run dev
-```
+- Quick local dev server with HMR: `npm run dev` or `npm run dev:host` (exposes server on the LAN).
+- Serve the exact production `dist` while iterating:
+  1. Build in watch mode: `npm run build:watch`
+  2. Auto-sync builds to the Apache DocumentRoot: `npm run watch-deploy` (requires `sudo` to write `/var/www/sportscore`).
+  3. Or create a symlink so Apache serves `dist` directly: `npm run link:sportscore` (requires `sudo`).
 
 ### Compile and Minify for Production
 

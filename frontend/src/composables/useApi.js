@@ -8,8 +8,18 @@ export function useApi() {
   const loading = ref(false);
   const error = ref(null);
 
-  // Backend URL - pas dit aan als nodig
-  const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  // Backend URL - prefer explicit VITE_API_URL when set; otherwise use relative paths so Vite dev proxy can route '/api' during development
+  const ENV_BASE = import.meta.env.VITE_API_URL;
+  let BASE_URL = '';
+  if (ENV_BASE) {
+    BASE_URL = ENV_BASE.replace(/\/$/, '');
+  } else if (typeof window !== 'undefined' && window.SCOREBOARD_API_BASE) {
+    // Allow a runtime-injected global (useful for static builds served from a different origin)
+    BASE_URL = String(window.SCOREBOARD_API_BASE).replace(/\/$/, '');
+  } else {
+    // Default to empty string (use relative paths) — works with Vite dev proxy or same-origin deployments
+    BASE_URL = '';
+  }
 
   /**
    * Generieke API call functie

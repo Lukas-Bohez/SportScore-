@@ -140,7 +140,7 @@ import { ElNotification } from "element-plus";
 
 const router = useRouter();
 const route = useRoute();
-const { get } = useApi();
+const { get, post, put, del } = useApi();
 
 const session = ref(null);
 const teams = ref([]);
@@ -182,25 +182,7 @@ const confirmDelete = async () => {
     } else {
       // Delete from API
       console.log("🌐 Deleting session from API");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      console.log("📡 Response status:", response.status);
-      console.log("📡 Response ok:", response.ok);
-
-      // Check if the response is ok (status 200-299)
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Server error:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      await del(`/api/v1/sessions/${session.value.id}`);
 
       console.log("✅ Session deleted from API successfully");
     }
@@ -254,29 +236,15 @@ const startSession = async () => {
       console.log("📦 Creating session in API from template...");
 
       // 1. Create session in API with 'active' status
-      const sessionResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: session.value.name,
-            total_rounds: session.value.total_rounds,
-            time_limit: session.value.time_limit,
-            scoring_mode: session.value.scoring_mode,
-            status: "active", // Set as active immediately
-          }),
-        },
-      );
+      const createdSession = await post('/api/v1/sessions', {
+        name: session.value.name,
+        total_rounds: session.value.total_rounds,
+        time_limit: session.value.time_limit,
+        scoring_mode: session.value.scoring_mode,
+        status: 'active', // Set as active immediately
+      });
 
-      if (!sessionResponse.ok) {
-        throw new Error(`HTTP error! status: ${sessionResponse.status}`);
-      }
-
-      const createdSession = await sessionResponse.json();
-      console.log("✅ Session created in API:", createdSession);
+      console.log('✅ Session created in API:', createdSession);
 
       // 2. Create teams and get ID mapping
       const teamIdMapping = {}; // Map localStorage IDs to API IDs
@@ -286,37 +254,22 @@ const startSession = async () => {
           // Create or get existing team
           let apiTeam;
           try {
-            const teamResponse = await fetch(
-              `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  name: team.name,
-                  color: team.color || "#ffffff",
-                  icon: team.icon || "👥",
-                  description: "",
-                }),
-              },
-            );
-
-            if (!teamResponse.ok) {
-              const errorText = await teamResponse.text();
-              // If team exists, fetch it
-              if (errorText.includes("already exists")) {
-                const allTeamsResponse = await fetch(
-                  `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
-                );
-                const allTeamsData = await allTeamsResponse.json();
-                const allTeams = allTeamsData.teams || allTeamsData;
+            try {
+              apiTeam = await post('/api/v1/teams', {
+                name: team.name,
+                color: team.color || '#ffffff',
+                icon: team.icon || '👥',
+                description: '',
+              });
+            } catch (err) {
+              if (err && String(err.message || '').toLowerCase().includes('already exists')) {
+                const allTeamsResp = await get('/api/v1/teams');
+                const allTeams = allTeamsResp.teams || allTeamsResp || [];
                 apiTeam = allTeams.find((t) => t.name === team.name);
               } else {
-                throw new Error(errorText);
+                console.error('Failed to create team:', err);
+                throw err;
               }
-            } else {
-              apiTeam = await teamResponse.json();
             }
           } catch (error) {
             console.error("Failed to create team:", error);
@@ -326,37 +279,17 @@ const startSession = async () => {
           teamIdMapping[team.id] = apiTeam.id;
 
           // Link team to session
-          await fetch(
-            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/add-team`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                team_id: apiTeam.id,
-              }),
-            },
-          );
+          await post(`/api/v1/sessions/${createdSession.id}/add-team`, { team_id: apiTeam.id });
 
           console.log(`✅ Team ${apiTeam.name} linked to session`);
 
           // 3. Create players for this team
           for (const player of team.players || []) {
-            await fetch(
-              `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  name: player.name,
-                  team_id: apiTeam.id,
-                  position: player.icon || "",
-                }),
-              },
-            );
+            await post(`/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`, {
+              name: player.name,
+              team_id: apiTeam.id,
+              position: player.icon || '',
+            });
             console.log(`✅ Player ${player.name} created`);
           }
         } catch (error) {
@@ -367,48 +300,26 @@ const startSession = async () => {
 
       // 4. Create activities
       for (const activity of session.value.activities || []) {
-        await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/activities`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              session_id: createdSession.id,
-              name: activity.name,
-              sport_type: activity.sport_type || "custom",
-              game_type: activity.game_type || "custom",
-              scoring_mode: activity.scoring_mode || "team",
-              time_winner: activity.time_winner || "lower",
-              total_rounds: activity.total_rounds || 1,
-              time_limit_per_round: activity.time_limit_per_round || null,
-              description: activity.description || null,
-            }),
-          },
-        );
+        await post(`/api/v1/sessions/${createdSession.id}/activities`, {
+          session_id: createdSession.id,
+          name: activity.name,
+          sport_type: activity.sport_type || 'custom',
+          game_type: activity.game_type || 'custom',
+          scoring_mode: activity.scoring_mode || 'team',
+          time_winner: activity.time_winner || 'lower',
+          total_rounds: activity.total_rounds || 1,
+          time_limit_per_round: activity.time_limit_per_round || null,
+          description: activity.description || null,
+        });
         console.log(`✅ Activity ${activity.name} created`);
       }
 
       console.log("✅ Session fully created and started!");
     } else {
       // This is an existing API session - just update status
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "active" }),
-        },
-      );
+      await put(`/api/v1/sessions/${session.value.id}`, { status: 'active' });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      console.log("✅ Session status updated to active");
+      console.log('✅ Session status updated to active');
     }
 
     // Show success notification

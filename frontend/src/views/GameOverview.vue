@@ -94,6 +94,9 @@ import GenericAccordion from "@/components/Generic/GenericAccordion.vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericModel from "@/components/Generic/GenericModel.vue";
 import { ElNotification } from "element-plus";
+import { useApi } from "@/composables/useApi";
+
+const { get, del } = useApi();
 
 const router = useRouter();
 const route = useRoute();
@@ -126,7 +129,7 @@ const teamAccordions = computed(() => {
   console.log("📋 Available activities:", activities.value);
 
   const selectedActivity = activities.value.find(
-    (a) => a.id === selectedDropdownValue.value,
+    (a) => String(a.id) == String(selectedDropdownValue.value),
   );
 
   console.log("✅ Found activity:", selectedActivity);
@@ -239,23 +242,7 @@ const confirmDelete = async () => {
   try {
     console.log("🗑️ Deleting session:", session.value.id);
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    console.log("📡 Response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Server error:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await del(`/api/v1/sessions/${session.value.id}`);
 
     console.log("✅ Session deleted successfully");
 
@@ -287,29 +274,44 @@ const loadSessionData = async () => {
     console.log("📡 Loading session data for GameOverview:", sessionId);
 
     // Load session
-    const sessionResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}`,
-    );
-    const sessionData = await sessionResponse.json();
+      // If the route provided a preloaded session (from History) use it to avoid additional fetches
+    const preloaded = route?.state && route.state.preloadedSession;
+    if (preloaded && String(preloaded.id) === String(sessionId)) {
+      console.log('📥 Using preloaded session from history route state');
+      session.value = preloaded;
+      teams.value = (preloaded.teams && preloaded.teams.length) ? preloaded.teams : [];
+
+      // ensure each team has players array
+      teams.value.forEach(t => { t.players = t.players || []; });
+
+      activities.value = (preloaded.activities && preloaded.activities.length) ? preloaded.activities : [];
+
+      // If activities exist but don't have scores, try to assemble scores from activities or leave lazy-loading
+      activities.value = activities.value.map(a => ({ ...a, scores: a.scores || [] }));
+
+      // default select first activity if none selected
+      if (!selectedDropdownValue.value && activities.value.length > 0) {
+        selectedDropdownValue.value = activities.value[0].id;
+      }
+
+      loading.value = false;
+      return;
+    }
+
+    const sessionData = await get(`/api/v1/sessions/${sessionId}`);
     session.value = sessionData;
 
     console.log("✅ Session loaded:", sessionData);
 
     // Load teams
-    const teamsResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/teams`,
-    );
-    const teamsData = await teamsResponse.json();
-    teams.value = teamsData.teams || teamsData;
+    const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
+    teams.value = teamsData.teams || teamsData || [];
 
     // Load players for each team
     for (const team of teams.value) {
       try {
-        const playersResponse = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
-        );
-        const playersData = await playersResponse.json();
-        team.players = playersData.players || playersData;
+        const playersData = await get(`/api/v1/sessions/${sessionId}/teams/${team.id}/players`);
+        team.players = playersData.players || playersData || [];
       } catch (error) {
         console.error(`Failed to load players for team ${team.id}:`, error);
         team.players = [];
@@ -319,37 +321,49 @@ const loadSessionData = async () => {
     console.log("✅ Teams with players loaded:", teams.value);
 
     // Load activities
-    const activitiesResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/activities`,
-    );
-    const activitiesData = await activitiesResponse.json();
-    const activitiesList = activitiesData.activities || activitiesData;
+    const activitiesData = await get(`/api/v1/sessions/${sessionId}/activities`);
+    const activitiesList = activitiesData.activities || activitiesData || [];
 
     // Load all scores for the session
     let allScores = [];
     try {
-      const scoresResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/scores`,
-      );
-      const scoresData = await scoresResponse.json();
-      allScores = scoresData.scores || scoresData || [];
-      console.log("✅ All scores loaded:", allScores);
+      try {
+        const scoresData = await get(`/api/v1/sessions/${sessionId}/scores`);
+        allScores = scoresData.scores || scoresData || [];
+        console.log('✅ All scores loaded:', allScores);
+      } catch (error) {
+        console.error('Failed to load scores:', error);
+        allScores = [];
+      }
     } catch (error) {
       console.error("Failed to load scores:", error);
       allScores = [];
     }
 
     // Associate scores with activities
-    const activitiesWithScores = activitiesList.map((activity) => {
-      // Filter scores that belong to this activity (game_id matches activity.id)
-      const activityScores = allScores.filter(
-        (score) => score.game_id === activity.id,
-      );
+    const activitiesWithScores = await Promise.all(activitiesList.map(async (activity) => {
+      // Filter scores that belong to this activity (try multiple potential keys)
+      let activityScores = allScores.filter((score) => {
+        const sid = String(activity.id);
+        return String(score.game_id) === sid || String(score.activity_id) === sid || (score.activity && String(score.activity.id) === sid) || (score.game && String(score.game.id) === sid);
+      });
+
+      // Fallback: fetch activity-specific scores if none found in session-level scores
+      if ((!activityScores || activityScores.length === 0)) {
+        try {
+          const scoresResp = await get(`/api/v1/activities/${activity.id}/scores`);
+          activityScores = scoresResp.scores || scoresResp || [];
+        } catch (e) {
+          // ignore and leave activityScores empty
+          activityScores = activityScores || [];
+        }
+      }
+
       return {
         ...activity,
         scores: activityScores,
       };
-    });
+    }));
 
     activities.value = activitiesWithScores;
     console.log("✅ Activities with scores loaded:", activities.value);
