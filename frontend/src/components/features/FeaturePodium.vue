@@ -5,24 +5,21 @@
       title="Lukas"
       :emoji="selectedEmoji"
       :score="18"
-      class="podium-second animate-podium-item"
-      style="animation-delay: 0.4s"
+      class="podium-second podium-item"
     />
     <FeaturePodiumItem
       :position="1"
       title="Abdullah"
       :emoji="selectedEmoji"
       :score="20"
-      class="podium-first animate-podium-item"
-      style="animation-delay: 0.8s"
+      class="podium-first podium-item"
     />
     <FeaturePodiumItem
       :position="3"
       title="Maarten"
       :emoji="selectedEmoji"
       :score="17"
-      class="podium-third animate-podium-item"
-      style="animation-delay: 0s"
+      class="podium-third podium-item"
     />
   </div>
 </template>
@@ -46,32 +43,56 @@ defineProps({
   align-items: flex-end;
 }
 
-/* Podium Item Animation */
-.animate-podium-item {
+.podium-item {
   opacity: 0;
-  animation: podium-rise 0.6s ease-out forwards;
-}
-
-@keyframes podium-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(150px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(var(--final-position));
-  }
-}
-
-.podium-first {
-  --final-position: calc(var(--space-5) * -2);
-}
-
-.podium-second {
-  --final-position: 0px;
+  transform: translateY(100vh);
 }
 
 .podium-third {
-  --final-position: var(--space-7);
+  animation: slideUp 0.6s ease-out 0.2s forwards;
+}
+
+.podium-second {
+  animation: slideUp 0.6s ease-out 0.8s forwards;
+}
+
+.podium-first {
+  animation: slideUp 0.6s ease-out 1.4s forwards;
+}
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(100vh);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Final positions after animation */
+.podium-first {
+  animation:
+    slideUp 0.6s ease-out 1.4s forwards,
+    finalPosition 0s linear 2s forwards;
+}
+
+.podium-third {
+  animation:
+    slideUp 0.6s ease-out 0.2s forwards,
+    finalThirdPosition 0s linear 0.8s forwards;
+}
+
+@keyframes finalPosition {
+  to {
+    transform: translateY(calc(var(--space-5) * -2));
+  }
+}
+
+@keyframes finalThirdPosition {
+  to {
+    transform: translateY(var(--space-7));
+  }
 }
 </style>

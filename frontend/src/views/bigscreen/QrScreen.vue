@@ -52,15 +52,15 @@ import FeatureDevider from "../../components/features/FeatureDevider.vue";
   text-align: center;
   width: 100%;
   h2 {
-    margin-top: var(--space-10);
+    margin-top: var(--space-7);
   }
   h4 {
-    margin-top: var(--space-8);
+    margin: var(--space-6) 0;
   }
 }
 .qr-screen-content {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-evenly;
   /* align-items: space-between; */
   /* gap: var(--space-12); */
   /* margin-top: var(--space-7); */
@@ -77,8 +77,8 @@ import FeatureDevider from "../../components/features/FeatureDevider.vue";
     }
   }
   .qr-screen-qrcode {
-    width: 18.75rem;
-    height: 18.75rem;
+    width: 14rem;
+    height: 14rem;
     background: var(--blue-20);
     padding: var(--space-3);
     border: 1px solid var(--blue-100);
@@ -101,6 +101,7 @@ import FeatureDevider from "../../components/features/FeatureDevider.vue";
 .qr-image {
   width: 100%;
   height: 100%;
+
   object-fit: contain;
 }
 
