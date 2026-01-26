@@ -192,8 +192,11 @@ h3 {
   height: 100%;
 }
 .history-page-content {
-  overflow: auto;
+  overflow-y: auto;
   margin-top: var(--space-6);
+  flex: 1;
+  min-height: 0;
+  padding-right: 0.5rem;
 }
 .back-button {
   display: flex;

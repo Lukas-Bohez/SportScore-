@@ -157,7 +157,7 @@
             ></GenericButton>
           </div>
 
-          <div class="score-section-fast-action">
+          <div v-if="!isTeamVsTime" class="score-section-fast-action">
             <h4>Snelle Acties</h4>
             <div class="score-section-fast-action-buttons">
               <GenericButton
@@ -172,10 +172,10 @@
                 v-if="!isTeamVsTime"
                 class="score-section-button"
                 variant="primary"
+                label="+10 Bonus"
                 @click="addQuickScore(10)"
                 :disabled="!selectedTeamId"
-                ><Plus></Plus>10</GenericButton
-              >
+              ></GenericButton>
             </div>
           </div>
         </div>
@@ -920,6 +920,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: var(--space-5);
+  padding-bottom: var(--space-8);
   margin-top: var(--space-6);
   background-color: var(--black-20);
   border-radius: var(--radius-M);

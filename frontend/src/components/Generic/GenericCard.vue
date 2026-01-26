@@ -106,8 +106,8 @@ defineProps({
 
 .activity-badge {
   padding: var(--space-2) var(--space-3);
-  background-color: var(--green-20, #e8f5e9);
-  border: 1px solid var(--green-40, #81c784);
+  background-color: var(--blue-20, #e8f5e9);
+  border: 1px solid var(--blue-40);
   border-radius: var(--radius-M);
   font-size: var(--font-size-S);
   color: var(--black-80);
