@@ -1,7 +1,9 @@
 <script>
-import { House, MonitorCheck, Swords, List, Plus } from "lucide-vue-next";
+import { House, MonitorCheck, Swords, List, Plus, PowerOff } from "lucide-vue-next";
 import GenericButton from "./GenericButton.vue";
+import ShutdownModal from "../ShutdownModal.vue";
 import { RouterLink } from "vue-router";
+import { ref } from "vue";
 
 export default {
   name: "GenericNav",
@@ -11,7 +13,57 @@ export default {
     Swords,
     List,
     Plus,
+    PowerOff,
     GenericButton,
+    ShutdownModal,
+  },
+  setup() {
+    const showShutdownModal = ref(false);
+    const isShuttingDown = ref(false);
+
+    const openShutdownModal = () => {
+      showShutdownModal.value = true;
+    };
+
+    const closeShutdownModal = () => {
+      showShutdownModal.value = false;
+    };
+
+    const handleShutdown = async () => {
+      isShuttingDown.value = true;
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        const response = await fetch(`${baseURL}/api/v1/system/shutdown`, {
+          method: "POST",
+        });
+
+        if (response.status === 202 || response.status === 200) {
+          alert("Shutdown gestart. De Raspberry Pi zal nu afsluiten.");
+          // Keep modal open with busy state
+        } else if (response.status === 403) {
+          alert("Fout: ongeldige admin secret.");
+          isShuttingDown.value = false;
+          closeShutdownModal();
+        } else {
+          const body = await response.json().catch(() => ({}));
+          alert("Fout bij afsluiten: " + (body.detail || response.statusText));
+          isShuttingDown.value = false;
+          closeShutdownModal();
+        }
+      } catch (error) {
+        alert("Netwerkfout: " + error.message);
+        isShuttingDown.value = false;
+        closeShutdownModal();
+      }
+    };
+
+    return {
+      showShutdownModal,
+      isShuttingDown,
+      openShutdownModal,
+      closeShutdownModal,
+      handleShutdown,
+    };
   },
 };
 </script>
@@ -28,24 +80,26 @@ export default {
       <span class="caption">Templates</span>
     </RouterLink>
 
-    <!-- Midden knop -->
-    <!-- <GenericButton
-      class="generic-nav-item--addButton"
-      variant="primary"
-    >
-      <Plus :size="24" />
-    </GenericButton> -->
-
     <RouterLink to="/geschiedenis" class="generic-nav-item">
       <Swords :size="22" class="icon" />
       <span class="caption">Geschiedenis</span>
     </RouterLink>
-    <!-- 
-    <RouterLink to="/actief" class="generic-nav-item">
-      <MonitorCheck :size="22" class="icon" />
-      <span class="caption">Actief</span>
-    </RouterLink> -->
+
+    <button 
+      class="generic-nav-item generic-nav-item--shutdown" 
+      @click="openShutdownModal"
+      :disabled="isShuttingDown"
+    >
+      <PowerOff :size="22" class="icon" />
+      <span class="caption">{{ isShuttingDown ? 'Bezig...' : 'Uit' }}</span>
+    </button>
   </nav>
+
+  <ShutdownModal 
+    :show="showShutdownModal" 
+    @close="closeShutdownModal"
+    @confirm="handleShutdown"
+  />
 </template>
 
 <style scoped>
@@ -67,17 +121,35 @@ export default {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  /* padding: var(--space-4) 0; */
   cursor: pointer;
   transition: color 0.3s ease;
   text-decoration: none;
   color: var(--black-100);
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  font-size: inherit;
 }
 /* Use router-link-active for active state */
 .router-link-active,
 .generic-nav-item:hover {
   color: var(--blue-100);
 }
+
+/* Shutdown button styling */
+.generic-nav-item--shutdown {
+  color: var(--red-100);
+}
+
+.generic-nav-item--shutdown:hover:not(:disabled) {
+  color: var(--red-80);
+}
+
+.generic-nav-item--shutdown:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .generic-nav-item--addButton {
   display: flex;
   align-items: center;
@@ -86,9 +158,6 @@ export default {
   border-radius: var(--radius-XL);
   padding: var(--space-4);
 }
-/* .generic-nav-item--addButton:hover {
-  background-color: var(--blue-100);
-} */
 .icon {
   color: inherit;
 }
