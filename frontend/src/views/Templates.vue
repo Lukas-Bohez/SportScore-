@@ -19,6 +19,10 @@
           />
         </div>
 
+        <p v-if="!loading && filteredCards.length === 0" class="no-results">
+          Geen resultaten gevonden
+        </p>
+
         <div class="templates-page-content">
           <p v-if="loading" class="loading-message">Sessies laden...</p>
           <RouterLink
@@ -36,10 +40,6 @@
             />
           </RouterLink>
         </div>
-
-        <p v-if="!loading && filteredCards.length === 0" class="no-results">
-          Geen resultaten gevonden
-        </p>
       </div>
     </div>
   </div>
@@ -56,13 +56,9 @@ import GenericCard from "@/components/Generic/GenericCard.vue";
 import GenericNav from "@/components/Generic/GenericNav.vue";
 import GenericInput from "@/components/Generic/GenericInput.vue";
 import GenericButton from "@/components/Generic/GenericButton.vue";
-import { useSessions } from "@/composables/useSessions";
-import { useApi } from "@/composables/useApi";
 
 const router = useRouter();
 const route = useRoute();
-const { sessions, fetchSessions, loading } = useSessions();
-const { get } = useApi();
 
 const goBack = () => {
   router.back();
@@ -70,8 +66,8 @@ const goBack = () => {
 
 const searchQueryName = ref("");
 const searchQueryDate = ref("");
-const sessionTeams = ref({});
-const sessionActivities = ref({}); // Store activities for each session
+const loading = ref(false);
+const sessionTemplates = ref([]);
 
 // Format date for display (from ISO to DD/MM/YYYY)
 const formatDate = (isoDate) => {
@@ -83,66 +79,31 @@ const formatDate = (isoDate) => {
   return `${day}/${month}/${year}`;
 };
 
-// Fetch teams for a specific session
-const fetchTeamsForSession = async (sessionId) => {
+// Load templates from localStorage
+const loadTemplates = () => {
   try {
-    const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
-    const teams = teamsData.teams || teamsData;
-    sessionTeams.value[sessionId] = teams;
-    console.log(
-      `✅ Teams loaded for session ${sessionId}:`,
-      teams.length,
-      teams,
-    );
+    loading.value = true;
+    const templatesKey = "sessionTemplates";
+    const templates = JSON.parse(localStorage.getItem(templatesKey) || "[]");
+    sessionTemplates.value = templates;
+    console.log("✅ Templates loaded from localStorage:", templates.length);
   } catch (error) {
-    console.error(`❌ Failed to load teams for session ${sessionId}:`, error);
-    sessionTeams.value[sessionId] = [];
+    console.error("❌ Failed to load templates:", error);
+    sessionTemplates.value = [];
+  } finally {
+    loading.value = false;
   }
 };
 
-// Fetch activities for a specific session
-const fetchActivitiesForSession = async (sessionId) => {
-  try {
-    const activitiesData = await get(
-      `/api/v1/sessions/${sessionId}/activities`,
-    );
-    const activities = activitiesData.activities || activitiesData;
-    sessionActivities.value[sessionId] = activities;
-    console.log(
-      `✅ Activities loaded for session ${sessionId}:`,
-      activities.length,
-      activities,
-    );
-  } catch (error) {
-    console.error(
-      `❌ Failed to load activities for session ${sessionId}:`,
-      error,
-    );
-    sessionActivities.value[sessionId] = [];
-  }
-};
-
-// Transform sessions to cards format
+// Transform templates to cards format
 const cards = computed(() => {
-  const result = sessions.value.map((session) => {
-    const teams = sessionTeams.value[session.id] || [];
-    const activities = sessionActivities.value[session.id] || [];
-    console.log(
-      `📋 Card for session ${session.id} (${session.name}):`,
-      teams.length,
-      "teams,",
-      activities.length,
-      "activities",
-    );
-    return {
-      id: session.id,
-      title: session.name,
-      date: formatDate(session.created_at),
-      teams: teams,
-      activities: activities,
-    };
-  });
-  return result;
+  return sessionTemplates.value.map((session) => ({
+    id: session.id,
+    title: session.name,
+    date: formatDate(session.created_at),
+    teams: session.teams || [],
+    activities: session.activities || [],
+  }));
 });
 
 const filteredCards = computed(() => {
@@ -156,54 +117,24 @@ const filteredCards = computed(() => {
   });
 });
 
-// Load sessions and their teams on mount
-onMounted(async () => {
-  await loadSessionsAndTeams();
-});
-
-// Watch for route query changes (when returning from new session creation)
+// Watch for route query changes (refresh trigger)
 watch(
   () => route.query.refresh,
-  async (newValue) => {
-    if (newValue === "true") {
-      console.log("🔄 Refreshing sessions after new session creation");
-      await loadSessionsAndTeams();
-      // Clear the query parameter after a short delay to allow the component to update
+  (newVal) => {
+    if (newVal) {
+      console.log("🔄 Refresh triggered, reloading templates");
+      loadTemplates();
+      // Clear the query parameter after reload
       setTimeout(() => {
         router.replace({ path: route.path, query: {} });
       }, 100);
     }
   },
-  { immediate: true }, // Execute immediately if query param is already present
 );
 
-// Function to load all sessions and their teams
-async function loadSessionsAndTeams() {
-  try {
-    console.log("📡 Fetching all sessions...");
-    await fetchSessions();
-    console.log("✅ Sessions loaded:", sessions.value.length);
-
-    // Clear previous data
-    sessionTeams.value = {};
-    sessionActivities.value = {};
-
-    // Fetch teams and activities for each session
-    for (const session of sessions.value) {
-      await Promise.all([
-        fetchTeamsForSession(session.id),
-        fetchActivitiesForSession(session.id),
-      ]);
-    }
-    console.log(
-      "✅ All teams and activities loaded for",
-      sessions.value.length,
-      "sessions",
-    );
-  } catch (error) {
-    console.error("❌ Failed to load sessions:", error);
-  }
-}
+onMounted(() => {
+  loadTemplates();
+});
 </script>
 <style scoped>
 h3 {
@@ -258,7 +189,6 @@ h3 {
   text-align: center;
   color: var(--black-50);
   margin-top: var(--space-8);
-  font-style: italic;
 }
 .loading-message {
   text-align: center;

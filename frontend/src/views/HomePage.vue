@@ -1,8 +1,18 @@
 <script setup>
 import GenericNav from "@/components/Generic/GenericNav.vue";
 import GenericButton from "@/components/Generic/GenericButton.vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
+import { notifyBigScreen } from "@/composables/useBigScreenSync";
+
+const router = useRouter();
+
+// Handle nieuwe sessie click
+const handleNewSession = () => {
+  console.log("🔔 User clicked: Nieuwe sessie");
+  notifyBigScreen("loading");
+  // Navigation happens automatically via RouterLink
+};
 </script>
 
 <template>
@@ -18,7 +28,11 @@ import { Plus } from "lucide-vue-next";
           <img src="/homevector.svg" alt="home vector" class="home-vector" />
         </div>
         <p>Scoreboard voor team building activiteiten</p>
-        <RouterLink class="router-link" to="/nieuwesessie">
+        <RouterLink
+          class="router-link"
+          to="/nieuwesessie"
+          @click="handleNewSession"
+        >
           <GenericButton variant="primary">
             <Plus />
             Nieuwe sessie

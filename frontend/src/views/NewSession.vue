@@ -52,64 +52,202 @@ const openSuccessModal = () => {
 };
 
 const handleConfirm = async () => {
-  console.log("Bevestigd! Sessie wordt gestart...");
+  console.log("🚀 Starting session directly from modal...");
 
   try {
-    // Update session status to 'active'
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSessionId.value}`,
+    // Load the template from localStorage
+    const templatesKey = "sessionTemplates";
+    const existingTemplates = JSON.parse(
+      localStorage.getItem(templatesKey) || "[]",
+    );
+    const template = existingTemplates.find(
+      (t) => t.id === createdSessionId.value,
+    );
+
+    if (!template) {
+      throw new Error("Template niet gevonden in localStorage");
+    }
+
+    console.log("📦 Creating session in API from template...", template);
+    console.log("📋 Template activities:", template.activities);
+    console.log("👥 Template teams:", template.teams);
+
+    // 1. Create session in API with 'active' status
+    const sessionResponse = await fetch(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions`,
       {
-        method: "PUT",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status: "active" }),
+        body: JSON.stringify({
+          name: template.name,
+          total_rounds: template.total_rounds,
+          time_limit: template.time_limit,
+          scoring_mode: template.scoring_mode,
+          status: "active",
+        }),
       },
     );
 
-    if (!response.ok) {
-      throw new Error(`Failed to start session: ${response.status}`);
+    if (!sessionResponse.ok) {
+      throw new Error(`HTTP error! status: ${sessionResponse.status}`);
     }
 
-    console.log("✅ Sessie status geüpdatet naar 'active'");
+    const createdSession = await sessionResponse.json();
+    console.log("✅ Session created in API:", createdSession);
 
-    // Show success notification
+    // 2. Create teams and get ID mapping
+    const teamIdMapping = {};
+
+    for (const team of template.teams) {
+      try {
+        let apiTeam;
+        try {
+          const teamResponse = await fetch(
+            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: team.name,
+                color: team.color || "#ffffff",
+                icon: team.icon || "👥",
+                description: "",
+              }),
+            },
+          );
+
+          if (!teamResponse.ok) {
+            const errorText = await teamResponse.text();
+            if (errorText.includes("already exists")) {
+              const allTeamsResponse = await fetch(
+                `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
+              );
+              const allTeamsData = await allTeamsResponse.json();
+              const allTeams = allTeamsData.teams || allTeamsData;
+              apiTeam = allTeams.find((t) => t.name === team.name);
+            } else {
+              throw new Error(errorText);
+            }
+          } else {
+            apiTeam = await teamResponse.json();
+          }
+        } catch (error) {
+          console.error("Failed to create team:", error);
+          throw error;
+        }
+
+        teamIdMapping[team.id] = apiTeam.id;
+
+        // Link team to session
+        await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/add-team`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              team_id: apiTeam.id,
+            }),
+          },
+        );
+
+        // 3. Create players if they exist
+        if (team.players && team.players.length > 0) {
+          for (const player of team.players) {
+            try {
+              await fetch(
+                `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    name: player.name,
+                    position: player.icon || player.position || "",
+                  }),
+                },
+              );
+            } catch (error) {
+              console.error("Failed to create player:", error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to process team:", error);
+        throw error;
+      }
+    }
+
+    // 4. Create activities
+    console.log("🎮 Creating activities...", template.activities);
+    if (template.activities && template.activities.length > 0) {
+      for (const activity of template.activities) {
+        try {
+          console.log("📝 Creating activity:", activity.name);
+          const activityResponse = await fetch(
+            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/activities`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                session_id: createdSession.id,
+                name: activity.name,
+                sport_type: activity.sport_type || "custom",
+                game_type: activity.game_type || "custom",
+                scoring_mode: activity.scoring_mode || "team",
+                time_winner: activity.time_winner || "lower",
+                total_rounds: activity.total_rounds || 1,
+                time_limit_per_round: activity.time_limit_per_round || null,
+                description: activity.description || null,
+              }),
+            },
+          );
+
+          if (activityResponse.ok) {
+            const createdActivity = await activityResponse.json();
+            console.log("✅ Activity created:", createdActivity);
+          } else {
+            const errorText = await activityResponse.text();
+            console.error("❌ Failed to create activity:", errorText);
+          }
+        } catch (error) {
+          console.error("❌ Failed to create activity:", error);
+        }
+      }
+    } else {
+      console.warn("⚠️ No activities found in template!");
+    }
+
+    console.log("✅ Session fully created, navigating to SessionManagement...");
+
     ElNotification({
       title: "Succes!",
-      message: "Sessie is gestart!",
+      message: `Sessie "${template.name}" is gestart!`,
       type: "success",
     });
 
-    // Navigate to sessie beheren page with refresh flag
-    router.push({
-      name: "Templates",
-      query: { refresh: "true", newSession: createdSessionId.value },
+    // Navigate directly to SessionManagement (sessie beheren)
+    await router.push({
+      name: "sessionmanagment",
+      params: { id: createdSession.id },
     });
   } catch (error) {
     console.error("❌ Failed to start session:", error);
     ElNotification({
       title: "Fout",
-      message: "Kon sessie niet starten",
+      message:
+        "Kon sessie niet starten: " + (error.message || "Onbekende fout"),
       type: "error",
     });
   }
-};
-
-const handleCancel = () => {
-  console.log("Sessie opgeslagen maar niet gestart");
-
-  // Show info notification
-  ElNotification({
-    title: "Opgeslaan!",
-    message: "Sessie is opgeslaan als template. Je kunt deze later starten.",
-    type: "info",
-  });
-
-  // Navigate to templates page
-  router.push({
-    name: "Templates",
-    query: { refresh: "true", newSession: createdSessionId.value },
-  });
 };
 
 const handleSuccess = () => {
@@ -442,7 +580,8 @@ onUnmounted(() => {
   window.removeEventListener("resize", updateScreenWidth);
 });
 
-// Save session with selected activities
+// Save session with selected activities (to localStorage as template)
+// Save session to localStorage (not API yet)
 async function saveSession() {
   // Clear previous errors
   sessionNameError.value = "";
@@ -463,187 +602,80 @@ async function saveSession() {
   }
 
   try {
-    // 1. Create session with 'setup' status (not active yet)
-    const newSession = await createSession({
+    // Create session object for localStorage
+    const sessionId = `session_${Date.now()}`;
+    const newSession = {
+      id: sessionId,
       name: sessionName.value,
       total_rounds: sessionTotalRounds.value,
       time_limit: sessionTimeLimit.value,
       scoring_mode: sessionScoringMode.value,
-      status: "setup", // Session is saved but not started yet
-    });
+      status: "template", // Template status (not yet started)
+      created_at: new Date().toISOString(),
+      teams: [],
+      activities: [],
+    };
 
-    console.log("✅ Sessie aangemaakt:", newSession);
+    console.log("📦 Sessie template aangemaakt:", newSession);
 
-    // Store the created session ID for navigation
-    createdSessionId.value = newSession.id;
-
-    // 2. Create teams and link them to session
-    const teamIdMapping = {}; // Map temp IDs to real API IDs
-
+    // Add teams to session
     for (const team of sessionTeams.value) {
-      try {
-        let createdTeam;
+      const teamData = {
+        id: team.id,
+        name: team.name,
+        color: team.color,
+        icon: team.icon,
+        players: [],
+      };
 
-        // Try to create team
-        try {
-          createdTeam = await createTeam({
-            name: team.name,
-            color: team.color,
-            icon: team.icon,
-            description: "",
-          });
-          console.log("✅ Team aangemaakt:", createdTeam);
-        } catch (createError) {
-          // If team already exists, fetch all teams and find the existing one
-          if (
-            createError.message &&
-            createError.message.includes("already exists")
-          ) {
-            console.log(
-              `⚠️ Team "${team.name}" bestaat al, bestaand team wordt gebruikt`,
-            );
+      // Add players for this team
+      const teamPlayers = sessionPlayers.value.filter(
+        (p) => p.team_id === team.id,
+      );
+      teamData.players = teamPlayers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        icon: p.position, // Use position field which contains the emoji
+        team_id: p.team_id,
+      }));
 
-            // Fetch all teams to find the existing one
-            const allTeams = await fetchTeams();
-            const existingTeam = allTeams.find((t) => t.name === team.name);
-
-            if (existingTeam) {
-              createdTeam = existingTeam;
-              console.log("✅ Bestaand team gevonden:", createdTeam);
-            } else {
-              throw new Error(
-                `Team "${team.name}" bestaat maar kon niet worden gevonden`,
-              );
-            }
-          } else {
-            throw createError;
-          }
-        }
-
-        // Map temporary ID to real API ID
-        teamIdMapping[team.id] = createdTeam.id;
-
-        // Link team to session using add-team endpoint
-        const addTeamResponse = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${newSession.id}/add-team`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              team_id: createdTeam.id,
-            }),
-          },
-        );
-
-        if (!addTeamResponse.ok) {
-          const errorText = await addTeamResponse.text();
-          throw new Error(`Failed to add team to session: ${errorText}`);
-        }
-
-        console.log(
-          `✅ Team ${createdTeam.id} gekoppeld aan sessie ${newSession.id}`,
-        );
-      } catch (error) {
-        console.error("❌ Failed to create or link team:", error);
-        throw error;
-      }
+      newSession.teams.push(teamData);
     }
 
-    // 3. Create all players and link them to session via session_players
-    for (const player of sessionPlayers.value) {
-      try {
-        const realTeamId = teamIdMapping[player.team_id];
-        if (realTeamId) {
-          // Create player AND link to session in one API call
-          await fetch(
-            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${newSession.id}/teams/${realTeamId}/players`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                name: player.name,
-                team_id: realTeamId,
-                position: player.position, // Send as 'position' to match backend model
-              }),
-            },
-          );
-
-          console.log(
-            `✅ Speler ${player.name} aangemaakt en gekoppeld aan sessie ${newSession.id} en team ${realTeamId}`,
-          );
-        }
-      } catch (error) {
-        console.error("❌ Failed to create and link player:", error);
-        throw error;
-      }
-    }
-
-    // 4. Create activities for this session (gebaseerd op geselecteerde templates)
-    const createdActivities = [];
+    // Add activities to session
     for (const activityId of selectedActivities.value) {
-      try {
-        // Find the activity template data
-        const activityTemplate = apiActivities.value.find(
-          (a) => a.id === activityId,
-        );
+      const activityTemplate = apiActivities.value.find(
+        (a) => a.id === activityId,
+      );
 
-        if (!activityTemplate) {
-          console.warn(
-            `⚠️ Activity template ${activityId} not found, skipping`,
-          );
-          continue;
-        }
-
-        // Create new activity for this session based on template
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${newSession.id}/activities`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              session_id: newSession.id,
-              name: activityTemplate.name,
-              sport_type: activityTemplate.sport_type || "custom",
-              game_type: activityTemplate.game_type || "custom",
-              scoring_mode: activityTemplate.scoring_mode || "team",
-              time_winner: activityTemplate.time_winner || "lower",
-              aggregate_player_times:
-                activityTemplate.aggregate_player_times || false,
-              total_rounds: activityTemplate.total_rounds || 1,
-              time_limit_per_round:
-                activityTemplate.time_limit_per_round || null,
-              description: activityTemplate.description || null,
-            }),
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const createdActivity = await response.json();
-        createdActivities.push(createdActivity);
-
-        console.log(
-          `✅ Activiteit "${activityTemplate.name}" aangemaakt voor sessie ${newSession.id}`,
-        );
-      } catch (error) {
-        console.error("❌ Failed to create activity:", error);
-        throw error;
+      if (activityTemplate) {
+        newSession.activities.push({
+          id: activityId,
+          name: activityTemplate.name,
+          sport_type: activityTemplate.sport_type || "custom",
+          game_type: activityTemplate.game_type || "custom",
+          scoring_mode: activityTemplate.scoring_mode || "team",
+          time_winner: activityTemplate.time_winner || "lower",
+          total_rounds: activityTemplate.total_rounds || 1,
+          time_limit_per_round: activityTemplate.time_limit_per_round || null,
+        });
       }
     }
 
-    console.log(
-      `✅ ${createdActivities.length} activiteiten aangemaakt voor sessie`,
+    // Save to localStorage
+    const templatesKey = "sessionTemplates";
+    const existingTemplates = JSON.parse(
+      localStorage.getItem(templatesKey) || "[]",
     );
+    existingTemplates.push(newSession);
+    localStorage.setItem(templatesKey, JSON.stringify(existingTemplates));
 
-    // Clear localStorage after successful save
+    console.log("✅ Sessie opgeslagen in localStorage:", newSession);
+
+    // Store the created session ID for modal
+    createdSessionId.value = sessionId;
+
+    // Clear form localStorage
     clearLocalStorage();
 
     // Open success modal
@@ -1251,12 +1283,10 @@ function deletePlayer(playerId) {
                 ref="successModalRef"
                 icon="circle-check"
                 iconColor="var(--green-100)"
-                message="Sessie is opgeslaan! Wilt u de sessie nu starten?"
-                confirmText="Ja, start sessie"
-                cancelText="Nee, later"
-                :showCancel="true"
+                message="Sessie is opgeslaan! Klik op 'Start Sessie' om de sessie te starten."
+                confirmText="Start Sessie"
+                :showCancel="false"
                 @confirm="handleConfirm"
-                @cancel="handleCancel"
               />
             </div>
           </div>

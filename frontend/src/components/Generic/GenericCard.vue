@@ -16,14 +16,14 @@
         </span>
       </div>
     </div>
-    <div v-if="teams && teams.length > 0" class="card-teams">
+    <!-- <div v-if="teams && teams.length > 0" class="card-teams">
       <p class="teams-label">Deelnemers:</p>
       <div class="teams-list">
         <span v-for="(team, index) in teams" :key="index" class="team-badge">
           {{ team.name || team }} {{ team.icon || "" }}
         </span>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
