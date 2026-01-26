@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SportScore - Score Invoer</title>
+    <link rel="stylesheet" href="css/scoreinput.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <style>
+        .control-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+
+        .control-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+
+        .activities-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .station-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .station-card h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-color);
+        }
+
+        .station-card p {
+            margin: 0 0 15px 0;
+            color: var(--text-secondary);
+        }
+
+        .station-card button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .station-card button:hover {
+            background: #0056b3;
+        }
+
+        .score-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .score-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .score-btn.small {
+            background: #28a745;
+            color: white;
+        }
+
+        .score-btn.medium {
+            background: #ffc107;
+            color: black;
+        }
+
+        .score-btn.large {
+            background: #dc3545;
+            color: white;
+        }
+
+        .score-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .score-feedback {
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+        }
+
+        .score-input-section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .form-group select,
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            font-size: 14px;
+        }
+
+        .points-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .points-controls button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .points-controls button:hover {
+            background: var(--theme-secondary);
+        }
+
+        .points-controls input {
+            flex: 1;
+            text-align: center;
+        }
+
+        .activity-selection-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--light-color);
+            border-radius: 8px;
+        }
+
+        .activity-selection-header h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-color);
+        }
+
+        .selected-activity {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .no-selection {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .station-card.selected {
+            border: 3px solid var(--primary-color);
+            background: rgba(0, 123, 255, 0.1);
+        }
+
+        .station-card.active {
+            border: 3px solid var(--success-color);
+            background: rgba(40, 167, 69, 0.1);
+        }
+
+        .activity-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .activity-actions .btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        .btn.select-activity {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+
+        .btn.set-active {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+        }
+
+        .btn.active-btn {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+
+        .participant-info {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="index.html" class="control-btn"
+            style="text-decoration: none; margin-bottom: 10px; display: inline-block;">← Terug naar Home</a>
+        <header class="header">
+            <h1>SportScore - Score Invoer</h1>
+            <div class="session-info">
+                <span id="session-name">Sessie laden...</span>
+                <span id="round-info" style="font-weight: 600;">Ronde 1/1</span>
+                <span id="timer" style="font-size: 1.2em; font-weight: 700;">--:--</span>
+            </div>
+            <!-- Round Controls -->
+            <div id="round-controls" style="margin-top: 10px; display: none; gap: 8px; flex-wrap: wrap;">
+                <button id="start-round-btn" class="control-btn" style="background: #10b981;">▶ Start Ronde</button>
+                <button id="pause-round-btn" class="control-btn" style="background: #f59e0b; display: none;">⏸
+                    Pauzeer</button>
+                <button id="resume-round-btn" class="control-btn" style="background: #10b981; display: none;">▶
+                    Hervatten</button>
+                <button id="end-round-btn" class="control-btn" style="background: #ef4444; display: none;">⏹ Einde
+                    Ronde</button>
+                <button id="next-round-btn" class="control-btn" style="background: #007bff; display: none;">▶
+                    Volgende Ronde</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="leaderboard-section">
+                <h2 id="leaderboard-title">Scorebord</h2>
+                <div class="leaderboard" id="leaderboard">
+                    <!-- Leaderboard will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="score-input-section">
+                <h2>Score Ingeven</h2>
+
+                <!-- Team/Player Selection -->
+                <div class="form-group">
+                    <label for="team-select">Team:</label>
+                    <select id="team-select" required>
+                        <option value="">Kies een team...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="player-select-group" style="display: none;">
+                    <label for="player-select">Speler:</label>
+                    <select id="player-select">
+                        <option value="">Alle spelers</option>
+                    </select>
+                </div>
+
+                <!-- Points Input -->
+                <div class="form-group" id="points-group">
+                    <label for="points-input">Punten:</label>
+                    <div class="points-controls">
+                        <button id="subtract-btn" type="button">-</button>
+                        <input type="number" id="points-input" value="1" min="-100" max="100" required>
+                        <button id="add-btn" type="button">+</button>
+                    </div>
+                </div>
+
+                <!-- Time Controls (visible for team_vs_time activities) -->
+                <div id="time-controls" class="form-group" style="display: none;">
+                    <label>Tijd invoer (Team vs Time)</label>
+                    <div class="time-input-container">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <div style="font-weight:600; margin-bottom:6px; width:100%;">Tijd</div>
+                            <input type="number" id="set-minutes" class="time-input" placeholder="min" min="0" />
+                            <span>:</span>
+                            <input type="number" id="set-seconds" class="time-input" placeholder="sec" min="0"
+                                max="59" />
+                            <span>.</span>
+                            <input type="number" id="set-ms" class="time-input" placeholder="ms" min="0" max="999" />
+                            <button id="set-time-btn" class="control-btn time-btn" type="button">Set</button>
+                            <button id="add-time-btn" class="control-btn time-btn" type="button">Add</button>
+                        </div>
+
+                        <!-- removed redundant record button - Set/Add will submit immediately -->
+                    </div>
+                    <div style="margin-top:8px;color:var(--text-secondary);font-size:0.9em;">Tip: vul minuten, seconden
+                        of milliseconden in en klik op <strong>Set</strong> of <strong>Add</strong> — de waarde wordt
+                        direct geregistreerd.</div>
+                </div>
+
+                <!-- Reason Input (visible except in team_vs_time) -->
+                <div class="form-group" id="reason-group">
+                    <label for="reason-input">Reden:</label>
+                    <input type="text" id="reason-input" placeholder="Bijv. Doelpunt, Bonus, etc.">
+                </div>
+
+                <!-- Submit Button -->
+                <button id="submit-score-btn" class="control-btn" type="button">Score Opslaan</button>
+
+                <!-- Sport Quick Buttons -->
+                <div class="quick-scores-section">
+                    <h3>Snelle Scores</h3>
+                    <div id="sport-quick-buttons" class="sport-quick-buttons">
+                        <!-- Sport-specific quick buttons will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Custom Quick Actions -->
+                <div class="custom-quick-actions-section">
+                    <h3>Aangepaste Snelle Acties</h3>
+                    <div class="custom-quick-actions-form">
+                        <input type="text" id="custom-reason" placeholder="Reden (bijv. Bonus)">
+                        <input type="number" id="custom-points" placeholder="Punten" min="-100" max="100">
+                        <button id="add-custom-action" class="control-btn">Toevoegen</button>
+                    </div>
+                    <div id="custom-quick-actions" class="custom-quick-actions">
+                        <!-- Custom quick actions will be loaded here -->
+                    </div>
+                </div>
+
+                <div id="activities-container" class="activities-container">
+                    <!-- Activities will be loaded here -->
+                </div>
+            </div>
+
+            <div class="recent-scores-section">
+                <h2>Recente Scores</h2>
+                <div class="recent-scores" id="recent-scores">
+                    <!-- Recent scores will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="session-controls">
+                <button id="pause-session-btn" type="button" class="control-btn pause">Pauze</button>
+                <button id="end-session-btn" type="button" class="control-btn end">Sessie Beëindigen</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Score Animation Overlay -->
+    <div class="score-animation" id="score-animation">
+        <div class="animation-content">
+            <div class="team-icon" id="anim-team-icon">👥</div>
+            <div class="score-change" id="anim-score-change">+5</div>
+            <div class="team-name" id="anim-team-name">Team Naam</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/shared-utils.js"></script>
+    <script src="js/simple-scoreinput.js"></script>
+    <script src="js/scoreinput2.js"></script>
+</body>
+
+</html>

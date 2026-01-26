@@ -1,0 +1,111 @@
+ROUNDS SYSTEM - QUICK DEPLOYMENT CHECKLIST
+
+PRE-DEPLOYMENT
+===============
+[ ] Run database migration: python backend/migrations/migrate_add_round_timing.py
+[ ] Verify schema: SELECT * FROM activities LIMIT 1 (check for new columns)
+
+BACKEND STARTUP
+===============
+[ ] Start FastAPI server: python backend/app.py
+[ ] Verify round_timer_monitor starts: Check logs for "Round timer monitor started"
+[ ] Test endpoint: curl http://localhost:8000/api/v1/activities/1/rounds/status
+
+FRONTEND TESTING
+================
+[ ] Homepage: Create activity with rounds (3) and time limit (120s)
+[ ] Activity Form: Fields visible and working (Aantal Rondes, Tijd per Ronde)
+[ ] Score Input: Round controls visible when activity selected
+[ ] Score Input: Timer shows correct format (MM:SS)
+[ ] Big Screen: Round info displays when active
+[ ] Big Screen: Timer updates in real-time
+
+RUNTIME TESTING
+================
+[ ] Click "Start Round" → Timer begins countdown
+[ ] Timer color changes (green → orange → red as time expires)
+[ ] After 120s: Round auto-advances
+[ ] Click "Pause Round" → Timer stops
+[ ] Click "Resume Round" → Timer continues
+[ ] Click "End Round" → Round ends
+[ ] Click "Next Round" → Advances if not last round
+[ ] Multiple pages/clients stay in sync (WebSocket)
+[ ] Activity completes after all rounds done
+[ ] Score submissions work during active rounds
+
+EXPECTED BEHAVIOR
+=================
+Single Round Activity (no rounds/time):
+  → Controls hidden, activity works normally
+
+Multi-Round Activity (3 rounds, no time):
+  → Controls visible, admin manually advances rounds
+
+Activity with Time Limit (1 round, 120s):
+  → Single round with countdown timer, auto-completes
+
+Tournament (3 rounds, 120s each):
+  → 3 rounds, each with 2-min auto-advance timer
+
+DATABASE
+========
+New Columns:
+  - time_limit_per_round (INT, nullable)
+  - round_status (TEXT: not_started|active|paused|completed)
+  - round_start_time (TIMESTAMP)
+  - round_end_time (TIMESTAMP)
+
+Existing Columns Unchanged:
+  - total_rounds (already existed)
+  - current_round (already existed)
+
+API ENDPOINTS (6 new)
+====================
+POST /api/v1/activities/{id}/rounds/start       → Starts round, begins timer
+POST /api/v1/activities/{id}/rounds/end         → Ends current round
+POST /api/v1/activities/{id}/rounds/pause       → Pauses active round
+POST /api/v1/activities/{id}/rounds/resume      → Resumes paused round
+POST /api/v1/activities/{id}/rounds/next        → Advances to next round
+GET  /api/v1/activities/{id}/rounds/status      → Returns round status & time
+
+SOCKET.IO EVENTS (8 new)
+========================
+round_started             → When round begins
+round_ended              → When round ends
+round_changed            → When advancing rounds
+round_paused             → When paused
+round_resumed            → When resumed
+round_time_update        → Every 5s with time remaining
+round_auto_advanced      → When auto-advanced due to time
+activity_completed       → When all rounds done
+
+TROUBLESHOOTING
+===============
+Timer not showing:
+  → Check: total_rounds > 1 OR time_limit_per_round set
+  → Check: HTML has round-info and timer elements
+  → Check: Browser console for errors
+
+Auto-advance not working:
+  → Check: round_timer_monitor task running in logs
+  → Check: round_status = 'active'
+  → Check: time_limit_per_round is set to number > 0
+  → Check: round_start_time is not NULL
+
+Socket events not received:
+  → Check: WebSocket connection active
+  → Check: Browser console for connection status
+  → Check: Firewall not blocking /socket.io path
+
+Syntax errors:
+  → Python: python -m py_compile backend/app.py
+  → JavaScript: node -c backend/.../js/*.js
+
+ROLLBACK
+========
+If needed to rollback:
+  1. Remove new columns from schema
+  2. Revert modified files from git
+  3. Restart backend
+
+VERIFICATION COMPLETE ✓

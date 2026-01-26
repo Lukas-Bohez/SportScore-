@@ -1,0 +1,1345 @@
+/* Start Screen Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    overflow-x: hidden;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 15px;
+    min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 30px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 40px;
+    }
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: var(--theme-background);
+    border-radius: 15px;
+}
+
+.header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--theme-text);
+}
+
+@media (min-width: 768px) {
+    .header h1 {
+        font-size: 2.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .header h1 {
+        font-size: 3rem;
+    }
+}
+
+.header p {
+    font-size: 1rem;
+    color: var(--theme-accent);
+}
+
+@media (min-width: 768px) {
+    .header p {
+        font-size: 1.2rem;
+    }
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* Tablet layout */
+@media (min-width: 768px) {
+    .main-content {
+        gap: 30px;
+        max-width: 700px;
+    }
+}
+
+/* Desktop layout - centered flexbox */
+@media (min-width: 1024px) {
+    .main-content {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 40px;
+        max-width: 1400px;
+    }
+}
+
+/* Right column - flexbox for the cards */
+.right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Session Setup */
+.session-setup {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+@media (min-width: 768px) {
+    .session-setup {
+        padding: 30px;
+    }
+}
+
+.session-setup h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--text-color);
+    font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .session-setup h2 {
+        margin-bottom: 30px;
+        font-size: 1.8rem;
+    }
+}
+
+.setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.form-group input,
+.form-group select {
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text-color);
+}
+
+.form-group input::placeholder,
+.form-group select option {
+    color: var(--text-secondary);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.create-btn {
+    padding: 15px 30px;
+    background: #2196f3;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.create-btn:hover {
+    background: #1976d2;
+    transform: translateY(-2px);
+}
+
+/* Active Session */
+.active-session {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+@media (min-width: 768px) {
+    .active-session {
+        padding: 30px;
+    }
+}
+
+.active-session h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--text-color);
+    /* Dark grey text */
+    font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .active-session h2 {
+        font-size: 1.8rem;
+    }
+}
+
+#active-session-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--background-color);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.session-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.continue-btn,
+.end-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.continue-btn {
+    background: var(--gold-color);
+    /* Dark goldenrod - 10% primary color */
+    color: #ffffff;
+}
+
+.continue-btn:hover {
+    background: var(--gold-hover);
+    /* Darker goldenrod on hover */
+}
+
+.end-btn {
+    background: var(--light-color);
+    /* Light grey background */
+    color: var(--text-color);
+    /* Dark grey text */
+}
+
+.end-btn:hover {
+    background: var(--border-color);
+    /* Medium grey on hover */
+}
+
+/* Recent Sessions */
+.recent-sessions {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+@media (min-width: 768px) {
+    .recent-sessions {
+        padding: 30px;
+    }
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.section-header h2 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .section-header h2 {
+        font-size: 1.8rem;
+    }
+}
+
+.view-all-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+}
+
+.view-all-btn:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(108, 117, 125, 0.3);
+}
+
+/* Team Management */
+.team-management {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+@media (min-width: 768px) {
+    .team-management {
+        padding: 30px;
+    }
+}
+
+.add-team-btn {
+    padding: 20px;
+    background: var(--card-bg);
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    width: 100%;
+    max-width: 800px;
+    /* Match teams-list width */
+}
+
+.add-team-btn:hover {
+    background: var(--theme-background);
+    border-color: var(--theme-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.team-form-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 2px solid var(--border-color);
+}
+
+.team-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.form-row .form-group {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 200px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* Button styles moved to css/buttons.css */
+
+.cancel-team-btn {
+    padding: 12px 24px;
+    background: #6c757d;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(108, 117, 125, 0.2);
+    flex: 1;
+}
+
+.cancel-team-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(108, 117, 125, 0.3);
+}
+
+.teams-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 800px;
+    /* Consistent width */
+}
+
+.team-card {
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    min-height: 200px;
+    /* Ensure consistent height */
+}
+
+.add-team-card {
+    grid-column: span 2;
+    /* Spans full width */
+    cursor: pointer;
+    border: 2px dashed var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-team-card:hover {
+    border-color: var(--theme-accent);
+    background: var(--theme-background);
+}
+
+.add-team-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.add-team-icon {
+    font-size: 3rem;
+}
+
+.add-team-text {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.team-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.team-icon {
+    font-size: 2rem;
+}
+
+.team-color-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.team-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-color);
+    flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.team-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-style: italic;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.team-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.delete-team-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+    flex: 1;
+}
+
+.delete-team-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
+}
+
+.edit-player-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+    margin-right: 8px;
+}
+
+.edit-player-btn:hover {
+    background: linear-gradient(135deg, #e0a800 0%, #d39e00 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(255, 193, 7, 0.3);
+}
+
+.delete-player-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+}
+
+.delete-player-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(220, 53, 69, 0.3);
+}
+
+/* Team and Activity item styles for homepage management */
+.team-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin: 8px 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.team-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.team-info .team-icon {
+    font-size: 1.5em;
+}
+
+.team-info>div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.team-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.team-color {
+    width: 20px;
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--primary-color);
+}
+
+.activity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin: 8px 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.activity-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+.activity-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.activity-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.activity-sport {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+#sessions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.session-item {
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 4px var(--shadow-color);
+}
+
+.session-info h3 {
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.session-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.session-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-small {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #b8860b;
+    /* Dark goldenrod - 10% primary color */
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: #a0780a;
+    /* Darker goldenrod on hover */
+}
+
+.btn-secondary {
+    background: #cccccc;
+    /* Light grey background */
+    color: #333333;
+    /* Dark grey text */
+}
+
+.btn-secondary:hover {
+    background: #aaaaaa;
+    /* Medium grey on hover */
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    color: #666666;
+    /* Medium grey text */
+}
+
+/* Warning banner for connectivity issues */
+.warning-banner {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 2rem;
+    }
+
+    .form-row {
+        flex-direction: column;
+    }
+
+    .form-row .form-group {
+        flex: 1 1 100%;
+    }
+
+    .section-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .view-all-btn,
+    .add-team-btn {
+        width: 100%;
+        padding: 12px 16px;
+        text-align: center;
+    }
+
+    .session-actions {
+        flex-direction: column;
+    }
+
+    .session-item {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .session-actions {
+        align-self: stretch;
+        justify-content: space-between;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+}
+
+/* Extra small screens - prevent overflow */
+@media (max-width: 557px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header {
+        padding: 20px 15px;
+        margin-bottom: 20px;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .main-content {
+        gap: 15px;
+    }
+
+    .session-setup,
+    .active-session,
+    .team-management,
+    .player-management,
+    .recent-sessions {
+        padding: 15px;
+    }
+
+    .team-card {
+        padding: 15px;
+    }
+
+    .team-actions {
+        flex-direction: column;
+    }
+
+    .delete-team-btn,
+    .save-team-btn {
+        width: 100%;
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+
+    .player-item,
+    .unassigned-players-dropdown {
+        padding: 10px;
+    }
+
+    .player-item-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .player-item-actions button {
+        width: 100%;
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+
+    .player-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .player-item-name {
+        margin-bottom: 8px;
+    }
+}
+
+/* Player Management */
+.player-management {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+    margin-top: 18px;
+}
+
+@media (min-width: 768px) {
+    .player-management {
+        padding: 30px;
+    }
+}
+
+#player-manager {
+    background: var(--light-color);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+@media (min-width: 768px) {
+    #player-manager {
+        padding: 20px;
+    }
+}
+
+#player-manager input {
+    background: var(--input-bg);
+    color: var(--text-color);
+    border: 2px solid var(--border-color);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+#player-manager input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+#pm-players-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.player-manager-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.player-manager-input {
+    flex: 1;
+    padding: 8px;
+}
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    border: 2px solid var(--border-color);
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.player-name {
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 1rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.player-team {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.player-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+.team-select {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    min-width: 120px;
+}
+
+/* Unassigned player items */
+.unassigned-player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 10px;
+}
+
+.unassigned-player-name {
+    flex: 1;
+    color: var(--text-color);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.unassigned-players-dropdown {
+    margin-top: 8px;
+    background: var(--card-bg);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.unassigned-dropdown-header {
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.unassigned-players-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.team-players-group {
+    margin-bottom: 16px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.team-players-group h4 {
+    background: var(--primary-color);
+    color: white;
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.team-players-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    gap: 10px;
+}
+
+.player-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.player-name {
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.team-assign-select {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    min-width: 140px;
+}
+
+.btn-compact {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--button-bg);
+    color: var(--button-text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-compact:hover {
+    background: var(--button-hover);
+}
+
+.btn-compact.edit-btn {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-compact.delete-btn {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-compact.delete-btn:hover {
+    background: #c0392b;
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
+}
+
+.unassigned-dropdown-header {
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.info-message {
+    color: var(--text-secondary);
+}
+
+/* Player row for assigned players */
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.player-row:last-child {
+    border-bottom: none;
+}
+
+.player-left {
+    flex: 1;
+    color: var(--text-color);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+.form-hint {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    display: block;
+    margin-top: 4px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-preview {
+    padding: 8px 16px;
+    min-width: 120px;
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.12s ease;
+    cursor: pointer;
+    background-color: #3B82F6;
+    display: inline-block;
+    margin-top: 0;
+    vertical-align: top;
+    text-align: center;
+}
+
+.color-preview:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+    transform: scale(1.05);
+}
+
+/* Player sections in step 3 */
+.players-section {
+    margin-bottom: 24px;
+}
+
+.players-section h4 {
+    color: var(--text-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.players-section h5 {
+    color: var(--text-color);
+    margin-bottom: 8px;
+    margin-top: 20px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+/* New comprehensive management styles */
+.add-team-form,
+.player-create,
+.activity-create {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.add-team-form input,
+.add-team-form select,
+.player-create input,
+.activity-create input,
+.activity-create select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg, #fff);
+    color: var(--text-color);
+}
+
+.add-team-form button,
+.player-create button,
+.activity-create button {
+    padding: 8px 16px;
+    background: var(--primary-color, #4CAF50);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.add-team-form button:hover,
+.player-create button:hover,
+.activity-create button:hover {
+    background: var(--primary-hover, #45a049);
+}
+
+.team-card,
+.player-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.team-card h3,
+.player-card strong {
+    margin: 0 0 10px 0;
+    color: var(--text-color);
+}
+
+.assigned-label {
+    color: var(--success-color, #4CAF50);
+    font-weight: 500;
+}
+
+.team-assign-select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg, #fff);
+}
+
+.edit-btn {
+    background: var(--warning-color, #ff9800);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.edit-btn:hover {
+    background: var(--warning-hover, #e68900);
+}
+
+.delete-btn {
+    background: var(--danger-color, #f44336);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.delete-btn:hover {
+    background: var(--danger-hover, #d32f2f);
+}
+
+.save-team-btn {
+    background: var(--success-color, #4CAF50);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.save-team-btn:hover {
+    background: var(--success-hover, #45a049);
+}
+
+.cancel-team-btn {
+    background: var(--secondary-color, #6c757d);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.cancel-team-btn:hover {
+    background: var(--secondary-hover, #5a6268);
+}
+
+.no-players {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
+}

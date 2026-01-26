@@ -1,0 +1,25 @@
+Format: 1.8
+Date: Tue, 10 Oct 2023 12:02:20 +0000
+Source: nodogsplash
+Binary: nodogsplash
+Architecture: arm64
+Version: 5.0.2-1
+Distribution: stable
+Urgency: high
+Maintainer: Shiao-An Yuan <shiao.an.yuan@gmail.com>
+Changed-By: Moritz Warning <moritzwarning@web.de>
+Description:
+ nodogsplash - manage access to public internet access
+Changes:
+ nodogsplash (5.0.2-1) stable; urgency=high
+ .
+   * Fix crash if query string is too long.
+Checksums-Sha1:
+ 05e0cfcd75b0b5f97a07563a9e039f96a41932eb 5218 nodogsplash_5.0.2-1_arm64.buildinfo
+ d40e9f781fd36c49d9b1373fe40635df0d6867ba 70468 nodogsplash_5.0.2-1_arm64.deb
+Checksums-Sha256:
+ 0ea0f7fd217b47898c3ffe38dc9b24f390cc6d711b80c5c8ddf1dfc52a3e954e 5218 nodogsplash_5.0.2-1_arm64.buildinfo
+ aa5e48e653efe0519ca53379eb681c79574e597c86ab95fae93cccccd058b3c0 70468 nodogsplash_5.0.2-1_arm64.deb
+Files:
+ 7633d94c430b473f10c1e792c23f5291 5218 net optional nodogsplash_5.0.2-1_arm64.buildinfo
+ f7951841ab62e581c8a359df6c2e298b 70468 net optional nodogsplash_5.0.2-1_arm64.deb

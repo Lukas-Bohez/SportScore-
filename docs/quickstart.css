@@ -1,0 +1,341 @@
+/* --- Global Variables --- */
+:root {
+  /* Colors */
+  --primary: #2563eb;       /* A slightly more modern, vibrant blue */
+  --primary-dark: #1e40af;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --bg-screen: #f1f5f9;
+  --bg-paper: #ffffff;
+  --bg-highlight: #fefce8;
+  --border-highlight: #f59e0b;
+  
+  /* Spacing */
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  
+  /* Radii */
+  --radius: 8px;
+}
+
+/* --- Base Setup --- */
+body { 
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; 
+  color: var(--text-main); 
+  line-height: 1.5; 
+  margin: 0; 
+  background: var(--bg-screen);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- A4 Paper Container --- */
+.page {
+  background: var(--bg-paper);
+  width: 100%;
+  max-width: 210mm; /* A4 Width */
+  min-height: 297mm; /* A4 Height */
+  margin: 40px auto;
+  padding: 25mm;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* --- Header Section --- */
+header { 
+  border-bottom: 2px solid var(--primary); 
+  padding-bottom: var(--spacing-md); 
+  margin-bottom: 40px; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-end; 
+}
+
+h1 { 
+  font-size: 32px; 
+  margin: 0; 
+  color: var(--primary); 
+  font-weight: 800; 
+  letter-spacing: -0.02em; 
+  line-height: 1.1;
+}
+
+.subtitle { 
+  font-size: 14px; 
+  color: var(--text-muted); 
+  margin-top: var(--spacing-sm); 
+  font-weight: 500; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px;
+}
+
+/* --- Section Typography --- */
+.section { margin-bottom: 40px; }
+
+h2 { 
+  font-size: 20px; 
+  margin: 0 0 18px 0; 
+  display: flex; 
+  align-items: center; 
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+/* Number Circles */
+.step-num { 
+  background: var(--primary); 
+  color: white; 
+  width: 32px; 
+  height: 32px; 
+  border-radius: 50%; 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-weight: 700;
+  font-size: 16px; 
+  margin-right: 14px; 
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+/* --- The WiFi Card (Redesigned) --- */
+.wifi-card { 
+  background: #f8fafc; 
+  border: 1px solid #cbd5e1; 
+  border-left: 5px solid var(--primary); /* Accent border */
+  border-radius: var(--radius); 
+  padding: 24px; 
+  display: flex; 
+  gap: 30px; 
+  align-items: center; 
+  justify-content: space-between;
+  margin-top: 15px;
+  page-break-inside: avoid;
+}
+
+.wifi-info {
+  flex-grow: 1;
+}
+
+.wifi-row {
+  margin-bottom: 12px;
+}
+.wifi-row:last-child { margin-bottom: 0; }
+
+.wifi-label { 
+  display: block;
+  font-size: 11px; 
+  text-transform: uppercase; 
+  color: var(--text-muted); 
+  font-weight: 700; 
+  letter-spacing: 0.05em; 
+  margin-bottom: 2px;
+}
+
+.wifi-value { 
+  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace; /* Monospace is vital for passwords */
+  font-size: 20px; 
+  color: var(--text-main); 
+  font-weight: 600; 
+  letter-spacing: -0.02em;
+  background: rgba(255,255,255,0.8);
+  padding: 2px 0;
+  border-radius: 4px;
+}
+
+.qr-box {
+  width: 120px; 
+  height: 120px; 
+  background: white; 
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  padding: 8px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  flex-shrink: 0; /* Prevents squishing */
+}
+.qr-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* --- Lists & Highlights --- */
+p { margin: 0 0 10px 0; font-size: 15px; color: #475569; }
+
+ol.steps { padding-left: 0; list-style: none; margin: 0; }
+
+ol.steps li { 
+  margin-bottom: 10px; 
+  font-size: 15px; 
+  padding-left: 46px; /* Align with H2 text */
+  position: relative;
+  color: #334155;
+}
+
+ol.steps li::before {
+  content: "•";
+  color: var(--primary);
+  font-weight: bold;
+  position: absolute;
+  left: 30px; /* Aligns visually under the step number */
+  font-size: 18px;
+  line-height: 18px;
+  top: 1px;
+}
+
+.highlight-box {
+  background: var(--bg-highlight);
+  border-left: 4px solid var(--border-highlight);
+  padding: 16px;
+  margin-top: 15px;
+  margin-left: 46px;
+  font-size: 14px;
+  color: #78350f;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  line-height: 1.5;
+}
+
+/* --- Footer --- */
+footer { 
+  margin-top: 60px; 
+  padding-top: 20px; 
+  border-top: 1px solid #e2e8f0; 
+  text-align: center; 
+  font-size: 12px; 
+  color: var(--text-muted); 
+}
+
+/* --- Screen-Only Elements --- */
+.no-print { 
+  display: flex; 
+  justify-content: center; 
+  padding: 40px 0; 
+}
+
+.btn { 
+  background: var(--primary); 
+  color: white; 
+  text-decoration: none; 
+  padding: 14px 28px; 
+  border-radius: 50px; 
+  font-weight: 600; 
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); 
+  transition: all 0.2s ease; 
+}
+
+.btn:hover { 
+  transform: translateY(-2px); 
+  background: var(--primary-dark);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4); 
+}
+
+/* --- Responsive (Mobile) --- */
+@media screen and (max-width: 210mm) {
+  .page {
+    margin: 0;
+    width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 20px;
+  }
+  .wifi-card {
+    flex-direction: column-reverse; /* Put QR code on top for mobile? Or keep row. Let's keep row but allow wrap */
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .qr-box {
+      margin: 0 auto; /* Center QR on small screens if wrapped */
+  }
+}
+
+/* --- Print Specifics --- */
+@page {
+  size: A4;
+  margin: 0; /* Let the body/page class handle margins */
+}
+
+@media print {
+  body { 
+    background: white; 
+    margin: 0;
+    padding: 0;
+  }
+  
+  .page { 
+    box-shadow: none; 
+    margin: 0; 
+    padding: 20mm; /* Slightly smaller padding for print safety */
+    width: 100%; 
+    max-width: 100%; 
+    border: none;
+  }
+
+  /* Hide UI elements */
+  .no-print { display: none !important; }
+
+  /* Ensure contrast and distinctness */
+  .wifi-card {
+    background-color: white !important; /* Save ink */
+    border: 2px solid #000; /* High contrast border */
+    border-left-width: 2px;
+    color: black;
+  }
+  
+  .step-num {
+      /* Force print background color */
+      -webkit-print-color-adjust: exact; 
+      print-color-adjust: exact;
+  }
+
+  .wifi-value {
+    background: none;
+    border: 1px solid #ccc; /* Box the password for clarity */
+    padding: 2px 8px;
+  }
+  
+  /* Prevent breaks */
+  .section, .wifi-card, .highlight-box { 
+    page-break-inside: avoid; 
+    break-inside: avoid; 
+  }
+  
+  /* Add space before step 3 to avoid it being too close to top if on new page */
+  .section:nth-of-type(3) {
+    margin-top: 60px;
+  }
+  
+  h1, h2, h3, p { color: #000; }
+  
+  /* Clean links */
+  a { text-decoration: none; color: #000; }
+}
+
+/* --- Printing Fixes --- */
+@media print {
+  /* This forces a clean break if the content is too long */
+  .page-break-before {
+    page-break-before: always;
+    margin-top: 40mm !important; /* Adds professional padding at top of page 2 */
+  }
+
+  .section {
+    page-break-inside: avoid;
+    margin-bottom: 30px;
+  }
+
+  /* Ensure the page container doesn't cut off */
+  .page {
+    height: auto;
+    min-height: initial;
+    padding: 15mm;
+  }
+}
+
+/* Helper class for the specific section */
+.page-break-before {
+    padding-top: 20px;
+}

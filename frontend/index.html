@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="/src/assets/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <title>SportScore!</title>
+  <script type="module">
+    // If the page is loaded as a module we can safely read import.meta.env
+    if (import.meta && import.meta.env && import.meta.env.VITE_API_URL) {
+      window.SCOREBOARD_API_BASE = String(import.meta.env.VITE_API_URL).replace(/\/$/, '');
+    }
+  </script>
+  <script>
+    // Non-module fallback + runtime rewrite for built assets
+    (function(){
+      try {
+        if (typeof window !== 'undefined' && window.SCOREBOARD_API_BASE) {
+          window.SCOREBOARD_API_BASE = String(window.SCOREBOARD_API_BASE).replace(/\/$/, '');
+          return;
+        }
+      } catch (e) {}
+      try {
+        window.SCOREBOARD_API_BASE = location.protocol + '//' + location.hostname + ':8000';
+      } catch (e) {
+        window.SCOREBOARD_API_BASE = '';
+      }
+
+      try {
+        const base = String(window.SCOREBOARD_API_BASE).replace(/\/$/, '');
+        const origFetch = window.fetch.bind(window);
+        window.fetch = function(input, init) {
+          try {
+            let url = input;
+            if (input instanceof Request) url = input.url;
+            if (typeof url === 'string' && url.indexOf('http://localhost:8000') === 0) {
+              const newUrl = url.replace(/^http:\/\/localhost:8000/, base);
+              if (input instanceof Request) input = new Request(newUrl, input); else if (typeof input === 'string') input = newUrl;
+            }
+          } catch (e) {}
+          return origFetch(input, init);
+        };
+        const patchIo = (ioCtor) => {
+          if (typeof ioCtor !== 'function') return ioCtor;
+          return function(url, opts) {
+            if (typeof url === 'string' && url.indexOf('http://localhost:8000') === 0) url = url.replace(/^http:\/\/localhost:8000/, base);
+            return ioCtor.call(this, url, opts);
+          };
+        };
+        if (window.io) window.io = patchIo(window.io);
+        Object.defineProperty(window, 'io', {
+          configurable: true,
+          enumerable: true,
+          set(v) { Object.defineProperty(this, 'io', { value: patchIo(v), writable: true }); },
+          get() { return (typeof this.__ioPatched !== 'undefined' && this.__ioPatched) ? this.__ioPatched : undefined; }
+        });
+      } catch (e) {}
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

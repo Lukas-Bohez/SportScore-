@@ -1,0 +1,78 @@
+
+
+Design checklist[1]
+
+Kleurgebruik[1]
+
+60-30-10 rule toepassen  
+Niet meer dan 2 hoofdkleuren  
+Hoofdkleur overheerst niet maar wordt goed toegepast op elementen die zeker moeten opvallen  
+Hoofdkleur = accentkleur voor zaken die mogen/moeten opvallen: Buttons, labels, actieve items...  
+Hoofdkleur: niet te flets of te donker  
+Light mode of dark mode, niets er tussenin  
+System kleuren bv groen voor positief of rood voor negatief[1]
+
+Grijswaarden[1]
+
+Gebruik een grayscale van een tiental grijswaarden gaande van heel donker (zwart of bijna zwart) tot heel lichtgrijs  
+Steek een klein beetje saturation van de hoofdkleur in de grijswaarden  
+Gebruiken voor achtergrond - voorgrond, bv lichts grijze achtergrond + witte kaders  
+Borders: niet te hard, niet te zacht  
+Belangrijke tekst: donkerder  
+Meta tekst: lichter (niet te licht, zie contrast)[1]
+
+Contrast[1]
+
+Leestekst: minstens 4.5:1  
+UI elementen of meta tekst: minstens 3:0  
+Tekst op foto’s: oppassen voor contrast, eventueel gradient overlay op toepassen of text shadow[1]
+
+Typografie[1]
+
+font-family[1]
+
+Geen standaard lettertype op Windows of Mac.  
+Gebruik een webfont dat goed rendert op scherm  
+Aantal verschillende fonts beperken (idealiter 1 voor UI + 1 voor headings als accent)[1]
+
+font-size[1]
+
+Leestekst groot genoeg (min 16px, liever 18px)  
+Headings duidelijk groter dan leestekst  
+Meta tekst mag kleiner, maar moet nog leesbaar blijven[1]
+
+Line-height[1]
+
+Line-height is ok voor de leesbaarheid  
+Minstens 1.5 voor kleine tekst (1.4 kan ook nog)  
+Niet kleiner dan de font-size voor grote tekst[1]
+
+Letter- en woordspatiëring[1]
+
+Geen overdreven letterspatiëring bij leestekst  
+Eventueel iets meer bij headings of knoppen als stijlkeuze, maar met mate  
+Woordspatiëring niet aanpassen tenzij echt nodig[1]
+
+Uitlijning en alineastructuur[1]
+
+Tekst links uitlijnen voor leesbaarheid (geen blokuitlijning)  
+Lange teksten opdelen in duidelijke paragrafen  
+Niet te lange regels (optimale regellengte ongeveer 60–80 karakters)[1]
+
+Componenten[1]
+
+Buttons  
+Links  
+Formuliervelden  
+Cards  
+Borders[1]
+
+Hiërarchie[1]
+
+Juiste, duidelijke hiërarchie met behulp van:  
+font-size  
+kleur  
+gewicht (bold vs regular)  
+witruimte  
+positie op de pagina[1]
+

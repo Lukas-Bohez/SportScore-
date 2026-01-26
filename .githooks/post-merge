@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Git hook to auto-deploy after a merge/pull
+# To enable, run: git config core.hooksPath .githooks
+
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Only deploy on the main/development branches if you want; adjust as needed
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$BRANCH" != "Main" && "$BRANCH" != "development" ]]; then
+  echo "Not deploying on branch $BRANCH"
+  exit 0
+fi
+
+# Run the helper script (requires sudo for deployment steps)
+bash "$REPO_ROOT/scripts/auto_deploy.sh"

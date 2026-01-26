@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SportScore - Leaderboard</title>
+    <link rel="stylesheet" href="css/leaderboard.css">
+    <link rel="stylesheet" href="css/themes.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🏆 SportScore - Leaderboard</h1>
+            <div class="session-info">
+                <span id="session-name">Sessie laden...</span>
+                <span id="session-status">Status: Laden...</span>
+            </div>
+            <div class="nav-links">
+                <a href="startscreen.html" class="nav-link">← Terug naar Admin pagina</a>
+            </div>
+            <div class="form-group" style="margin-top: 10px;">
+                <label for="activity-select">Activiteit:</label>
+                <select id="activity-select">
+                    <option value="">Alle sessie scores</option>
+                </select>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="session-details">
+                <div class="session-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Type:</span>
+                        <span id="game-type" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item" style="display:none;" data-removed-for-now="true">
+                        <span class="stat-label">Rondes:</span>
+                        <span id="rounds" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Teams:</span>
+                        <span id="team-count" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Aangemaakt:</span>
+                        <span id="created-at" class="stat-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="leaderboard-section">
+                <h2>🏅 Eindstand</h2>
+                <div class="leaderboard" id="leaderboard">
+                    <!-- Leaderboard will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="teams-section">
+                <h2>👥 Alle Teams</h2>
+                <div class="teams-grid" id="teams-grid">
+                    <!-- Teams will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="score-history-section">
+                <h2>📊 Score Geschiedenis</h2>
+                <div class="score-history" id="score-history">
+                    <!-- Score history will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-info">
+                <span>SportScore - Teambuilding Score Management</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/leaderboard.js"></script>
+</body>
+
+</html>

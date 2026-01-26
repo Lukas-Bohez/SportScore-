@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SportScore - Homepage</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+    <link rel="stylesheet" href="css/startscreen.css">
+    <link rel="stylesheet" href="css/buttons.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <style>
+        body {
+            padding-bottom: 80px;
+            /* Ensure content isn't hidden behind fixed nav */
+        }
+
+        .main-content {
+            display: flex;
+            justify-content: center;
+        }
+
+        .right-column {
+            max-width: 800px;
+            margin: 0 auto;
+            padding-bottom: 120px;
+            /* prevent content from being obscured by bottom nav */
+            box-sizing: border-box;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+
+        .control-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-orange {
+            background: linear-gradient(135deg, #ff8c00 0%, #ff7700 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(255, 140, 0, 0.2);
+        }
+
+        .btn-orange:hover {
+            background: linear-gradient(135deg, #ff7700 0%, #e66a00 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 140, 0, 0.3);
+        }
+
+        .btn-red {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+        }
+
+        .btn-red:hover {
+            background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color, #ddd);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary, #666);
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color, #007bff);
+            border-bottom-color: var(--primary-color, #007bff);
+        }
+
+        .tab-btn:hover {
+            color: var(--primary-color, #007bff);
+        }
+
+        .tab-content {
+            position: relative;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .power-user-link {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .nav-item:focus {
+            outline: none;
+        }
+
+        .content-section {
+            display: none;
+            padding: 20px;
+            min-height: calc(100vh - 200px);
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 20px;
+        }
+
+        .hero h2 {
+            font-size: 2.5em;
+            margin: 0 0 20px;
+            color: var(--text-color);
+        }
+
+        .hero p {
+            font-size: 1.2em;
+            margin: 0 0 30px;
+            color: var(--text-secondary, #666);
+        }
+
+        .hero .btn {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .hero .btn:hover {
+            background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+            transform: translateY(-2px);
+        }
+
+        .templates-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .template-card {
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 16px;
+            padding: 28px 24px 20px 24px;
+            flex: 1 1 320px;
+            max-width: 380px;
+            min-width: 260px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .template-card h3 {
+            margin-bottom: 18px;
+            font-size: 1.25em;
+            font-weight: 700;
+            color: #222;
+        }
+
+        .template-actions {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        @media (min-width: 700px) {
+            .templates-grid {
+                justify-content: center;
+            }
+
+            .template-card {
+                flex-basis: calc(50% - 20px);
+                max-width: 380px;
+            }
+        }
+
+        .manage-teams {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .manage-teams .team-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .active-session-view {
+            text-align: center;
+        }
+
+        .session-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .sessions-view {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .sessions-view h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            font-size: 1.8em;
+        }
+
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .view-toggle button {
+            padding: 8px 16px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-toggle button.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .sessions-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .session-item {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--shadow-color);
+            transition: transform 0.3s ease;
+        }
+
+        .session-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .session-item h4 {
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        .session-item .details {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .session-item .players {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .session-item .players div {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .session-item .btn {
+            margin-top: 15px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--card-bg);
+            border-top: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 8px var(--shadow-color);
+            z-index: 1000;
+            /* Ensure it appears on top of content */
+        }
+
+        @media (min-width: 768px) {
+            .bottom-nav {
+                justify-content: center;
+                gap: 40px;
+                padding: 15px 0;
+            }
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            border: 2px solid var(--text-color);
+            /* Dynamic border color for active/hover state */
+        }
+
+        .nav-item .icon {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+
+        .nav-item .label {
+            font-size: 0.8em;
+            color: var(--text-color);
+        }
+
+        /* Shutdown nav styling */
+        .nav-item.shutdown .icon {
+            color: #dc3545;
+        }
+
+        .nav-item.shutdown .label {
+            color: #dc3545;
+        }
+
+        .nav-item.shutdown:hover,
+        .nav-item.shutdown.active {
+            border: 2px solid #dc3545;
+        }
+
+        /* Highscores embedded styles */
+        .highscores-container {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        .highscores-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .highscores-header h2 {
+            margin: 0;
+        }
+
+        .highscores-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .highscores-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .highscores-card,
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 2px 8px var(--shadow-color);
+        }
+
+        .highscores-card h3,
+        .card h3 {
+            margin: 0 0 8px;
+            color: var(--text-color);
+        }
+
+        .highscores-row,
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            color: var(--text-color);
+        }
+
+        .highscores-row .label,
+        .row .label {
+            color: var(--text-secondary);
+        }
+
+        .highscores-controls select,
+        .highscores-controls input {
+            background: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .templates-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sessions-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .teams-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            justify-items: center;
+            max-width: 100%;
+            width: 100%;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        .team-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 247, 250, 0.96));
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .team-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
+        }
+
+        .team-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .team-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Ensure activity/team management sections fit within the right-column and don't overlap bottom navigation */
+        .activities-management,
+        .team-management,
+        .step.card {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 24px;
+            padding-bottom: 8px;
+        }
+
+        .team-name-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            line-height: 1.2;
+        }
+
+        .team-icon {
+            font-size: 1.4em;
+        }
+
+        .team-color-badge {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+            flex-shrink: 0;
+        }
+
+        .team-name {
+            font-weight: 700;
+            font-size: 1.05em;
+        }
+
+        .team-color-hex {
+            font-size: 0.8em;
+            color: var(--text-secondary, #6c757d);
+            letter-spacing: 0.5px;
+        }
+
+        .team-description {
+            color: var(--text-secondary, #6c757d);
+            margin-bottom: 12px;
+            font-size: 0.92em;
+        }
+
+        .team-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .team-actions button {
+            flex: 1;
+        }
+
+        /* Button styles matching simple-setup */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+            box-sizing: border-box;
+            min-height: 36px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+            min-height: 32px;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+        }
+
+        .team-form-container {
+            background: var(--card-background, #ffffff);
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .team-form-container.hidden {
+            display: none;
+        }
+
+        .team-form .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .team-form .form-group {
+            flex: 1;
+        }
+
+        .team-form .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.95em;
+        }
+
+        .team-form input,
+        .team-form select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .color-preview {
+            padding: 10px 20px;
+            min-width: 180px;
+            /* increased width for better visibility */
+            border-radius: 6px;
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.12s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            /* avoid wrapping */
+            margin-top: 0;
+            vertical-align: middle;
+            background-color: #3B82F6;
+            text-align: center;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-secondary, #6c757d);
+            font-style: italic;
+            padding: 40px 20px;
+            grid-column: 1 / -1;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--card-background, #ffffff);
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .player-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .player-item span {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .player-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .team-select {
+            padding: 4px 8px;
+            font-size: 13px;
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 4px;
+            background: var(--background-color);
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        .player-manager-input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .player-manager-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color, #e1e5e9);
+            border-radius: 6px;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+
+        /* Active Session Styles */
+        #active-sessions-container {
+            margin-top: 20px;
+        }
+
+        .active-session-card {
+            background: var(--card-bg);
+            border: 2px solid var(--primary-color, #007bff);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .active-session-card.no-active {
+            border-color: var(--border-color, #ddd);
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary, #666);
+        }
+
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color, #ddd);
+            padding-bottom: 15px;
+        }
+
+        .session-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-box {
+            background: var(--background-color, #f8f9fa);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color, #007bff);
+        }
+
+        .detail-box label {
+            display: block;
+            color: var(--text-secondary, #666);
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .detail-box value {
+            font-size: 1.1em;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .activity-selector-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: var(--background-color, #f8f9fa);
+            border-radius: 8px;
+            border: 1px solid var(--border-color, #ddd);
+        }
+
+        .activity-selector-container label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        .activity-selector-container select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color, #ddd);
+            border-radius: 6px;
+            background: var(--background-color);
+            color: var(--text-color);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .scores-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--background-color, #f8f9fa);
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color, #ddd);
+        }
+
+        .score-item:last-child {
+            border-bottom: none;
+        }
+
+        .score-item-name {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .score-item-value {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--primary-color, #007bff);
+        }
+
+        .session-controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .session-controls .btn {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        /* History Session Styles */
+        .history-session-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color, #ddd);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .history-session-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+            border-color: var(--primary-color, #007bff);
+        }
+
+        .history-session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-session-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .history-session-date {
+            font-size: 0.9em;
+            color: var(--text-secondary, #666);
+        }
+
+        .history-session-sport {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: var(--text-secondary, #666);
+        }
+
+        .history-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary, #666);
+        }
+
+        .active-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary, #666);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--background-color, #fff);
+            margin: 20px;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-close {
+            position: sticky;
+            top: 0;
+            right: 0;
+            float: right;
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--text-secondary, #666);
+            cursor: pointer;
+            padding: 10px 20px;
+            z-index: 1;
+            background: var(--background-color, #fff);
+            border-radius: 0 12px 0 0;
+        }
+
+        .modal-close:hover,
+        .modal-close:focus {
+            color: var(--text-color, #000);
+        }
+
+        #history-modal-body {
+            padding: 0 24px 24px 24px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>SportScore</h1>
+            <p>Digitaal scorebord voor teambuildings</p>
+        </header>
+
+        <main>
+            <!-- Start Session Section -->
+            <div id="start-section" class="content-section">
+                <div class="hero">
+                    <h2>Start Nieuwe Sessie</h2>
+                    <p>Kies een template om snel te beginnen, of maak een custom sessie.</p>
+                    <a href="simple-setup.html" class="btn">Sessie Starten</a>
+                </div>
+                <div class="templates-grid" id="templates-grid">
+                    <div class="template-card">
+                        <h3>test sessie aanmaken</h3>
+                        <div class="template-actions">
+                            <button class="btn" onclick="homepage.loadTemplate(1768468349066)">Gebruiken</button>
+                            <button class="delete-team-btn" onclick="homepage.deleteTemplate(1768468349066)">Verwijderen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Session Section -->
+            <div id="active-section" class="content-section">
+                <div class="right-column">
+                    <div class="active-session-view">
+                        <h2>Actieve Sessie</h2>
+                        <div id="active-sessions-container">
+                            <div id="active-sessions-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Teams Section -->
+            <!-- Manage Teams Section -->
+            <div id="beheer-section" class="content-section active">
+                <div class="right-column">
+                    <!-- Step 3: Teams Management -->
+                    <div class="step card">
+                        <div class="team-management" id="team-management">
+                            <div class="section-header">
+                                <h2>Teams Beheer</h2>
+                                <button id="add-team-btn" class="add-team-btn btn-sm">+ Nieuw Team</button>
+                            </div>
+
+                            <div id="team-form-container" class="team-form-container hidden">
+                                <h3 id="team-form-title">Nieuw Team</h3>
+                                <form id="team-form" class="team-form">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="team-name">Team Naam:</label>
+                                            <input type="text" id="team-name" name="team-name"
+                                                placeholder="bijv. Team Blauw" required>
+                                        </div>
+                                        <div class="form-group color-group">
+                                            <label for="team-color">Kleur:</label>
+                                            <input type="color" id="team-color" name="team-color" value="#3B82F6"
+                                                style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+                                            <div id="color-preview" class="color-preview">#3B82F6</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="team-icon">Icoon:</label>
+                                            <select id="team-icon" name="team-icon">
+                                                <option value="team">👥 Team</option>
+                                                <option value="star">⭐ Ster</option>
+                                                <option value="trophy">🏆 Trofee</option>
+                                                <option value="fire">🔥 Vuur</option>
+                                                <option value="rocket">🚀 Raket</option>
+                                                <option value="crown">👑 Kroon</option>
+                                                <option value="lightning">⚡ Bliksem</option>
+                                                <option value="heart">❤️ Hart</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="team-description">Beschrijving (optioneel):</label>
+                                            <input type="text" id="team-description" name="team-description"
+                                                placeholder="bijv. De beste spelers">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-actions">
+                                        <button type="submit" id="team-submit-btn"
+                                            class="save-team-btn">Toevoegen</button>
+                                        <button type="button" id="cancel-team-btn"
+                                            class="cancel-team-btn btn-sm">Annuleren</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Teams are displayed here -->
+                            <div id="teams-list" class="teams-list">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Players Management -->
+                    <div class="step card">
+                        <div id="players-section">
+                            <div class="section-header">
+                                <h2>Spelers Beheer</h2>
+                            </div>
+
+                            <div id="player-manager" style="display: block;">
+                                <div class="player-manager-input-row form-group vertical">
+                                    <input type="text" id="pm-player-name" class="player-manager-input full-width"
+                                        placeholder="Nieuwe speler naam" aria-label="Nieuwe speler naam">
+                                    <button id="add-player-global-btn" class="add-team-btn btn-sm">Toevoegen</button>
+                                </div>
+
+                                <div class="import-players-section" style="margin-top:8px; margin-bottom:12px;">
+                                    <button id="open-player-import-btn" class="btn btn-sm">Importeer spelers</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div id="pm-players-list"></div>
+                    <div id="player-form-section" class="step card">
+                        <div class="form-group">
+                            <label for="player-search">Zoek spelers:</label>
+                            <input type="text" id="player-search" placeholder="Typ om te zoeken...">
+                        </div>
+                        <div class="players-list" id="players-list"></div>
+                    </div>
+
+                    <!-- Activities Management -->
+                    <div class="step card">
+                        <div class="activities-management" id="activities-management">
+                            <div class="section-header">
+                                <h2>Activiteiten Beheer</h2>
+                                <button id="add-activity-btn" class="add-team-btn btn-sm">+ Nieuwe Activiteit</button>
+                            </div>
+
+                            <div id="activity-form-container" class="team-form-container hidden">
+                                <form id="activity-form" class="team-form">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="activity-name">Activiteit Naam:</label>
+                                            <input type="text" id="activity-name" name="activity-name"
+                                                placeholder="bijv. Basketbal 3-Punters" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="activity-sport">Stijl (sport type):</label>
+                                            <select id="activity-sport" name="activity-sport">
+                                                <option value="voetbal" selected>⚽ Voetbal</option>
+                                                <option value="quiz">🧠 Quiz</option>
+                                                <option value="basketbal">🏀 Basketbal</option>
+                                                <option value="volleybal">🏐 Volleybal</option>
+                                                <option value="hockey">🏑 Hockey</option>
+                                                <option value="tennis">🎾 Tennis</option>
+                                                <option value="atletiek">🏃 Atletiek</option>
+                                                <option value="zwemmen">🏊 Zwemmen</option>
+                                                <option value="fietsen">🚴 Wielrennen</option>
+                                                <option value="hardlopen">🏃 Hardlopen</option>
+                                                <option value="esports">🎮 E-Sports</option>
+                                                <option value="boardgame">🎲 Bordspel</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="activity-scoring">Scoring Mode:</label>
+                                            <select id="activity-scoring" name="activity-scoring">
+                                                <option value="team">👥 Team Scores</option>
+                                                <option value="team_with_players">👥👤 Team met Spelers</option>
+                                                <option value="player">👤 Speler Scores</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="activity-game-type">Game Type (modus):</label>
+                                            <select id="activity-game-type" name="activity-game-type">
+                                                <option value="sport_challenge" selected>🏃 Sport Challenge</option>
+                                                <option value="quiz">🧠 Quiz Modus</option>
+                                                <option value="elimination">❌ Eliminatie Modus</option>
+                                                <option value="team_vs_time">⏱️ Team vs Tijd</option>
+                                                <option value="golf">⛳ Golf Scoring</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Team-vs-Time settings moved below for improved layout -->
+                                    </div>
+
+                                    <!-- Team-vs-Time settings (improved layout) - removed, using defaults -->
+                                    <div class="form-row">
+                                        <div class="form-group full-width">
+                                            <!-- Team vs Time settings removed - defaults to lower time wins, no aggregation -->
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="activity-rounds">Aantal Rondes:</label>
+                                            <input type="number" id="activity-rounds" name="activity-rounds" value="1"
+                                                min="1" max="20" title="Aantal rondes voor deze activiteit">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="activity-time">Tijd per Ronde (sec):</label>
+                                            <input type="number" id="activity-time" name="activity-time"
+                                                placeholder="Optioneel" min="1"
+                                                title="Tijdslimiet per ronde in seconden">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="activity-desc">Beschrijving (optioneel):</label>
+                                        <input type="text" id="activity-desc" name="activity-desc"
+                                            placeholder="bijv. Snelle 3-punters ronde">
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="save-team-btn">Activiteit Opslaan</button>
+                                        <button type="button" id="cancel-activity-btn"
+                                            class="cancel-team-btn btn-sm">Annuleren</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div id="activities-list" class="teams-list"></div>
+                        </div>
+                    </div>
+                </div> <!-- end right-column -->
+            </div> <!-- end beheer-section -->
+            <div id="sessions-section" class="content-section">
+                <div class="sessions-view">
+                    <h2>Geschiedenis</h2>
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" data-tab="history">Sessie Geschiedenis</button>
+                        <button class="tab-btn" data-tab="highscores">Highscores</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="history-tab" class="tab-pane active">
+                            <div class="history-export-controls"
+                                style="margin-bottom:10px; display:flex; gap:8px; align-items:center;">
+                                <button id="export-all-btn" class="btn btn-sm">Export alle sessies</button>
+                                <span id="export-status"
+                                    style="color:var(--text-secondary); font-size:0.9em; margin-left:8px;"></span>
+                            </div>
+
+                            <div class="sessions-list" id="history-sessions-list">
+                                <!-- Closed sessions will be loaded here -->
+                            </div>
+                        </div>
+                        <div id="highscores-tab" class="tab-pane">
+                            <div class="highscores-container">
+                                <div class="highscores-header">
+                                    <div>
+                                        <h2>🏆 Global Highscores</h2>
+                                        <div style="color: var(--text-secondary);">Beste resultaten per activiteit over
+                                            alle sessies
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="highscores-controls">
+                                    <label for="filter-sport" class="label">Filter sport/stijl:</label>
+                                    <select id="filter-sport">
+                                        <option value="">Alle</option>
+                                        <option value="quiz">Quiz</option>
+                                        <option value="voetbal">Voetbal</option>
+                                        <option value="basketbal">Basketbal</option>
+                                        <option value="volleybal">Volleybal</option>
+                                        <option value="hockey">Hockey</option>
+                                        <option value="tennis">Tennis</option>
+                                        <option value="atletiek">Atletiek</option>
+                                        <option value="zwemmen">Zwemmen</option>
+                                        <option value="fietsen">Wielrennen</option>
+                                        <option value="hardlopen">Hardlopen</option>
+                                        <option value="esports">E-Sports</option>
+                                        <option value="boardgame">Bordspel</option>
+                                    </select>
+                                    <label for="search-activity" class="label">Zoek activiteit:</label>
+                                    <input id="search-activity" placeholder="bv. Basketbal 3-Punters" />
+                                </div>
+                                <div id="highscores-grid" class="highscores-grid">
+                                    <!-- Cards will be injected -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Session Modal -->
+            <div id="history-modal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close">&times;</span>
+                    <div id="history-modal-body"></div>
+                </div>
+            </div>
+
+            <!-- Export Confirm Modal -->
+            <div id="export-confirm-modal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close export-close">&times;</span>
+                    <div style="padding:12px; max-height:70vh; overflow:auto;">
+                        <h3>Bevestig export</h3>
+                        <div id="export-confirm-info" style="color:var(--text-secondary); margin-bottom:8px;"></div>
+                        <div style="margin-bottom:8px;"><strong>Selecteer activiteiten om te exporteren:</strong></div>
+                        <div id="export-confirm-activity-list"
+                            style="max-height:300px; overflow:auto; border:1px solid #eee; padding:8px; border-radius:6px;">
+                        </div>
+                        <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+                            <div style="font-size:0.9em; color:var(--text-secondary);">Formaat: XLSX</div>
+                            <button id="export-confirm-start" class="btn btn-sm" style="margin-left:auto;">Start
+                                export</button>
+                            <button id="export-confirm-cancel" class="btn btn-sm">Annuleren</button>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <div style="height:10px; background:#eee; border-radius:6px; overflow:hidden;">
+                                <div id="export-confirm-progress"
+                                    style="height:100%; width:0%; background:var(--primary-color,#3B82F6);"></div>
+                            </div>
+                            <div style="margin-top:6px; font-size:0.9em; color:var(--text-secondary);">Voortgang: <span
+                                    id="export-confirm-percent">0%</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Import Modal -->
+            <div id="player-import-modal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close import-close">&times;</span>
+                    <div style="padding:12px; max-height:70vh; overflow:auto;">
+                        <h3>Importeer spelers</h3>
+                        <div style="margin-bottom:8px;"><label for="player-import-file">Bestand (CSV / XLSX):</label>
+                            <input type="file" id="player-import-file" accept=".csv,.xlsx,.xls" />
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                            <label><input type="checkbox" id="player-import-auto-create-teams" checked /> Teams
+                                automatisch aanmaken</label>
+                            <label style="margin-left:8px;">Gedrag bij duplicaten:
+                                <select id="player-import-duplicate-mode">
+                                    <option value="skip">Overslaan</option>
+                                    <option value="merge">Samenvoegen / Toewijzen team</option>
+                                    <option value="create">Nieuw aanmaken</option>
+                                </select>
+                            </label>
+                            <button id="player-import-auto-detect-btn" class="btn btn-sm">Detecteer kolommen</button>
+                            <button id="player-import-start-btn" class="btn btn-sm">Importeer</button>
+                        </div>
+                        <div id="player-import-mapping"
+                            style="margin-top:8px; display:none; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <div style="display:flex; gap:6px; align-items:center;"><label>Naam modus:</label>
+                                <select id="player-import-name-mode">
+                                    <option value="full">Volledige naam</option>
+                                    <option value="split">Voornaam + Achternaam</option>
+                                </select>
+                            </div>
+                            <div id="map-name-col" style="display:flex; gap:6px; align-items:center;"><label>Naam
+                                    Kolom:</label>
+                                <select id="player-import-col-name"></select>
+                            </div>
+                            <div id="map-first-last" style="display:flex; gap:6px; align-items:center;">
+                                <div style="display:flex; gap:6px; align-items:center;"><label>Voornaam Kolom:</label>
+                                    <select id="player-import-col-first"></select>
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <label>Achternaam Kolom:</label>
+                                    <select id="player-import-col-last"></select>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:6px; align-items:center;"><label>Team Kolom:</label>
+                                <select id="player-import-col-team"></select>
+                            </div>
+                        </div>
+
+                        <!-- Mapping summary (visible by default) -->
+                        <div id="player-import-mapping-summary"
+                            style="margin-top:8px; color:var(--text-secondary); font-size:0.95em;">Huidige mapping:
+                            <span id="player-import-mapping-summary-text">(geen bestand geselecteerd)</span> <button
+                                id="player-import-edit-mapping-btn-inline" class="btn btn-sm"
+                                style="margin-left:8px;">Bewerk mapping</button>
+                        </div>
+
+                        <div style="margin-top:8px;">
+                            <div id="player-import-progress"
+                                style="height:12px; background:#eee; border-radius:6px; overflow:hidden;">
+                                <div id="player-import-progress-bar"
+                                    style="width:0%; height:100%; background:var(--primary-color,#3B82F6);"></div>
+                            </div>
+                            <div style="margin-top:6px; display:flex; gap:8px; align-items:center;"><span
+                                    id="player-import-progress-percent"
+                                    style="font-size:0.9em; color:var(--text-secondary);">0%</span><span
+                                    id="player-import-result"
+                                    style="margin-left:8px; color:var(--text-secondary);"></span>
+                            </div>
+                        </div>
+                        <div id="player-import-preview"
+                            style="margin-top:8px; max-height:220px; overflow:auto; background:var(--panel-bg); padding:8px; border-radius:6px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-item" data-section="active">
+                <div class="icon">⚡</div>
+                <div class="label">Actief</div>
+            </div>
+            <div class="nav-item" data-section="sessions">
+                <div class="icon">🕐</div>
+                <div class="label">geschiedenis</div>
+            </div>
+            <div class="nav-item" data-section="start">
+                <div class="icon">🚀</div>
+                <div class="label">Start</div>
+            </div>
+
+            <div class="nav-item shutdown" id="shutdown-nav" role="button" tabindex="0" title="Schakel Pi uit">
+                <div class="icon">⏻</div>
+                <div class="label">Uit</div>
+            </div>
+
+            <div class="nav-item active" data-section="beheer">
+                <div class="icon">⚙️</div>
+                <div class="label">Beheer</div>
+            </div>
+        </nav>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/shared-utils.js"></script>
+    <script src="js/afsluiten.js"></script>
+    <script type="module" src="js/homepageExport.js"></script>
+    <script type="module" src="js/homepage.js"></script>
+    <script type="module" src="js/homepageHistory.js"></script>
+
+</body>
+
+</html>
