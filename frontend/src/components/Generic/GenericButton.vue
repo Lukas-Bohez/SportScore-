@@ -1,6 +1,7 @@
 <template>
   <button
     :class="['generic-button', `generic-button--${variant}`]"
+    :disabled="disabled"
     @click="$emit('click', $event)"
   >
     <slot
@@ -27,7 +28,11 @@ export default {
       type: String,
       default: "primary",
       validator: (value) =>
-        ["primary", "secondary", "tertiary", "quaternary"].includes(value),
+        ["primary", "secondary", "tertiary", "quaternary", "danger"].includes(value),
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["click"],
@@ -74,6 +79,27 @@ export default {
   color: var(--black-100);
 }
 
+.generic-button--quaternary {
+  padding: 0 0;
+  color: var(--black-100);
+  background-color: transparent;
+  /* background-color: var(--black-10); */
+}
+
+.generic-button--quaternary:hover {
+  color: var(--black-50);
+  background-color: transparent;
+}
+
+.generic-button--danger {
+  background-color: var(--red-100);
+  color: var(--white);
+}
+
+.generic-button--danger:hover:not(:disabled) {
+  background-color: var(--red-80);
+}
+
 /* Icon color styles */
 .generic-button--primary :deep(svg) {
   color: var(--white);
@@ -87,23 +113,18 @@ export default {
   color: var(--black-100);
 }
 
-.generic-button--quaternary {
-  padding: 0 0;
-  color: var(--black-100);
-  background-color: transparent;
-  /* background-color: var(--black-10); */
-}
-
-.generic-button--quaternary:hover {
-  color: var(--black-50);
-  background-color: transparent;
-}
-.generic-button--quaternary:hover :deep(svg) {
-  color: var(--black-50);
-}
-
 .generic-button--quaternary:deep(svg) {
   color: var(--black-100);
   transition: all 0.3s ease;
+}
+
+.generic-button--danger :deep(svg) {
+  color: var(--white);
+}
+
+.generic-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 </style>
