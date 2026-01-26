@@ -3,23 +3,6 @@
     <h2><strong>SportScore!</strong></h2>
     <h4>Laat de wedstrijd <strong>beginnen!</strong></h4>
 
-    <!-- TEST KNOP - verwijder dit later -->
-    <!-- <div style="position: fixed; top: 10px; right: 10px; z-index: 9999">
-      <button
-        @click="testNavigate"
-        style="
-          padding: 10px 20px;
-          background: red;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-        "
-      >
-        TEST: Ga naar Loading
-      </button>
-    </div> -->
-
     <div class="qr-screen-content">
       <div class="qr-screen-content-left">
         <h3>Stap 1 <strong> Verbinden</strong></h3>
@@ -62,54 +45,6 @@
 </template>
 <script setup>
 import FeatureDevider from "../../components/features/FeatureDevider.vue";
-import { onMounted, onUnmounted, watch } from "vue";
-import { useRouter } from "vue-router";
-import { useBigScreenSync } from "@/composables/useBigScreenSync";
-
-const router = useRouter();
-const { currentScreen, startPolling, stopPolling } = useBigScreenSync();
-
-// TEST functie - verwijder dit later
-const testNavigate = () => {
-  console.log("🧪 TEST: Manually navigating to LoadingScreen");
-  router.push({ name: "loadingScreen" });
-};
-
-// Watch for screen changes
-watch(currentScreen, (newScreen) => {
-  if (!newScreen) return;
-
-  console.log("📺 QrScreen: Screen change detected:", newScreen);
-
-  // Map screen names to routes
-  const screenRoutes = {
-    loading: "loadingScreen",
-    countdown: "countdown",
-    podium: "podiumscreen",
-    scorescreen: "scorescreen",
-    qrscreen: "qrscreen",
-  };
-
-  const routeName = screenRoutes[newScreen.screen];
-  if (routeName && routeName !== "qrscreen") {
-    // Don't navigate to itself
-    console.log(`📺 QrScreen: Navigating to ${routeName}...`);
-    router.push({
-      name: routeName,
-      params: newScreen.session_id ? { id: newScreen.session_id } : {},
-    });
-  }
-});
-
-onMounted(() => {
-  console.log("📺 QrScreen: Starting screen sync...");
-  startPolling();
-});
-
-onUnmounted(() => {
-  console.log("📺 QrScreen: Stopping screen sync...");
-  stopPolling();
-});
 </script>
 
 <style scoped>
