@@ -4,6 +4,11 @@
       <p class="card-title">{{ title }}</p>
       <p class="card-date">{{ date }}</p>
     </div>
+    <div class="card-meta" v-if="(teams && teams.length) || (activities && activities.length)">
+      <span v-if="teams && teams.length" class="meta-item">{{ teams.length }} teams</span>
+      <span v-if="activities && activities.length" class="meta-item">{{ activities.length }} activiteiten</span>
+    </div>
+
     <div v-if="activities && activities.length > 0" class="card-activities">
       <p class="activities-label">Activiteiten:</p>
       <div class="activities-list">
@@ -90,6 +95,22 @@ defineProps({
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+.card-meta {
+  color: var(--black-60);
+  font-size: var(--font-size-S);
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.meta-item {
+  background: var(--background-color);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--black-80);
+  font-weight: 600;
+  font-size: var(--font-size-S);
 }
 
 .activities-label {

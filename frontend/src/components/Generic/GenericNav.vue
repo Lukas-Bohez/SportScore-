@@ -4,6 +4,7 @@ import GenericButton from "./GenericButton.vue";
 import ShutdownModal from "../ShutdownModal.vue";
 import { RouterLink } from "vue-router";
 import { ref } from "vue";
+import { useApi } from "@/composables/useApi";
 
 export default {
   name: "GenericNav",
@@ -29,31 +30,25 @@ export default {
       showShutdownModal.value = false;
     };
 
+    const { post } = useApi();
+
     const handleShutdown = async () => {
       isShuttingDown.value = true;
       try {
-        const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-        const response = await fetch(`${baseURL}/api/v1/system/shutdown`, {
-          method: "POST",
-        });
-
-        if (response.status === 202 || response.status === 200) {
-          alert("Shutdown gestart. De Raspberry Pi zal nu afsluiten.");
-          // Keep modal open with busy state
-        } else if (response.status === 403) {
-          alert("Fout: ongeldige admin secret.");
+        await post('/api/v1/system/shutdown');
+        alert('Shutdown gestart. De Raspberry Pi zal nu afsluiten.');
+        // Keep modal open with busy state
+      } catch (error) {
+        const msg = String(error && (error.message || error.detail)) || String(error);
+        if (msg.includes('403') || msg.toLowerCase().includes('forbidden')) {
+          alert('Fout: ongeldige admin secret.');
           isShuttingDown.value = false;
           closeShutdownModal();
         } else {
-          const body = await response.json().catch(() => ({}));
-          alert("Fout bij afsluiten: " + (body.detail || response.statusText));
+          alert('Fout bij afsluiten: ' + msg);
           isShuttingDown.value = false;
           closeShutdownModal();
         }
-      } catch (error) {
-        alert("Netwerkfout: " + error.message);
-        isShuttingDown.value = false;
-        closeShutdownModal();
       }
     };
 

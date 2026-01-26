@@ -57,6 +57,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import GenericResult from "../../components/Generic/GenericResult.vue";
+import { useApi } from "@/composables/useApi";
+const { get } = useApi();
 
 const currentActivity = ref(null);
 const scores = ref([]);
@@ -74,12 +76,9 @@ let timerInterval = null;
 const pollActiveSession = async () => {
   try {
     // Get active session
-    const sessionResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions`,
-    );
-    const sessionData = await sessionResponse.json();
-    const activeSessions = sessionData.sessions.filter(
-      (s) => s.status === "active",
+    const sessionData = await get('/api/v1/sessions');
+    const activeSessions = (sessionData.sessions || sessionData || []).filter(
+      (s) => s.status === 'active',
     );
 
     if (activeSessions.length === 0) {
@@ -98,11 +97,8 @@ const pollActiveSession = async () => {
     }
 
     // Load activities for this session
-    const activitiesResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.id}/activities`,
-    );
-    const activitiesData = await activitiesResponse.json();
-    const activities = activitiesData.activities || activitiesData;
+    const activitiesData = await get(`/api/v1/sessions/${session.id}/activities`);
+    const activities = activitiesData.activities || activitiesData || [];
 
     if (activities.length === 0) {
       console.log("No activities found");
@@ -194,27 +190,21 @@ const loadActivityData = async (activityId, sessionId) => {
     await loadScores(activityId);
 
     // Load teams
-    const teamsResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/teams`,
-    );
-    const teamsData = await teamsResponse.json();
-    teams.value = teamsData.teams || teamsData;
-    console.log("✅ Teams loaded:", teams.value);
+    const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
+    teams.value = teamsData.teams || teamsData || [];
+    console.log('✅ Teams loaded:', teams.value);
 
     // Load all players
     players.value = [];
     for (const team of teams.value) {
-      const playersResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
-      );
-      const playersData = await playersResponse.json();
+      const playersData = await get(`/api/v1/sessions/${sessionId}/teams/${team.id}/players`);
       if (playersData.players) {
         players.value.push(
           ...playersData.players.map((p) => ({ ...p, team_id: team.id })),
         );
       }
     }
-    console.log("✅ Players loaded:", players.value);
+    console.log('✅ Players loaded:', players.value);
 
     console.log("✅ Activity data loaded");
   } catch (error) {
@@ -225,11 +215,8 @@ const loadActivityData = async (activityId, sessionId) => {
 // Load scores only
 const loadScores = async (activityId) => {
   try {
-    const scoresResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/activities/${activityId}/scores`,
-    );
-    const scoresData = await scoresResponse.json();
-    scores.value = scoresData.scores || scoresData;
+    const scoresData = await get(`/api/v1/activities/${activityId}/scores`);
+    scores.value = scoresData.scores || scoresData || [];
   } catch (error) {
     console.error("❌ Failed to load scores:", error);
   }

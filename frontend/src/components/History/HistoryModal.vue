@@ -7,7 +7,7 @@
           <p class="muted">{{ formatDate(session.completed_at || session.created_at) }}</p>
         </div>
         <div class="modal-actions">
-          <GenericButton class="btn-export" variant="secondary" @click="exportSession">Exporteer sessie</GenericButton>
+          <GenericDropdown class="export-dropdown" :options="exportOptions" v-model="exportChoice" placeholder="Exporteer" />
           <GenericButton class="btn-close" variant="quaternary" @click="close" title="Sluiten">✕</GenericButton>
         </div>
       </div>
@@ -15,15 +15,12 @@
       <div class="history-modal-body">
         <div class="session-summary">
           <div class="detail-box">
-            <label>Teams</label>
             <value>{{ (session.teams || []).length }} {{ ((session.teams || []).length === 1) ? 'team' : 'teams' }}</value>
           </div>
           <div class="detail-box">
-            <label>Activiteiten</label>
             <value>{{ (session.activities || []).length }} {{ ((session.activities || []).length === 1) ? 'activiteit' : 'activiteiten' }}</value>
           </div>
           <div class="detail-box">
-            <label>Spelers</label>
             <value>{{ playerCount }} {{ (playerCount === 1) ? 'speler' : 'spelers' }}</value>
           </div>
         </div>
@@ -230,6 +227,37 @@ function exportSession() {
   }
 }
 
+// export via XLSX (uses src/utils/exporter.js)
+const exportChoice = ref("");
+const exportOptions = [
+  { label: 'Download (JSON)', value: 'json' },
+  { label: 'Download (XLSX - volledig)', value: 'xlsx' }
+];
+
+watch(exportChoice, async (v) => {
+  if (!v) return;
+  try {
+    if (v === 'json') {
+      exportSession();
+    } else if (v === 'xlsx') {
+      await exportSessionXlsx();
+    }
+  } catch (err) {
+    console.error('Export failed', err);
+  } finally {
+    exportChoice.value = '';
+  }
+});
+
+async function exportSessionXlsx() {
+  try {
+    const mod = await import('@/utils/exporter');
+    await mod.exportSessionToXlsx(internalSession.value);
+  } catch (e) {
+    console.error('Failed to export XLSX:', e);
+  }
+}
+
 function parseScore(raw, isTimeMode) {
   if (raw === undefined || raw === null) return null;
   if (typeof raw === "string") {
@@ -411,6 +439,13 @@ function sortedPlayers(playersObj) {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.export-dropdown .generic-dropdown__select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  font-weight: 600;
 }
 .btn-close {
   padding: 6px 8px;

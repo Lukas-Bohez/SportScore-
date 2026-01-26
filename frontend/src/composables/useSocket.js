@@ -17,11 +17,14 @@ export function useSocket() {
       return socket;
     }
 
-    const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-    console.log("🔌 Creating new socket connection to:", baseURL);
+    // Allow using a relative origin when VITE_API_URL is not set so dev proxy can handle socket.io
+    const envBase = import.meta.env.VITE_API_URL || '';
+    const socketUrl = envBase || undefined; // undefined => connect to current origin
+    console.log("🔌 Creating new socket connection to:", socketUrl || 'current origin');
 
-    socket = io(baseURL, {
-      transports: ["websocket", "polling"],
+    socket = io(socketUrl, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

@@ -241,7 +241,7 @@ import { ElNotification } from "element-plus";
 import { Plus } from "lucide-vue-next";
 
 const router = useRouter();
-const { get } = useApi();
+const { get, post } = useApi();
 
 const loading = ref(true);
 const activeSession = ref(null);
@@ -282,12 +282,10 @@ const loadActiveSession = async () => {
   try {
     loading.value = true;
 
-    // Get active session
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions`,
-    );
-    const data = await response.json();
-    const activeSessions = data.sessions.filter((s) => s.status === "active");
+    // Get active session (use composable get so we hit relative /api when VITE_API_URL is not set)
+    const data = await get('/api/v1/sessions');
+    const allSessions = data.sessions || data || [];
+    const activeSessions = (allSessions || []).filter((s) => s.status === 'active');
 
     if (activeSessions.length === 0) {
       console.log("No active session found");
@@ -469,22 +467,7 @@ const addScore = async () => {
       round_number: currentRound.value,
     };
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/activities/${selectedActivity.value.id}/scores`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scoreData),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
+    const result = await post(`/api/v1/activities/${selectedActivity.value.id}/scores`, scoreData);
     console.log("✅ Score added successfully:", result);
 
     ElNotification({
@@ -541,22 +524,7 @@ const addTimeScore = async () => {
       round_number: currentRound.value,
     };
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/activities/${selectedActivity.value.id}/scores`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scoreData),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
+    const result = await post(`/api/v1/activities/${selectedActivity.value.id}/scores`, scoreData);
     console.log("✅ Time score added successfully:", result);
 
     ElNotification({
@@ -690,22 +658,9 @@ const endSession = async () => {
 
   try {
     // Update session status to 'completed' in API
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${activeSession.value.id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "completed" }),
-      },
-    );
+    await put(`/api/v1/sessions/${activeSession.value.id}`, { status: 'completed' });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    console.log("✅ Session status updated to completed");
+    console.log('✅ Session status updated to completed');
 
     // Clear localStorage for ScoreScreen
     localStorage.removeItem("selectedActivityId");
