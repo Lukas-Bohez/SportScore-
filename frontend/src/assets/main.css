@@ -94,6 +94,14 @@ main {
   height: calc(100vh - 4rem);
   overflow-y: auto;
 }
+
+.vue-devtools__anchor-btn {
+  display: none !important;
+}
+
+.vue-devtools__panel {
+  display: none !important;
+}
 .layout-app-pages {
   /* position: relative; */
   display: flex;
