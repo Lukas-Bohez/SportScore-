@@ -52,14 +52,54 @@ const isTime = ref(false);
 
 const { get } = useApi();
 
-watch(() => props.activity, async (a) => {
-  leaderboard.value = [];
-  if (!a) return;
-  isTime.value = String(a.game_type) === 'team_vs_time';
+  // Helper to normalize score value for display & comparison
+  const extractNumeric = (it) => {
+    const v = it?.total_score ?? it?.score ?? it?.punten ?? it?.score_value;
+    if (v == null) return NaN;
+    if (typeof v === 'string' && v.includes(':')) {
+      // parse mm:ss.xxx
+      const parts = v.split(':');
+      const minutes = parseInt(parts[0], 10) || 0;
+      const secondsParts = parts[1] ? parts[1].split('.') : ['0'];
+      const seconds = parseInt(secondsParts[0], 10) || 0;
+      const ms = secondsParts[1] ? Math.round(Number('0.' + secondsParts[1]) * 1000) : 0;
+      return Math.abs(minutes * 60 * 1000 + seconds * 1000 + ms);
+    }
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  };
   loading.value = true;
   try {
     const res = await get(`/api/v1/activities/${a.id}/leaderboard`);
     leaderboard.value = res.leaderboard || [];
+
+    // Ensure leaderboard ordering: default high-to-low, except for time-based or explicitly lower-is-better activities
+    const lowerIsBetter = isTime.value || (a && (a.lower_is_better === true || String(a.lower_is_better) === 'true')) || (a && String(a.scoring_mode || '').toLowerCase().includes('golf'));
+
+    const parseScoreValue = (it) => {
+      let v = it.total_score ?? it.score ?? it.punten ?? it.score_value;
+      if (v === undefined || v === null) return NaN;
+      if (typeof v === 'string' && v.includes(':')) {
+        // mm:ss.xxx or m:ss.xxx
+        const parts = v.split(':');
+        const minutes = parseInt(parts[0], 10) || 0;
+        const secondsParts = parts[1] ? parts[1].split('.') : ['0'];
+        const seconds = parseInt(secondsParts[0], 10) || 0;
+        const ms = secondsParts[1] ? Math.round(Number('0.' + secondsParts[1]) * 1000) : 0;
+        return Math.abs(minutes * 60 * 1000 + seconds * 1000 + ms);
+      }
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    };
+
+    leaderboard.value.sort((x, y) => {
+      const nx = parseScoreValue(x);
+      const ny = parseScoreValue(y);
+      if (Number.isNaN(nx) && Number.isNaN(ny)) return 0;
+      if (Number.isNaN(nx)) return 1;
+      if (Number.isNaN(ny)) return -1;
+      return lowerIsBetter ? nx - ny : ny - nx;
+    });
   } catch (e) {
     console.warn('Failed to load activity leaderboard', e);
     leaderboard.value = [];
