@@ -5,11 +5,7 @@
       label="Teams"
       @click="selectButton('teams')"
     />
-    <GenericButton
-      :variant="activeButton === 'players' ? 'primary' : 'tertiary'"
-      label="Spelers"
-      @click="selectButton('players')"
-    />
+    <!-- Spelers mode verwijderd - backend ondersteunt geen standalone spelers -->
     <GenericButton
       :variant="activeButton === 'teams&spelers' ? 'primary' : 'tertiary'"
       label="Teams&spelers"

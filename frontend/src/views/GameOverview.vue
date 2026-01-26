@@ -57,11 +57,10 @@
       </div>
 
       <GenericButton variant="primary" label="Download activiteiten" />
-
-      <div class="nav-container">
-        <GenericNav />
-      </div>
     </div>
+  </div>
+  <div class="nav-container">
+    <GenericNav />
   </div>
 </template>
 <script setup>

@@ -1,0 +1,132 @@
+### Test Session Endpoints
+# Base URL
+@baseUrl = http://localhost:8000/api/v1
+
+### Variables
+@sessionId = 38
+@teamId = 24
+
+###############################################
+# ADD EXISTING TEAM TO SESSION
+###############################################
+
+### Add existing team to session
+POST {{baseUrl}}/sessions/{{sessionId}}/add-team
+Content-Type: application/json
+
+{
+  "team_id": {{teamId}}
+}
+
+###############################################
+# CREATE NEW TEAM IN SESSION
+###############################################
+
+### Create new team in session
+POST {{baseUrl}}/sessions/{{sessionId}}/teams
+Content-Type: application/json
+
+{
+  "name": "Team Rood",
+  "color": "#FF0000",
+  "icon": "🔴"
+}
+
+### Create team with minimal data (uses defaults)
+POST {{baseUrl}}/sessions/{{sessionId}}/teams
+Content-Type: application/json
+
+{
+  "name": "Team Blauw"
+}
+
+###############################################
+# GET SESSION TEAMS
+###############################################
+
+### Get all teams for a session
+GET {{baseUrl}}/sessions/{{sessionId}}/teams
+
+###############################################
+# GET SESSION DETAILS
+###############################################
+
+### Get session details
+GET {{baseUrl}}/sessions/{{sessionId}}
+
+###############################################
+# GET SESSION ACTIVITIES
+###############################################
+
+### Get all activities for a session
+GET {{baseUrl}}/sessions/{{sessionId}}/activities
+
+###############################################
+# CREATE ACTIVITY IN SESSION
+###############################################
+
+### Create activity for session
+POST {{baseUrl}}/sessions/{{sessionId}}/activities
+Content-Type: application/json
+
+{
+  "session_id": 38,
+  "name": "Hardlopen",
+  "sport_type": "custom",
+  "game_type": "custom",
+  "scoring_mode": "team",
+  "time_winner": "lower",
+  "aggregate_player_times": false,
+  "total_rounds": 1,
+  "time_limit_per_round": null,
+  "description": "Een hardloop activiteit"
+}
+
+###############################################
+# CREATE PLAYER FOR TEAM IN SESSION
+###############################################
+
+### Create player for team in session
+POST {{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/players
+Content-Type: application/json
+
+{
+  "name": "Jarne",
+  "team_id": 5,
+  "icon": "😊"
+}
+
+###############################################
+# GET PLAYERS FOR TEAM IN SESSION
+###############################################
+
+### Get all players for a team in session
+GET {{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/players
+
+###############################################
+# DELETE SESSION
+###############################################
+
+### Delete session (CAREFUL!)
+# DELETE {{baseUrl}}/sessions/{{sessionId}}
+
+###############################################
+# GET ALL SESSIONS
+###############################################
+
+### Get all sessions
+GET {{baseUrl}}/sessions
+
+###############################################
+# GET ALL TEAMS (STANDALONE)
+###############################################
+
+### Get all teams
+GET {{baseUrl}}/teams
+
+###############################################
+# GET ALL ACTIVITIES (TEMPLATES)
+###############################################
+
+### Get all global activities (templates)
+GET {{baseUrl}}/activities

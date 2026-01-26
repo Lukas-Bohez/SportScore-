@@ -32,10 +32,11 @@ async def get_sessions():
 
 @router.post(f"{ENDPOINT}/sessions", response_model=SessionResponse, tags=["Sessions"], summary="Create a new session")
 async def create_session(session: SessionCreate):
-    # End any currently active session
-    active_session = SessionRepository.get_active_session()
-    if active_session and active_session.get('status') == 'active':
-        SessionRepository.update_session(active_session['id'], status='completed')
+    # End any currently active session only if we're creating an active session
+    if session.status == 'active':
+        active_session = SessionRepository.get_active_session()
+        if active_session and active_session.get('status') == 'active':
+            SessionRepository.update_session(active_session['id'], status='completed')
 
     session_id = SessionRepository.create_session(
         session.name, session.game_type,
@@ -44,8 +45,8 @@ async def create_session(session: SessionCreate):
     )
     created_session = SessionRepository.get_session_by_id(session_id)
 
-    # Set the new session as active
-    SessionRepository.update_session(session_id, status='active')
+    # Set the session status to the requested status (default is 'active' from SessionCreate)
+    SessionRepository.update_session(session_id, status=session.status or 'active')
 
     # Emit real-time update for new session creation
     if sio:

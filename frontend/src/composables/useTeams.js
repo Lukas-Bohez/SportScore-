@@ -14,11 +14,47 @@ export function useTeams() {
    */
   async function fetchTeams() {
     try {
-      const data = await get("/api/teams");
-      teams.value = data;
-      return data;
+      const data = await get("/api/v1/teams");
+      // Backend returns {teams: [...]}
+      teams.value = data?.teams || [];
+      return data?.teams || [];
     } catch (e) {
       console.error("Failed to fetch teams:", e);
+      throw e;
+    }
+  }
+
+  /**
+   * Haal alle teams op met hun spelers
+   */
+  async function fetchTeamsWithPlayers() {
+    try {
+      const data = await get("/api/v1/teams");
+      const teamsData = data?.teams || [];
+
+      // Fetch players for each team
+      const teamsWithPlayers = await Promise.all(
+        teamsData.map(async (team) => {
+          try {
+            const playersData = await get(`/api/v1/players?team_id=${team.id}`);
+            return {
+              ...team,
+              players: playersData?.players || [],
+            };
+          } catch (e) {
+            console.error(`Failed to fetch players for team ${team.id}:`, e);
+            return {
+              ...team,
+              players: [],
+            };
+          }
+        }),
+      );
+
+      teams.value = teamsWithPlayers;
+      return teamsWithPlayers;
+    } catch (e) {
+      console.error("Failed to fetch teams with players:", e);
       throw e;
     }
   }
@@ -29,7 +65,7 @@ export function useTeams() {
    */
   async function fetchTeamsBySession(sessionId) {
     try {
-      const data = await get(`/api/sessions/${sessionId}/teams`);
+      const data = await get(`/api/v1/sessions/${sessionId}/teams`);
       return data;
     } catch (e) {
       console.error("Failed to fetch teams for session:", e);
@@ -43,7 +79,7 @@ export function useTeams() {
    */
   async function fetchTeam(id) {
     try {
-      const data = await get(`/api/teams/${id}`);
+      const data = await get(`/api/v1/teams/${id}`);
       currentTeam.value = data;
       return data;
     } catch (e) {
@@ -56,12 +92,13 @@ export function useTeams() {
    * Maak nieuw team aan
    * @param {object} teamData - Team data
    * @param {string} teamData.name - Team naam
-   * @param {string} teamData.emoji - Team emoji
-   * @param {array} teamData.players - Array van spelers (optioneel)
+   * @param {string} teamData.color - Team kleur (hex)
+   * @param {string} teamData.icon - Team icon/emoji
+   * @param {string} teamData.description - Team beschrijving (optioneel)
    */
   async function createTeam(teamData) {
     try {
-      const data = await post("/api/teams", teamData);
+      const data = await post("/api/v1/teams", teamData);
       await fetchTeams();
       return data;
     } catch (e) {
@@ -77,7 +114,7 @@ export function useTeams() {
    */
   async function updateTeam(id, teamData) {
     try {
-      const data = await put(`/api/teams/${id}`, teamData);
+      const data = await put(`/api/v1/teams/${id}`, teamData);
       const index = teams.value.findIndex((t) => t.id === id);
       if (index !== -1) {
         teams.value[index] = data;
@@ -95,7 +132,7 @@ export function useTeams() {
    */
   async function deleteTeam(id) {
     try {
-      await del(`/api/teams/${id}`);
+      await del(`/api/v1/teams/${id}`);
       teams.value = teams.value.filter((t) => t.id !== id);
       return true;
     } catch (e) {
@@ -113,7 +150,7 @@ export function useTeams() {
    */
   async function addPlayer(teamId, playerData) {
     try {
-      const data = await post(`/api/teams/${teamId}/players`, playerData);
+      const data = await post(`/api/v1/teams/${teamId}/players`, playerData);
       return data;
     } catch (e) {
       console.error("Failed to add player:", e);
@@ -142,6 +179,7 @@ export function useTeams() {
     loading,
     error,
     fetchTeams,
+    fetchTeamsWithPlayers,
     fetchTeamsBySession,
     fetchTeam,
     createTeam,

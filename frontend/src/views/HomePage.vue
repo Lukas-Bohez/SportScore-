@@ -25,7 +25,7 @@ import { Plus } from "lucide-vue-next";
           </GenericButton>
         </RouterLink>
         <div>
-          <!-- <RouterLink class="router-link" to="/bigscreen/qrscreen">
+          <RouterLink class="router-link" to="/bigscreen/qrscreen">
             QR Code Scannen
           </RouterLink>
           <RouterLink class="router-link" to="/bigscreen/countdownscreen">
@@ -39,13 +39,13 @@ import { Plus } from "lucide-vue-next";
           </RouterLink>
           <RouterLink class="router-link" to="/bigscreen/scorescreen">
             ScoreScreen
-          </RouterLink> -->
+          </RouterLink>
         </div>
       </div>
     </div>
-    <div class="nav-container">
-      <GenericNav />
-    </div>
+  </div>
+  <div class="nav-container">
+    <GenericNav />
   </div>
 </template>
 

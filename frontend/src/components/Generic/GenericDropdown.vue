@@ -142,7 +142,6 @@ export default {
 .generic-input__error {
   color: var(--red-100, #ff0000);
   font-size: 0.875rem;
-  margin-top: -0.5rem;
 }
 
 .generic-dropdown__selected {
