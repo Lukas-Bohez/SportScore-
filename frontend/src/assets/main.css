@@ -91,15 +91,17 @@ main {
   align-items: center;
   justify-content: center;
   width: 100%;
+  height: calc(100vh - 4rem);
+  overflow-y: auto;
 }
 .layout-app-pages {
   /* position: relative; */
   display: flex;
+  max-width: 50rem;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: calc(100vh - 4.875rem); /* Adjust for nav height */
-  max-width: 50rem;
+  height: 100%;
   width: 100%;
   padding: var(--space-5) var(--space-6);
 }

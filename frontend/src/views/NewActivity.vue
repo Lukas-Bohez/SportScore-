@@ -120,9 +120,7 @@ async function saveActivity() {
     game_type: selectedGameType.value,
     sport_type: selectedSportStyle.value,
     total_rounds: numberOfRounds.value ? parseInt(numberOfRounds.value) : 1, // Default to 1 if empty
-    time_limit_per_round: timeLimit.value
-      ? parseInt(timeLimit.value) * 60
-      : 0, // Default to 0 (no limit) if empty, convert minutes to seconds
+    time_limit_per_round: timeLimit.value ? parseInt(timeLimit.value) * 60 : 0, // Default to 0 (no limit) if empty, convert minutes to seconds
   };
 
   try {
@@ -242,7 +240,7 @@ async function saveActivity() {
       </div>
     </div>
 
-    <div class="button-group">
+    <div class="button-group button-group--new-activity">
       <GenericButton variant="secondary" @click="goBack" :disabled="loading">
         Annuleren
       </GenericButton>
@@ -258,6 +256,9 @@ async function saveActivity() {
 </template>
 
 <style scoped>
+.button-group--new-activity {
+  padding-bottom: 0.9rem;
+}
 .layout-page-new-activity {
   position: relative;
   width: 100%;

@@ -1,103 +1,384 @@
 <template>
   <div class="app-container">
     <div class="layout-app-pages">
-      <!-- <div class="step-content"> -->
-      <div>
-        <h2><span>Sessie</span> overzicht</h2>
+      <div v-if="loading">
+        <p>Sessie laden...</p>
+      </div>
+      <div v-else-if="session" class="session-overview-head-conten">
+        <div class="session-header">
+          <h2><span>Sessie</span> overzicht</h2>
+          <span class="status-badge" :class="`status-badge--${session.status}`">
+            {{ getStatusLabel(session.status) }}
+          </span>
+        </div>
         <div class="session-overview-head">
           <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Sessie naam:</h4>
-            <P class="text">Team Building Dag 2025</P>
+            <p class="text">{{ session.name }}</p>
           </div>
           <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Aantal rondes per game:</h4>
-            <p class="text">3</p>
+            <p class="text">{{ session.total_rounds || "N/A" }}</p>
+          </div>
+          <div class="session-overview-head-content">
+            <h4 class="stap4-subtitle">Tijdslimiet:</h4>
+            <p class="text">
+              {{
+                session.time_limit ? `${session.time_limit}s` : "Geen limiet"
+              }}
+            </p>
+          </div>
+          <div class="session-overview-head-content">
+            <h4 class="stap4-subtitle">Score modus:</h4>
+            <p class="text">{{ session.scoring_mode || "N/A" }}</p>
           </div>
         </div>
 
         <div class="section-overview-content">
-          <div>
+          <div v-if="activities.length > 0">
             <h4 class="stap4-subtitle">Activiteiten:</h4>
             <div class="activity-container">
-              <p class="activity-container-item">Voetbal ⚽️</p>
-              <p class="activity-container-item">Basketbal 🏀</p>
-              <p class="activity-container-item">Tennis 🎾</p>
+              <p
+                v-for="activity in activities"
+                :key="activity.id"
+                class="activity-container-item"
+              >
+                {{ activity.name }}
+              </p>
             </div>
           </div>
-          <div>
+          <div v-if="teams.length > 0">
             <h4 class="stap4-subtitle">Deelnemers:</h4>
             <div class="teams-container">
-              <div class="team-container">
-                <p class="activity-item">Team A😑</p>
+              <div v-for="team in teams" :key="team.id" class="team-container">
+                <p class="activity-item">{{ team.name }} {{ team.icon }}</p>
                 <div class="activity-container">
-                  <p class="activity-container-item">speler A 😁</p>
-                  <p class="activity-container-item">speler Bart 🤣</p>
-                  <p class="activity-container-item">speler Cedrick 🤣</p>
-                  <p class="activity-container-item">speler Dylen 🤣</p>
-                  <p class="activity-container-item">speler Dylanorenzo 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                </div>
-              </div>
-              <div class="team-container">
-                <p class="activity-item">Team B 😂</p>
-                <div class="activity-container">
-                  <p class="activity-container-item">speler A 😁</p>
-                  <p class="activity-container-item">speler B 🤣</p>
-                  <p class="activity-container-item">speler C 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                </div>
-              </div>
-              <div class="team-container">
-                <p class="activity-item">Team B 😂</p>
-                <div class="activity-container">
-                  <p class="activity-container-item">speler A 😁</p>
-                  <p class="activity-container-item">speler B 🤣</p>
-                  <p class="activity-container-item">speler C 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
-                </div>
-              </div>
-              <div class="team-container">
-                <p class="activity-item">Team B 😂</p>
-                <div class="activity-container">
-                  <p class="activity-container-item">speler A 😁</p>
-                  <p class="activity-container-item">speler B 🤣</p>
-                  <p class="activity-container-item">speler C 🤣</p>
-                  <p class="activity-container-item">speler D 🤣</p>
+                  <p
+                    v-for="player in team.players"
+                    :key="player.id"
+                    class="activity-container-item"
+                  >
+                    {{ player.name }} {{ player.position }}
+                  </p>
                 </div>
               </div>
             </div>
+          </div>
+          <div v-else>
+            <p>Geen deelnemers gevonden voor deze sessie.</p>
           </div>
         </div>
       </div>
-      <div class="button-group">
-        <GenericButton variant="secondary">Bewerken</GenericButton>
-        <GenericButton variant="primary">Start</GenericButton>
+      <div v-else>
+        <p>Sessie niet gevonden.</p>
       </div>
-      <div class="nav-container">
-        <GenericNav />
+      <div class="button-group">
+        <GenericButton variant="secondary" @click="deleteSession"
+          >Verwijderen</GenericButton
+        >
+        <GenericButton
+          variant="primary"
+          @click="startSession"
+          v-if="session?.status === 'setup'"
+        >
+          Start Sessie
+        </GenericButton>
+        <GenericButton
+          variant="primary"
+          @click="startSession"
+          v-else-if="session?.status === 'active'"
+          disabled
+        >
+          Sessie Actief
+        </GenericButton>
+        <GenericButton
+          variant="secondary"
+          v-else-if="session?.status === 'completed'"
+          disabled
+        >
+          Sessie Afgelopen
+        </GenericButton>
       </div>
     </div>
   </div>
+  <div class="nav-container">
+    <GenericNav />
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <GenericModel
+    ref="deleteModal"
+    :message="`Weet je zeker dat je de sessie '${session?.name || 'deze sessie'}' wilt verwijderen?`"
+    icon="triangle-alert"
+    iconColor="var(--red-100)"
+    confirmText="Ja"
+    cancelText="Nee"
+    :showCancel="true"
+    @confirm="confirmDelete"
+    @cancel="cancelDelete"
+  />
+
+  <!-- Error Modal -->
+  <GenericModel
+    ref="errorModal"
+    message="Er is een fout opgetreden bij het verwijderen van de sessie. Probeer het later opnieuw."
+    icon="triangle-alert"
+    iconColor="var(--red-100)"
+    confirmText="OK"
+    :showCancel="false"
+  />
 </template>
 <script setup>
 defineOptions({ name: "SessionBeheren" });
 
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { ChevronLeft } from "lucide-vue-next";
 import GenericButton from "@/components/Generic/GenericButton.vue";
 import GenericNav from "@/components/Generic/GenericNav.vue";
+import GenericModel from "@/components/Generic/GenericModel.vue";
+import { useSessions } from "@/composables/useSessions";
+import { useApi } from "@/composables/useApi";
+import { ElNotification } from "element-plus";
+
 const router = useRouter();
+const route = useRoute();
+const { get } = useApi();
+
+const session = ref(null);
+const teams = ref([]);
+const activities = ref([]);
+const loading = ref(true);
+const deleteModal = ref(null);
+const errorModal = ref(null);
+
 const back = () => {
   router.back();
 };
+
+const deleteSession = () => {
+  if (!session.value) return;
+
+  // Open the modal instead of using browser confirm
+  deleteModal.value.open();
+};
+
+const confirmDelete = async () => {
+  if (!session.value) return;
+
+  try {
+    console.log("🗑️ Deleting session:", session.value.id);
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    console.log("📡 Response status:", response.status);
+    console.log("📡 Response ok:", response.ok);
+
+    // Check if the response is ok (status 200-299)
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Server error:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    console.log("✅ Session deleted successfully");
+  } catch (error) {
+    console.error("❌ Failed to delete session:", error);
+    // Show error modal only if deletion actually failed
+    errorModal.value?.open();
+    return; // Stop here if there was an error
+  }
+
+  // Navigate back to templates page (only if deletion was successful)
+  try {
+    await router.push({
+      path: "/templates",
+      query: { refresh: "true" },
+    });
+    console.log("✅ Navigated to Templates");
+  } catch (navError) {
+    console.error("⚠️ Navigation error (but session was deleted):", navError);
+    // Even if navigation fails, try alternative navigation
+    router.push("/templates");
+  }
+};
+
+const cancelDelete = () => {
+  console.log("Delete cancelled");
+};
+
+const getStatusLabel = (status) => {
+  const labels = {
+    setup: "Template",
+    active: "Actief",
+    paused: "Gepauzeerd",
+    completed: "Afgelopen",
+    cancelled: "Geannuleerd",
+  };
+  return labels[status] || status;
+};
+
+const startSession = async () => {
+  if (!session.value) return;
+
+  try {
+    console.log("🚀 Starting session:", session.value.id);
+
+    // Update session status to 'active'
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "active" }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    console.log("✅ Session started successfully");
+
+    // Update local session status
+    session.value.status = "active";
+
+    // Show success notification
+    ElNotification({
+      title: "Succes!",
+      message: "Sessie is gestart!",
+      type: "success",
+    });
+
+    // TODO: Navigate to score input page when it's ready
+    // router.push({ name: "ScoreInput", params: { id: session.value.id } });
+  } catch (error) {
+    console.error("❌ Failed to start session:", error);
+    ElNotification({
+      title: "Fout",
+      message: "Kon sessie niet starten",
+      type: "error",
+    });
+  }
+};
+
+// Load session data
+const loadSessionData = async () => {
+  try {
+    loading.value = true;
+    const sessionId = route.params.id;
+
+    // Fetch session details
+    const sessionData = await get(`/api/v1/sessions/${sessionId}`);
+    session.value = sessionData;
+    console.log("✅ Session loaded:", sessionData);
+
+    // Fetch teams for this session
+    const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
+    teams.value = teamsData.teams || teamsData;
+    console.log("✅ Teams loaded:", teams.value.length);
+    console.log("📋 Teams data:", JSON.stringify(teams.value, null, 2));
+
+    // Fetch players for each team
+    for (const team of teams.value) {
+      try {
+        const playersData = await get(
+          `/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
+        );
+        team.players = playersData.players || playersData;
+        console.log(
+          `✅ Players loaded for team ${team.name}:`,
+          team.players.length,
+        );
+        console.log(
+          `📋 Players data for ${team.name}:`,
+          JSON.stringify(team.players, null, 2),
+        );
+      } catch (error) {
+        console.error(`❌ Failed to load players for team ${team.id}:`, error);
+        team.players = [];
+      }
+    }
+
+    // Fetch activities for this session
+    try {
+      const activitiesData = await get(
+        `/api/v1/sessions/${sessionId}/activities`,
+      );
+      activities.value = activitiesData.activities || activitiesData;
+      console.log("✅ Activities loaded:", activities.value.length);
+    } catch (error) {
+      console.error("❌ Failed to load activities:", error);
+      activities.value = [];
+    }
+  } catch (error) {
+    console.error("❌ Failed to load session data:", error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  loadSessionData();
+});
 </script>
 <style scoped>
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.status-badge {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-M);
+  font-size: var(--font-size-S);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge--setup {
+  background-color: var(--blue-20);
+  color: var(--blue-100);
+  border: 1px solid var(--blue-100);
+}
+
+.status-badge--active {
+  background-color: var(--green-20, #d4edda);
+  color: var(--green-100, #28a745);
+  border: 1px solid var(--green-100, #28a745);
+}
+
+.status-badge--paused {
+  background-color: var(--orange-40);
+  color: var(--orange-100);
+  border: 1px solid var(--orange-100);
+}
+
+.status-badge--completed {
+  background-color: var(--black-20);
+  color: var(--black-80);
+  border: 1px solid var(--black-40);
+}
+
+.status-badge--cancelled {
+  background-color: var(--red-20, #f8d7da);
+  color: var(--red-100, #dc3545);
+  border: 1px solid var(--red-100, #dc3545);
+}
+
 .layout-app-pages {
   justify-content: space-between;
 }
@@ -113,6 +394,7 @@ const back = () => {
   justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   strong {
     color: var(--black-100);
   }

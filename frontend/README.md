@@ -36,3 +36,5 @@ npm run dev
 ```sh
 npm run build
 ```
+
+Op stap 3 wil dat de gebruiker kan spelers/teams of teams%spelers kan maken. Eerste wil een toggle switch button tonen om de gebruiker te laten kiezen. Op basis van zijn kuze toon je een aanpassing form. Voor teams toon je input om teams gewoon toetoevoegen voor spelers het zelfde. Voor teams met spleers toon je eerst een dropdown van tesms dat de gebruiker al gemaakt heeft. Als hij nog geen teams heeft dat zeg in de placehoder dat er nog geen teams nog zijn.

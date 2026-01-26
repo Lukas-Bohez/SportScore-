@@ -3,6 +3,8 @@ import EmojiPicker from "vue3-emoji-picker";
 import "vue3-emoji-picker/css";
 import { ref, onMounted, onUnmounted } from "vue";
 
+const emit = defineEmits(["select"]);
+
 const selectedEmoji = ref("😊");
 const emojiName = ref("Smiling Face with Smiling Eyes");
 const showPicker = ref(false);
@@ -12,6 +14,10 @@ function onSelectEmoji(emoji) {
   selectedEmoji.value = emoji.i;
   emojiName.value = emoji.n || "Emoji";
   showPicker.value = false;
+
+  // Emit the emoji data to parent
+  emit("select", emoji);
+
   console.log(emoji);
 }
 
@@ -130,9 +136,24 @@ onUnmounted(() => {
 .picker-dropdown {
   position: absolute;
   top: calc(100% + 0.5rem);
-  left: 0;
+  right: 0;
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: var(--radius-M);
+  max-width: 90vw;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .picker-dropdown {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+    max-width: 95vw;
+    max-height: 80vh;
+    overflow: auto;
+  }
 }
 </style>

@@ -14,9 +14,6 @@
       </div>
     </div>
   </div>
-  <div class="nav-container">
-    <GenericNav />
-  </div>
 </template>
 
 <script setup>

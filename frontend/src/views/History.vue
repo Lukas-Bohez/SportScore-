@@ -26,10 +26,10 @@
           Geen resultaten gevonden
         </p>
       </div>
-      <div class="nav-container">
-        <GenericNav />
-      </div>
     </div>
+  </div>
+  <div class="nav-container">
+    <GenericNav />
   </div>
 </template>
 <script setup>

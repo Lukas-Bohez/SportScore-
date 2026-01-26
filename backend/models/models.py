@@ -255,7 +255,7 @@ class SessionBase(BaseModel):
     show_players: bool = True  # Whether to show players on scoreboard
 
 class SessionCreate(SessionBase):
-    pass
+    status: Optional[str] = "setup"  # Allow status to be set on creation, default to 'setup'
 
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
