@@ -5,33 +5,33 @@
         <p>Sessie laden...</p>
       </div>
       <div v-else-if="session" class="session-overview-head-conten">
+        <GenericButton class="generic-button--quaternary" @click="back">
+          <ChevronLeft class="icon--quaternary" />Terug
+        </GenericButton>
         <div class="session-header">
           <h2><span>Sessie</span> overzicht</h2>
-          <span class="status-badge" :class="`status-badge--${session.status}`">
-            {{ getStatusLabel(session.status) }}
-          </span>
         </div>
         <div class="session-overview-head">
           <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Sessie naam:</h4>
             <p class="text">{{ session.name }}</p>
           </div>
-          <div class="session-overview-head-content">
+          <!-- <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Aantal rondes per game:</h4>
             <p class="text">{{ session.total_rounds || "N/A" }}</p>
-          </div>
-          <div class="session-overview-head-content">
+          </div> -->
+          <!-- <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Tijdslimiet:</h4>
             <p class="text">
               {{
                 session.time_limit ? `${session.time_limit}s` : "Geen limiet"
               }}
             </p>
-          </div>
-          <div class="session-overview-head-content">
+          </div> -->
+          <!-- <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Score modus:</h4>
             <p class="text">{{ session.scoring_mode || "N/A" }}</p>
-          </div>
+          </div> -->
         </div>
 
         <div class="section-overview-content">
@@ -58,7 +58,7 @@
                     :key="player.id"
                     class="activity-container-item"
                   >
-                    {{ player.name }} {{ player.position }}
+                    {{ player.icon || player.emoji || "" }} {{ player.name }}
                   </p>
                 </div>
               </div>
@@ -79,9 +79,13 @@
         <GenericButton
           variant="primary"
           @click="startSession"
-          v-if="session?.status === 'setup'"
+          v-if="
+            session?.status === 'template' ||
+            session?.status === 'setup' ||
+            session?.status === 'completed'
+          "
         >
-          Start Sessie
+          Sessie Starten
         </GenericButton>
         <GenericButton
           variant="primary"
@@ -90,13 +94,6 @@
           disabled
         >
           Sessie Actief
-        </GenericButton>
-        <GenericButton
-          variant="secondary"
-          v-else-if="session?.status === 'completed'"
-          disabled
-        >
-          Sessie Afgelopen
         </GenericButton>
       </div>
     </div>
@@ -169,27 +166,44 @@ const confirmDelete = async () => {
   try {
     console.log("🗑️ Deleting session:", session.value.id);
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
+    // Check if this is a template from localStorage
+    const isTemplate = session.value.id.toString().startsWith("session_");
+
+    if (isTemplate) {
+      // Delete from localStorage
+      console.log("📦 Deleting template from localStorage");
+      const templatesKey = "sessionTemplates";
+      const templates = JSON.parse(localStorage.getItem(templatesKey) || "[]");
+      const updatedTemplates = templates.filter(
+        (t) => t.id !== session.value.id,
+      );
+      localStorage.setItem(templatesKey, JSON.stringify(updatedTemplates));
+      console.log("✅ Template deleted from localStorage");
+    } else {
+      // Delete from API
+      console.log("🌐 Deleting session from API");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      },
-    );
+      );
 
-    console.log("📡 Response status:", response.status);
-    console.log("📡 Response ok:", response.ok);
+      console.log("📡 Response status:", response.status);
+      console.log("📡 Response ok:", response.ok);
 
-    // Check if the response is ok (status 200-299)
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Server error:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Check if the response is ok (status 200-299)
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Server error:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log("✅ Session deleted from API successfully");
     }
-
-    console.log("✅ Session deleted successfully");
   } catch (error) {
     console.error("❌ Failed to delete session:", error);
     // Show error modal only if deletion actually failed
@@ -230,28 +244,172 @@ const startSession = async () => {
   if (!session.value) return;
 
   try {
-    console.log("🚀 Starting session:", session.value.id);
+    console.log("🚀 Starting session from template:", session.value.id);
 
-    // Update session status to 'active'
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
+    // Check if this is a template from localStorage
+    const isTemplate = session.value.id.toString().startsWith("session_");
+
+    if (isTemplate) {
+      // This is a template from localStorage - need to create it in API first
+      console.log("📦 Creating session in API from template...");
+
+      // 1. Create session in API with 'active' status
+      const sessionResponse = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: session.value.name,
+            total_rounds: session.value.total_rounds,
+            time_limit: session.value.time_limit,
+            scoring_mode: session.value.scoring_mode,
+            status: "active", // Set as active immediately
+          }),
         },
-        body: JSON.stringify({ status: "active" }),
-      },
-    );
+      );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!sessionResponse.ok) {
+        throw new Error(`HTTP error! status: ${sessionResponse.status}`);
+      }
+
+      const createdSession = await sessionResponse.json();
+      console.log("✅ Session created in API:", createdSession);
+
+      // 2. Create teams and get ID mapping
+      const teamIdMapping = {}; // Map localStorage IDs to API IDs
+
+      for (const team of session.value.teams) {
+        try {
+          // Create or get existing team
+          let apiTeam;
+          try {
+            const teamResponse = await fetch(
+              `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  name: team.name,
+                  color: team.color || "#ffffff",
+                  icon: team.icon || "👥",
+                  description: "",
+                }),
+              },
+            );
+
+            if (!teamResponse.ok) {
+              const errorText = await teamResponse.text();
+              // If team exists, fetch it
+              if (errorText.includes("already exists")) {
+                const allTeamsResponse = await fetch(
+                  `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/teams`,
+                );
+                const allTeamsData = await allTeamsResponse.json();
+                const allTeams = allTeamsData.teams || allTeamsData;
+                apiTeam = allTeams.find((t) => t.name === team.name);
+              } else {
+                throw new Error(errorText);
+              }
+            } else {
+              apiTeam = await teamResponse.json();
+            }
+          } catch (error) {
+            console.error("Failed to create team:", error);
+            throw error;
+          }
+
+          teamIdMapping[team.id] = apiTeam.id;
+
+          // Link team to session
+          await fetch(
+            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/add-team`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                team_id: apiTeam.id,
+              }),
+            },
+          );
+
+          console.log(`✅ Team ${apiTeam.name} linked to session`);
+
+          // 3. Create players for this team
+          for (const player of team.players || []) {
+            await fetch(
+              `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  name: player.name,
+                  team_id: apiTeam.id,
+                  position: player.icon || "",
+                }),
+              },
+            );
+            console.log(`✅ Player ${player.name} created`);
+          }
+        } catch (error) {
+          console.error("Failed to create team or players:", error);
+          throw error;
+        }
+      }
+
+      // 4. Create activities
+      for (const activity of session.value.activities || []) {
+        await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${createdSession.id}/activities`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              session_id: createdSession.id,
+              name: activity.name,
+              sport_type: activity.sport_type || "custom",
+              game_type: activity.game_type || "custom",
+              scoring_mode: activity.scoring_mode || "team",
+              time_winner: activity.time_winner || "lower",
+              total_rounds: activity.total_rounds || 1,
+              time_limit_per_round: activity.time_limit_per_round || null,
+              description: activity.description || null,
+            }),
+          },
+        );
+        console.log(`✅ Activity ${activity.name} created`);
+      }
+
+      console.log("✅ Session fully created and started!");
+    } else {
+      // This is an existing API session - just update status
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/sessions/${session.value.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: "active" }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log("✅ Session status updated to active");
     }
-
-    console.log("✅ Session started successfully");
-
-    // Update local session status
-    session.value.status = "active";
 
     // Show success notification
     ElNotification({
@@ -260,66 +418,89 @@ const startSession = async () => {
       type: "success",
     });
 
-    // TODO: Navigate to score input page when it's ready
-    // router.push({ name: "ScoreInput", params: { id: session.value.id } });
+    // Navigate to session management page
+    router.push({
+      name: "sessionmanagment",
+    });
   } catch (error) {
     console.error("❌ Failed to start session:", error);
     ElNotification({
       title: "Fout",
-      message: "Kon sessie niet starten",
+      message:
+        "Kon sessie niet starten: " + (error.message || "Onbekende fout"),
       type: "error",
     });
   }
 };
 
-// Load session data
+// Load session data (from API or localStorage)
 const loadSessionData = async () => {
   try {
     loading.value = true;
     const sessionId = route.params.id;
 
-    // Fetch session details
-    const sessionData = await get(`/api/v1/sessions/${sessionId}`);
-    session.value = sessionData;
-    console.log("✅ Session loaded:", sessionData);
+    console.log("📡 Loading session:", sessionId);
 
-    // Fetch teams for this session
-    const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
-    teams.value = teamsData.teams || teamsData;
-    console.log("✅ Teams loaded:", teams.value.length);
-    console.log("📋 Teams data:", JSON.stringify(teams.value, null, 2));
+    // Check if this is a template ID (from localStorage)
+    if (sessionId.toString().startsWith("session_")) {
+      // Load from localStorage
+      console.log("📦 Loading template from localStorage");
+      const templatesKey = "sessionTemplates";
+      const templates = JSON.parse(localStorage.getItem(templatesKey) || "[]");
+      const template = templates.find((t) => t.id === sessionId);
 
-    // Fetch players for each team
-    for (const team of teams.value) {
-      try {
-        const playersData = await get(
-          `/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
-        );
-        team.players = playersData.players || playersData;
-        console.log(
-          `✅ Players loaded for team ${team.name}:`,
-          team.players.length,
-        );
-        console.log(
-          `📋 Players data for ${team.name}:`,
-          JSON.stringify(team.players, null, 2),
-        );
-      } catch (error) {
-        console.error(`❌ Failed to load players for team ${team.id}:`, error);
-        team.players = [];
+      if (template) {
+        session.value = template;
+        teams.value = template.teams || [];
+        activities.value = template.activities || [];
+        console.log("✅ Template loaded from localStorage:", template);
+      } else {
+        console.error("❌ Template not found in localStorage");
+        session.value = null;
       }
-    }
+    } else {
+      // Load from API
+      console.log("📡 Loading session from API");
+      const sessionData = await get(`/api/v1/sessions/${sessionId}`);
+      session.value = sessionData;
+      console.log("✅ Session loaded:", sessionData);
 
-    // Fetch activities for this session
-    try {
-      const activitiesData = await get(
-        `/api/v1/sessions/${sessionId}/activities`,
-      );
-      activities.value = activitiesData.activities || activitiesData;
-      console.log("✅ Activities loaded:", activities.value.length);
-    } catch (error) {
-      console.error("❌ Failed to load activities:", error);
-      activities.value = [];
+      // Fetch teams for this session
+      const teamsData = await get(`/api/v1/sessions/${sessionId}/teams`);
+      teams.value = teamsData.teams || teamsData;
+      console.log("✅ Teams loaded:", teams.value.length);
+
+      // Fetch players for each team
+      for (const team of teams.value) {
+        try {
+          const playersData = await get(
+            `/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
+          );
+          team.players = playersData.players || playersData;
+          console.log(
+            `✅ Players loaded for team ${team.name}:`,
+            team.players.length,
+          );
+        } catch (error) {
+          console.error(
+            `❌ Failed to load players for team ${team.id}:`,
+            error,
+          );
+          team.players = [];
+        }
+      }
+
+      // Fetch activities for this session
+      try {
+        const activitiesData = await get(
+          `/api/v1/sessions/${sessionId}/activities`,
+        );
+        activities.value = activitiesData.activities || activitiesData;
+        console.log("✅ Activities loaded:", activities.value.length);
+      } catch (error) {
+        console.error("❌ Failed to load activities:", error);
+        activities.value = [];
+      }
     }
   } catch (error) {
     console.error("❌ Failed to load session data:", error);

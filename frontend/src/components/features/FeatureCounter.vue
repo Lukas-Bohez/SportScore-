@@ -34,6 +34,10 @@ export default {
       type: Number,
       default: 1,
     },
+    modelValue: {
+      type: Number,
+      default: 0,
+    },
     min: {
       type: Number,
       default: 0,
@@ -45,20 +49,27 @@ export default {
   },
   data() {
     return {
-      count: this.initialValue,
+      count: this.modelValue || this.initialValue,
     };
+  },
+  watch: {
+    modelValue(newVal) {
+      this.count = newVal;
+    },
   },
   methods: {
     increment() {
       if (this.count < this.max) {
         this.count++;
         this.$emit("change", this.count);
+        this.$emit("update:modelValue", this.count);
       }
     },
     decrement() {
       if (this.count > this.min) {
         this.count--;
         this.$emit("change", this.count);
+        this.$emit("update:modelValue", this.count);
       }
     },
     handleInput(value) {
@@ -69,9 +80,10 @@ export default {
         this.count = this.max;
       }
       this.$emit("change", this.count);
+      this.$emit("update:modelValue", this.count);
     },
   },
-  emits: ["change"],
+  emits: ["change", "update:modelValue"],
 };
 </script>
 
