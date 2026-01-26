@@ -4,8 +4,19 @@ import GenericButton from "@/components/Generic/GenericButton.vue";
 import { RouterLink, useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
 import { notifyBigScreen } from "@/composables/useBigScreenSync";
+import { onMounted, computed } from "vue";
+import { useSessions } from "@/composables/useSessions";
 
 const router = useRouter();
+
+// Composable: check for active sessions and load them on mount
+const { activeSessions, fetchActiveSessions } = useSessions();
+const hasActiveSessions = computed(() => Array.isArray(activeSessions.value) && activeSessions.value.length > 0);
+
+onMounted(() => {
+  // Best-effort load; ignore errors to avoid blocking homepage render
+  fetchActiveSessions().catch((e) => console.debug("Failed to load active sessions on homepage:", e));
+});
 
 // Handle nieuwe sessie click
 const handleNewSession = () => {
@@ -18,8 +29,8 @@ const handleNewSession = () => {
 <template>
   <div class="app-container">
     <div class="layout-home-page">
-      <RouterLink class="back-to-active-sessions" to="/sessionmanagment">
-        <span></span> Terug naar actieve sessies
+      <RouterLink v-if="hasActiveSessions" class="back-to-active-sessions" to="/sessionmanagment">
+        <span aria-hidden="true"></span> Terug naar actieve sessies
       </RouterLink>
       <div class="home-content">
         <h1>Welkom bij</h1>
