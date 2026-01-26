@@ -162,6 +162,7 @@ h3 {
   margin-top: var(--space-6);
   flex: 1;
   min-height: 0;
+  padding-right: 0.5rem;
 }
 .templates-page-content::-webkit-scrollbar {
   width: 8px;
