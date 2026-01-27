@@ -102,6 +102,24 @@ export function initBigscreenFlow() {
     evaluateAndNavigate();
   });
 
+  // Also react to legacy/show events
+  on('show-qr', () => {
+    qrVisible.value = true;
+    console.log('BigScreenFlow: show-qr');
+    evaluateAndNavigate();
+  });
+
+  on('qr-state', (payload) => {
+    try {
+      const value = (payload && typeof payload === 'object') ? (payload.data !== undefined ? payload.data : (payload.data || payload)) : payload;
+      qrVisible.value = !!value;
+      console.log('BigScreenFlow: qr-state ->', qrVisible.value);
+      evaluateAndNavigate();
+    } catch (e) {
+      console.warn('BigScreenFlow: qr-state parsing failed', e);
+    }
+  });
+
   // Allow server to request direct navigation e.g. via /api/v1/bigscreen/navigate
   // Payload expected: { screen: '<name-or-path>', session_id: <id>, data: {...} }
   on('bigscreen:navigate', (payload) => {
@@ -122,9 +140,28 @@ export function initBigscreenFlow() {
     }
   });
 
-  // Re-evaluate on connect (useful after reconnect)
+  // Events that indicate a client connected or session changed - re-evaluate and hide QR in many cases
+  const hideQrAndEvaluate = () => {
+    if (qrVisible.value) {
+      qrVisible.value = false;
+      console.log('BigScreenFlow: hiding QR due to connection/session event');
+    }
+    evaluateAndNavigate();
+  };
+
+  on('welcome', hideQrAndEvaluate);
+  on('connected', hideQrAndEvaluate);
+  on('session_created', hideQrAndEvaluate);
+  on('session_update', hideQrAndEvaluate);
+  on('session_status_update', hideQrAndEvaluate);
+
+  // Re-evaluate on connect (useful after reconnect). Also emit current qr-state so server knows we're showing/hiding the QR
   on('connect', () => {
     console.log('BigScreenFlow: socket connected -> evaluate');
+    try {
+      // let server know current QR state (server might store/emit to others)
+      if (typeof emit === 'function') emit('qr-state', qrVisible.value);
+    } catch (e) {}
     evaluateAndNavigate();
   });
 

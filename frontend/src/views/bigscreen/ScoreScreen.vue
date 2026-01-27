@@ -147,17 +147,56 @@ const pollActiveSession = async () => {
       return;
     }
 
+    // Attempt to infer the activity most players have selected
+    let majorityActivityId = null;
+    try {
+      const teamsData = await get(`/api/v1/sessions/${session.id}/teams`);
+      const teamsList = teamsData.teams || teamsData || [];
+      const counts = {};
+
+      for (const t of teamsList) {
+        const pData = await get(`/api/v1/sessions/${session.id}/teams/${t.id}/players`);
+        const pList = pData.players || pData || [];
+        for (const p of pList) {
+          // Check possible fields where a player's selected activity might be stored
+          const candidate = p.selected_activity_id || p.activity_id || p.selectedActivity || (p.activity && p.activity.id) || null;
+          const id = candidate ? parseInt(candidate) : null;
+          if (id && !isNaN(id)) {
+            counts[id] = (counts[id] || 0) + 1;
+          }
+        }
+      }
+
+      // pick the activity id with the highest count
+      let max = 0;
+      for (const [aid, c] of Object.entries(counts)) {
+        if (c > max) {
+          max = c;
+          majorityActivityId = parseInt(aid);
+        }
+      }
+      if (majorityActivityId) console.log('Inferred majority activity id:', majorityActivityId, 'count:', max);
+    } catch (e) {
+      console.warn('Failed to compute majority activity from players:', e);
+    }
+
     // Check localStorage for selected activity
     const selectedActivityId = localStorage.getItem("selectedActivityId");
     const lastActivityUpdate = localStorage.getItem("lastActivityUpdate");
 
     let activityToShow = null;
 
-    // If there's a selected activity in localStorage, use that
+    // If there's a selected activity in localStorage, use that (user override)
     if (selectedActivityId) {
       activityToShow = activities.find(
         (a) => a.id === parseInt(selectedActivityId),
       );
+    }
+
+    // If there's a majority activity inferred, prefer that
+    if (!activityToShow && majorityActivityId) {
+      const maj = activities.find((a) => a.id === majorityActivityId);
+      if (maj) activityToShow = maj;
     }
 
     // Fallback to first activity if no selection or activity not found
