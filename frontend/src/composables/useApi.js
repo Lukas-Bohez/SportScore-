@@ -16,8 +16,21 @@ export function useApi() {
   } else if (typeof window !== 'undefined' && window.SCOREBOARD_API_BASE) {
     // Allow a runtime-injected global (useful for static builds served from a different origin)
     BASE_URL = String(window.SCOREBOARD_API_BASE).replace(/\/$/, '');
+  } else if (typeof window !== 'undefined') {
+    // Fallback to a sensible default when the SPA is served statically (e.g., via Apache).
+    // Use hostname + :8000 (backend) which matches the example frontend behaviour and avoids hitting the static file server for API calls.
+    const hostname = (window.location && window.location.hostname) || 'localhost';
+    const detected = `http://${hostname || 'localhost'}:8000`;
+    try {
+      // Validate URL
+      new URL(detected);
+      BASE_URL = detected.replace(/\/$/, '');
+    } catch (e) {
+      console.warn('API: Fallback baseURL invalid, using relative paths', detected, e);
+      BASE_URL = '';
+    }
   } else {
-    // Default to empty string (use relative paths) — works with Vite dev proxy or same-origin deployments
+    // No window (server-side), keep empty
     BASE_URL = '';
   }
 

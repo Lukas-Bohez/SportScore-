@@ -4,25 +4,57 @@ import GenericButton from "@/components/Generic/GenericButton.vue";
 import { RouterLink, useRouter } from "vue-router";
 import { Plus } from "lucide-vue-next";
 import { notifyBigScreen } from "@/composables/useBigScreenSync";
-import { onMounted, computed } from "vue";
+import { onMounted, computed, ref, watch } from "vue";
 import { useSessions } from "@/composables/useSessions";
+import GenericModel from "@/components/Generic/GenericModel.vue";
 
 const router = useRouter();
 
 // Composable: check for active sessions and load them on mount
-const { activeSessions, fetchActiveSessions } = useSessions();
-const hasActiveSessions = computed(() => Array.isArray(activeSessions.value) && activeSessions.value.length > 0);
+const { activeSession, fetchActiveSessions } = useSessions();
+const hasActiveSessions = computed(() => !!activeSession.value);
+
+const goToActiveSession = () => {
+  if (activeSession.value && activeSession.value.id) {
+    router.push({ path: '/sessionmanagment', query: { session: activeSession.value.id } }).catch((e) => console.warn('Router push to sessionmanagment failed:', e));
+  } else {
+    router.push({ path: '/sessionmanagment' }).catch((e) => console.warn('Router push to sessionmanagment failed:', e));
+  }
+};
+const activeSessionModal = ref(null);
 
 onMounted(() => {
   // Best-effort load; ignore errors to avoid blocking homepage render
   fetchActiveSessions().catch((e) => console.debug("Failed to load active sessions on homepage:", e));
 });
 
-// Handle nieuwe sessie click
-const handleNewSession = () => {
+// Auto-open popup when an active session becomes available
+watch(activeSession, (val) => {
+  if (val) {
+    // slight delay so DOM has the modal ref
+    setTimeout(() => {
+      try { activeSessionModal.value?.open(); } catch (e) { /* ignore */ }
+    }, 50);
+  }
+});
+
+// Handle nieuwe sessie click: notify bigscreen but do NOT open the BigScreen UI as a fallback (prevents opening a new tab)
+const handleNewSession = async () => {
   console.log("🔔 User clicked: Nieuwe sessie");
-  notifyBigScreen("loading");
-  // Navigation happens automatically via RouterLink
+  try {
+    // Disable UI fallback so we don't open a new tab from this action
+    await notifyBigScreen("loading", null, null, { uiFallback: false });
+  } catch (err) {
+    console.warn('Notify bigscreen failed:', err);
+  }
+};
+
+const onNewSessionClick = async () => {
+  await handleNewSession();
+  // Navigate in-SPA to the New Session view
+  router.push({ path: '/nieuwesessie' }).catch((e) => {
+    console.warn('Router push to /nieuwesessie failed:', e);
+  });
 };
 </script>
 
@@ -39,16 +71,22 @@ const handleNewSession = () => {
           <img src="/homevector.svg" alt="home vector" class="home-vector" />
         </div>
         <p>Scoreboard voor team building activiteiten</p>
-        <RouterLink
-          class="router-link"
-          to="/nieuwesessie"
-          @click="handleNewSession"
-        >
-          <GenericButton variant="primary">
-            <Plus />
-            Nieuwe sessie
-          </GenericButton>
-        </RouterLink>
+        <GenericButton variant="primary" @click="onNewSessionClick">
+          <Plus />
+          Nieuwe sessie
+        </GenericButton>
+
+        <GenericModel
+          ref="activeSessionModal"
+          v-if="activeSession"
+          icon="circle-info"
+          iconColor="var(--blue-100)"
+          :message="activeSession ? `Er is een actieve sessie: ${activeSession.name}. Wil je doorgaan naar sessiebeheer?` : ''"
+          confirmText="Ga verder"
+          cancelText="Sluit"
+          :showCancel="true"
+          @confirm="goToActiveSession"
+        />
         <!-- <div>
           <RouterLink class="router-link" to="/bigscreen/qrscreen">
             QR Code Scannen

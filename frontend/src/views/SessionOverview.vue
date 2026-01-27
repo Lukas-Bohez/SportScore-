@@ -51,7 +51,10 @@
             <h4 class="stap4-subtitle">Deelnemers:</h4>
             <div class="teams-container">
               <div v-for="team in teams" :key="team.id" class="team-container">
-                <p class="activity-item">{{ team.name }} {{ team.icon }}</p>
+                <div class="team-header">
+                  <button @click="unlinkTeam(team.id)" class="action-button action-button--danger left-unlink" title="Ontkoppelen">✖</button>
+                  <p class="activity-item team-name">{{ team.name }} {{ team.icon }}</p>
+                </div>
                 <div class="activity-container">
                   <p
                     v-for="player in team.players"
@@ -158,6 +161,20 @@ const deleteSession = () => {
 
   // Open the modal instead of using browser confirm
   deleteModal.value.open();
+};
+
+// Unlink team from session
+const unlinkTeam = async (teamId) => {
+  if (!session.value) return;
+  try {
+    await post(`/api/v1/sessions/${session.value.id}/remove-team`, { team_id: teamId });
+    ElNotification({ title: 'Succes', message: 'Team is ontkoppeld van de sessie', type: 'success' });
+    // Refresh session data
+    await loadSessionData();
+  } catch (err) {
+    console.error('❌ Failed to unlink team:', err);
+    ElNotification({ title: 'Fout', message: 'Kon team niet ontkoppelen: ' + (err.message || ''), type: 'error' });
+  }
 };
 
 const confirmDelete = async () => {
@@ -505,6 +522,15 @@ onMounted(() => {
   align-items: stretch;
   padding-bottom: var(--space-4);
 
+  .team-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 200px;
+    min-width: 200px;
+    flex-shrink: 0;
+  }
+
   & > p {
     flex-shrink: 0;
     display: flex;
@@ -512,16 +538,25 @@ onMounted(() => {
 
   & .activity-container {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--space-3);
     flex: 1;
 
     & p {
-      flex: 1 1 calc(45%);
-      min-width: 120px;
+      width: 100%;
       box-sizing: border-box;
     }
   }
+
+  .left-unlink {
+    margin-right: var(--space-2);
+  }
+
+  .team-name { font-weight: 600; }
+
+  .left-unlink { margin-right: var(--space-2); }
+
+  .action-button--danger { color: var(--red-100); }
 }
 
 h2 {
@@ -584,7 +619,9 @@ h2 {
   padding: var(--space-4);
   border: 1px solid var(--black-40);
   border-radius: var(--radius-M);
-  width: fit-content;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
 }
 .stap4-subtitle {
   font-size: var(--font-size-L);

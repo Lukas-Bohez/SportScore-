@@ -231,7 +231,7 @@ function exportSession() {
 const exportChoice = ref("");
 const exportOptions = [
   { label: 'Download (JSON)', value: 'json' },
-  { label: 'Download (XLSX - volledig)', value: 'xlsx' }
+  { label: 'Download (XLS)', value: 'xlsx' }
 ];
 
 watch(exportChoice, async (v) => {

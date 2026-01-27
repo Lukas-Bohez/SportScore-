@@ -167,6 +167,92 @@ async def create_session_team(session_id: int, request: Request):
     return SessionTeamResponse(**created_team)
 
 
+# Backwards-compatible endpoint to add an existing team to a session
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/add-team", tags=["Session Teams"], summary="Add an existing team to a session by team_id")
+async def add_existing_team_to_session(session_id: int, request: Request):
+    payload: Dict[str, Any]
+    try:
+        payload = await request.json()
+    except Exception:
+        try:
+            raw = await request.body()
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode('utf-8', errors='ignore')
+            payload = json.loads(raw or '{}')
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid request body")
+
+    team_id = payload.get('team_id')
+    if team_id is None:
+        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
+
+    # Ensure session exists
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Ensure team exists
+    team = SessionTeamRepository.get_team_by_id(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    success = SessionTeamRepository.add_existing_team_to_session(session_id, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to add team to session")
+
+    created_team = SessionTeamRepository.get_team_in_session(team_id, session_id)
+
+    if sio:
+        total_score = SessionScoreRepository.get_team_total_score(session_id, team_id)
+        await sio.emit('team_update', _jsonable({
+            'session_id': session_id,
+            'team_id': team_id,
+            'team': { **created_team, 'total_score': total_score },
+            'action': 'linked',
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+
+    return SessionTeamResponse(**created_team)
+
+
+# Endpoint to remove/unlink a team from a session without deleting the team itself
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/remove-team", tags=["Session Teams"], summary="Remove/unlink a team from a session by team_id")
+async def remove_team_from_session_endpoint(session_id: int, request: Request):
+    payload: Dict[str, Any]
+    try:
+        payload = await request.json()
+    except Exception:
+        try:
+            raw = await request.body()
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode('utf-8', errors='ignore')
+            payload = json.loads(raw or '{}')
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid request body")
+
+    team_id = payload.get('team_id')
+    if team_id is None:
+        raise HTTPException(status_code=422, detail="Field 'team_id' is required")
+
+    # Ensure session exists
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    success = SessionTeamRepository.remove_team_from_session(session_id, team_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to remove team from session")
+
+    if sio:
+        await sio.emit('team_update', _jsonable({
+            'session_id': session_id,
+            'team_id': team_id,
+            'action': 'removed',
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+
+    return {"success": True, "team_id": team_id}
+
 @router.get(f"{ENDPOINT}/sessions/{{session_id}}/teams/{{team_id}}/players", response_model=PlayerListResponse, tags=["Session Team Players"], summary="List players for a session team")
 async def get_players_for_team(session_id: int, team_id: int):
     team = SessionTeamRepository.get_team_in_session(team_id, session_id)

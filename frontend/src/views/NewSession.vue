@@ -12,7 +12,7 @@ import {
 import { useRouter } from "vue-router";
 import GenericStepBar from "@/components/Generic/GenericStepBar.vue";
 import GenericInput from "@/components/Generic/GenericInput.vue";
-import { ref, computed, onMounted, onUnmounted, h, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, h, watch, nextTick } from "vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericCheckbox from "@/components/Generic/GenericCheckbox.vue";
 import GenericToggle from "@/components/Generic/GenericToggle.vue";
@@ -26,7 +26,8 @@ import {
   usePlayers,
 } from "@/composables";
 import { useApi } from "@/composables/useApi";
-const { post, get } = useApi();
+const { post, get, put } = useApi();
+import { notifyBigScreen } from '@/composables/useBigScreenSync';
 import { useRoute } from "vue-router";
 
 const modalRef = ref(null);
@@ -74,14 +75,16 @@ const handleConfirm = async () => {
     console.log("📋 Template activities:", template.activities);
     console.log("👥 Template teams:", template.teams);
 
-    // 1. Create session in API with 'active' status
-    const createdSession = await post('/api/v1/sessions', {
-      name: template.name,
-      total_rounds: template.total_rounds,
-      time_limit: template.time_limit,
-      scoring_mode: template.scoring_mode,
-      status: 'active',
-    });
+    // 1. Create session using composable (don't set status here, use start endpoint)
+    const createdSession = await createSession(
+      {
+        name: template.name,
+        total_rounds: template.total_rounds,
+        time_limit: template.time_limit,
+        scoring_mode: template.scoring_mode,
+      },
+      (template.activities || []).map((a) => a.id),
+    );
     console.log("✅ Session created in API:", createdSession);
 
     // 2. Create teams and get ID mapping
@@ -91,28 +94,28 @@ const handleConfirm = async () => {
       try {
         let apiTeam;
         try {
-              apiTeam = await post('/api/v1/teams', {
-                name: team.name,
-                color: team.color || '#ffffff',
-                icon: team.icon || '👥',
-                description: '',
-              });
-            } catch (err) {
-              // If the API indicates the team already exists, find it
-              if (err && String(err.message || '').toLowerCase().includes('already exists')) {
-                const allTeamsResp = await get('/api/v1/teams');
-                const allTeams = allTeamsResp.teams || allTeamsResp || [];
-                apiTeam = allTeams.find((t) => t.name === team.name);
-              } else {
-                console.error('Failed to create team:', err);
-                throw err;
-              }
-      }
+          apiTeam = await post('/api/v1/teams', {
+            name: team.name,
+            color: team.color || '#ffffff',
+            icon: team.icon || '👥',
+            description: '',
+          });
+        } catch (err) {
+          // If the API indicates the team already exists, find it
+          if (err && String(err.message || '').toLowerCase().includes('already exists')) {
+            const allTeamsResp = await get('/api/v1/teams');
+            const allTeams = allTeamsResp.teams || allTeamsResp || [];
+            apiTeam = allTeams.find((t) => t.name === team.name);
+          } else {
+            console.error('Failed to create team:', err);
+            throw err;
+          }
+        }
 
         // Link team to session
         await post(`/api/v1/sessions/${createdSession.id}/add-team`, { team_id: apiTeam.id });
 
-        // 3. Create players if they exist
+        // 3. Create players for this team if they exist
         if (team.players && team.players.length > 0) {
           for (const player of team.players) {
             try {
@@ -131,37 +134,81 @@ const handleConfirm = async () => {
       }
     }
 
-    // 4. Create activities
-    console.log("🎮 Creating activities...", template.activities);
+    // 3. Create unassigned/global players (players with no team) as global players
+    if (template.players && template.players.length > 0) {
+      for (const p of template.players) {
+        if (!p.team_id) {
+          try {
+            // create global player; backend will accept team_id optionally
+            await createPlayer({ name: p.name, team_id: null, position: p.icon || p.position || '' });
+          } catch (err) {
+            console.warn('Failed to create global player for template:', p, err);
+          }
+        }
+      }
+    }
+
+    // 4. Activities are already copied by createSession (via composable)
+    console.log('🎮 Activities handled by createSession');
+
+    // 5. Start session via dedicated endpoint
+    try {
+      await startSession(createdSession.id);
+      console.log('✅ Session started via /start endpoint');
+    } catch (err) {
+      console.warn('Failed to start session via /start endpoint, trying to set status directly as fallback', err);
+      // As last resort, attempt to update session status
+      try {
+        await put(`/api/v1/sessions/${createdSession.id}`, { status: 'active' });
+      } catch (e) {
+        console.error('Failed to set session active on server:', e);
+      }
+    }
+
+    // 6. Create activities that weren't in global list (if any)
+    // (Kept for backward compatibility, but createSession already copies global activities)
     if (template.activities && template.activities.length > 0) {
       for (const activity of template.activities) {
-        try {
-          console.log("📝 Creating activity:", activity.name);
+        if (!activity.id) {
           try {
-            const createdActivity = await post(`/api/v1/sessions/${createdSession.id}/activities`, {
+            await post(`/api/v1/sessions/${createdSession.id}/activities`, {
               session_id: createdSession.id,
               name: activity.name,
               sport_type: activity.sport_type || 'custom',
               game_type: activity.game_type || 'custom',
               scoring_mode: activity.scoring_mode || 'team',
               time_winner: activity.time_winner || 'lower',
+              aggregate_player_times: activity.aggregate_player_times || false,
               total_rounds: activity.total_rounds || 1,
               time_limit_per_round: activity.time_limit_per_round || null,
               description: activity.description || null,
             });
-            console.log("✅ Activity created:", createdActivity);
           } catch (err) {
-            console.error("❌ Failed to create activity:", err);
+            console.error('Failed to create activity fallback:', err);
           }
-        } catch (error) {
-          console.error("❌ Failed to create activity:", error);
         }
       }
-    } else {
-      console.warn("⚠️ No activities found in template!");
     }
 
-    console.log("✅ Session fully created, navigating to SessionManagement...");
+    console.log("✅ Session fully created, attempting to notify bigscreen and navigate...");
+
+    // Notify bigscreen to show the scorescreen for this session
+    try {
+      const notifyResult = await notifyBigScreen('scorescreen', createdSession.id, { name: template.name });
+      if (notifyResult && notifyResult.method && notifyResult.method !== 'socket') {
+        // Let user know we used a fallback method (HTTP or UI open)
+        ElNotification({
+          title: "Info",
+          message:
+            notifyResult.method === 'http'
+              ? 'Opmerking: bigscreen genotificeerd via HTTP (geen socket)'
+              : 'Opmerking: bigscreen UI geopend in nieuw venster als fallback',
+          type: "info",
+        });
+      }
+    } catch (err) {
+      console.warn('Bigscreen notification failed (non-fatal):', err);
+    }
 
     ElNotification({
       title: "Succes!",
@@ -216,7 +263,7 @@ const {
   loading,
 } = useActivities();
 
-const { createSession, loading: sessionLoading } = useSessions();
+const { createSession, startSession, loading: sessionLoading } = useSessions();
 
 // Use teams composable
 const {
@@ -224,6 +271,7 @@ const {
   fetchTeams,
   fetchTeamsWithPlayers,
   createTeam,
+  deleteTeam: apiDeleteTeam,
   loading: teamsLoading,
 } = useTeams();
 
@@ -245,6 +293,19 @@ const selectedActivities = ref([]);
 // Step 3: Participant mode (teams, players, or teams&players)
 const participantMode = ref("teams"); // "teams", "players", "teams&spelers"
 const teamName = ref("");
+
+// Session-level scoring mode should follow the participant mode selection
+watch(participantMode, (val) => {
+  // participantMode 'players' acts like 'team_with_players' (teams + players + unassigned pool)
+  const mapping = { teams: 'team', players: 'team_with_players', 'teams&spelers': 'team_with_players' };
+  sessionScoringMode.value = mapping[val] || 'team';
+});
+
+// Ensure initial session scoring mode is in sync
+{
+  const mapping = { teams: 'team', players: 'team_with_players', 'teams&spelers': 'team_with_players' };
+  sessionScoringMode.value = mapping[participantMode.value] || 'team';
+}
 const teamIcon = ref(""); // Emoji name (icon field)
 const teamIconDisplay = ref("😊"); // Emoji for display
 const playerName = ref("");
@@ -321,6 +382,63 @@ const existingTeams = computed(() => {
     players: sessionPlayers.value.filter((p) => p.team_id === team.id),
   }));
 });
+
+// Available global teams (from API) that can be added with one click
+const availableTeams = ref([]);
+
+// Lazy-load available teams when entering step 3
+watch(step, async (val) => {
+  if (val === 3 && availableTeams.value.length === 0) {
+    try {
+      const fetched = await fetchTeamsWithPlayers();
+      // Exclude teams already added to the session
+      availableTeams.value = (fetched || []).filter((t) => !sessionTeams.value.some((st) => String(st.id) === String(t.id)));
+      console.log('✅ Available teams loaded (filtered):', availableTeams.value.length);
+    } catch (e) {
+      console.warn('⚠️ Failed to load available teams:', e);
+      availableTeams.value = [];
+    }
+  }
+});
+
+// Add an available/global team to the local session template (including its players)
+function addAvailableTeamToSession(team) {
+  // Prevent duplicates
+  const exists = sessionTeams.value.some((t) => String(t.id) === String(team.id));
+  if (exists) {
+    ElNotification({ title: 'Info', message: `Team "${team.name}" is al toegevoegd`, type: 'info' });
+    return;
+  }
+
+  // Add team (preserve numeric id so create flow can map existing teams)
+  sessionTeams.value.push({
+    id: team.id,
+    name: team.name,
+    color: team.color || '#ffffff',
+    icon: team.icon || '👥',
+  });
+
+  // Add players (avoid duplicates by name+team)
+  for (const p of team.players || []) {
+    const already = sessionPlayers.value.some(
+      (sp) => sp.name === p.name && String(sp.team_id) === String(team.id),
+    );
+    if (!already) {
+      sessionPlayers.value.push({
+        id: `imported-${p.id}`,
+        name: p.name,
+        team_id: team.id,
+        position: p.position || p.icon || '😊',
+      });
+    }
+  }
+
+  saveToLocalStorage();
+  // Remove from available list (no longer needed)
+  availableTeams.value = availableTeams.value.filter((at) => String(at.id) !== String(team.id));
+  ElNotification({ title: 'Succes!', message: `Team "${team.name}" en zijn spelers zijn toegevoegd`, type: 'success' });
+}
+
 
 function next() {
   // Validate based on current step
@@ -548,6 +666,7 @@ async function saveSession() {
       status: "template", // Template status (not yet started)
       created_at: new Date().toISOString(),
       teams: [],
+      players: [],
       activities: [],
     };
 
@@ -576,6 +695,14 @@ async function saveSession() {
 
       newSession.teams.push(teamData);
     }
+
+    // Add players to session (flat list)
+    newSession.players = sessionPlayers.value.map((p) => ({
+      id: p.id,
+      name: p.name,
+      icon: p.position || p.icon || "",
+      team_id: p.team_id || null,
+    }));
 
     // Add activities to session
     for (const activityId of selectedActivities.value) {
@@ -621,6 +748,45 @@ async function saveSession() {
       message: "Kon sessie niet opslaan: " + (e.message || "Onbekende fout"),
       type: "error",
     });
+  }
+}
+
+// Start immediately without saving as template
+async function startSessionNow() {
+  if (!sessionName.value.trim()) {
+    ElNotification({ title: 'Waarschuwing', message: 'Voer een sessie naam in', type: 'warning' });
+    return;
+  }
+
+  try {
+    const sessionData = {
+      name: sessionName.value,
+      total_rounds: sessionTotalRounds.value,
+      time_limit: sessionTimeLimit.value,
+      scoring_mode: sessionScoringMode.value,
+      game_type: sessionGameType.value,
+      sport_type: sessionSportType.value,
+      show_players: sessionShowPlayers.value,
+      status: 'active',
+    };
+
+    // create session and copy activities
+    const created = await createSession(sessionData, selectedActivities.value || []);
+    console.log('✅ Session created:', created);
+
+    // Create local teams/players in API if present
+    // Map local temporary teams to API teams if needed (not creating teams here; assume teams can be added later via UI)
+
+    // Start session
+    await startSession(created.id);
+
+    ElNotification({ title: 'Succes', message: 'Sessie gestart!', type: 'success' });
+
+    // Navigate to session management
+    router.push({ name: 'sessionmanagment' });
+  } catch (e) {
+    console.error('Failed to start session:', e);
+    ElNotification({ title: 'Fout', message: 'Kon sessie niet starten: ' + (e.message || ''), type: 'error' });
   }
 }
 
@@ -700,45 +866,110 @@ async function addTeam() {
 }
 
 // Edit team function
-function editTeam(teamId) {
+async function editTeam(teamId) {
   const team = sessionTeams.value.find((t) => t.id === teamId);
   if (team) {
+    // Ensure the user sees the team form (switch to Teams mode) and populate it
+    participantMode.value = 'teams';
     editingTeamId.value = teamId;
     teamName.value = team.name;
     teamIconDisplay.value = team.icon;
     teamIcon.value = team.icon;
+
+    // Focus the team name field for faster edits
+    await nextTick();
+    const input = document.querySelector('.participant-form .generic-input input');
+    if (input) input.focus();
   }
 }
 
 // Delete team function
-function deleteTeam(teamId) {
-  const team = sessionTeams.value.find((t) => t.id === teamId);
-  if (team) {
-    // Remove team
-    sessionTeams.value = sessionTeams.value.filter((t) => t.id !== teamId);
+async function deleteTeam(teamId) {
+  const team = sessionTeams.value.find((t) => String(t.id) === String(teamId));
+  if (!team) return;
 
-    // Remove all players from this team
-    sessionPlayers.value = sessionPlayers.value.filter(
-      (p) => p.team_id !== teamId,
-    );
+  // If this is a persisted global team (not a temp local one), try to delete it via API
+  const isTemp = String(team.id).startsWith('temp-');
 
-    // Save to localStorage
-    saveToLocalStorage();
-
-    ElNotification({
-      title: "Succes!",
-      message: `Team "${team.name}" is verwijderd!`,
-      type: "success",
-    });
-
-    // Clear form if we were editing this team
-    if (editingTeamId.value === teamId) {
-      editingTeamId.value = null;
-      teamName.value = "";
-      teamIcon.value = "";
-      teamIconDisplay.value = "😊";
+  if (!isTemp) {
+    try {
+      await apiDeleteTeam(team.id);
+      console.log('✅ Deleted team from API:', team.id);
+    } catch (err) {
+      console.warn('⚠️ Failed to delete team via API, falling back to unassign:', err);
+      // Notify user but continue to unassign locally
+      ElNotification({ title: 'Waarschuwing', message: `Kon team ${team.name} niet volledig verwijderen, het wordt nu alleen ontkoppeld.`, type: 'warning' });
     }
   }
+
+  // Unassign players from this team (leave them in the session as unassigned)
+  sessionPlayers.value = sessionPlayers.value.map((p) => {
+    if (String(p.team_id) === String(team.id)) {
+      return { ...p, team_id: null };
+    }
+    return p;
+  });
+
+  // Remove team from sessionTeams
+  sessionTeams.value = sessionTeams.value.filter((t) => String(t.id) !== String(team.id));
+
+  // Save to localStorage
+  saveToLocalStorage();
+
+  // Refresh available teams if needed
+  try {
+    const fetched = await fetchTeamsWithPlayers();
+    availableTeams.value = (fetched || []).filter((t) => !sessionTeams.value.some((st) => String(st.id) === String(t.id)));
+  } catch (e) {
+    console.warn('⚠️ Failed to refresh available teams after deletion:', e);
+    // If API failed and team was local (deleted), ensure it's removed from available list
+    if (isTemp) {
+      availableTeams.value = availableTeams.value.filter((at) => String(at.id) !== String(team.id));
+    }
+  }
+
+  ElNotification({
+    title: "Succes!",
+    message: `Team "${team.name}" is verwijderd. Spelers zijn nu ongeplaatst.`,
+    type: "success",
+  });
+
+  // Clear form if we were editing this team
+  if (editingTeamId.value === teamId) {
+    editingTeamId.value = null;
+    teamName.value = "";
+    teamIcon.value = "";
+    teamIconDisplay.value = "😊";
+  }
+}
+
+// Unassign team from session (return to available teams without deleting the global team)
+async function unassignTeamFromSession(teamId) {
+  const team = sessionTeams.value.find((t) => String(t.id) === String(teamId));
+  if (!team) return;
+
+  // Remove players linked to this team
+  sessionPlayers.value = sessionPlayers.value.filter((p) => String(p.team_id) !== String(teamId));
+
+  // Remove team from session
+  sessionTeams.value = sessionTeams.value.filter((t) => String(t.id) !== String(teamId));
+
+  // Save
+  saveToLocalStorage();
+
+  // Refresh available teams (include the unassigned one)
+  try {
+    const fetched = await fetchTeamsWithPlayers();
+    availableTeams.value = (fetched || []).filter((t) => !sessionTeams.value.some((st) => String(st.id) === String(t.id)));
+  } catch (e) {
+    console.warn('⚠️ Failed to refresh available teams after unassign:', e);
+    // fallback: add this team back if it's not a temp one
+    if (!String(team.id).startsWith('temp-') && !availableTeams.value.some((at) => String(at.id) === String(team.id))) {
+      availableTeams.value.unshift(team);
+    }
+  }
+
+  ElNotification({ title: 'Succes!', message: `Team "${team.name}" is ontkoppeld van de sessie`, type: 'success' });
 }
 
 // Cancel edit
@@ -760,7 +991,9 @@ async function addPlayerToTeam() {
   // Clear previous error
   selectedTeamError.value = "";
 
-  if (!selectedTeamForPlayer.value) {
+  // Allow adding unassigned players when in 'players' mode (selectedTeamForPlayer may be empty)
+  let teamId = selectedTeamForPlayer.value || null;
+  if (!teamId && participantMode.value !== 'players' && !editingPlayerId.value) {
     selectedTeamError.value = "Kies eerst een team";
     return;
   }
@@ -775,7 +1008,7 @@ async function addPlayerToTeam() {
   }
 
   const teamNameForMessage = sessionTeams.value.find(
-    (t) => t.id === selectedTeamForPlayer.value,
+    (t) => t.id === (teamId === '' ? null : teamId),
   )?.name;
 
   if (editingPlayerId.value) {
@@ -799,11 +1032,11 @@ async function addPlayerToTeam() {
     }
     editingPlayerId.value = null;
   } else {
-    // Add new player
+    // Add new player (respect teamId which may be null for unassigned)
     const newPlayer = {
-      id: `temp-${tempPlayerId++}`, // Temporary ID
+      id: `temp-${tempPlayerId++}`,
       name: playerName.value,
-      team_id: selectedTeamForPlayer.value,
+      team_id: teamId,
       position: playerIconDisplay.value || "😊",
     };
 
@@ -811,8 +1044,7 @@ async function addPlayerToTeam() {
 
     ElNotification({
       title: "Succes!",
-      message: `Speler "${playerName.value}" is toegevoegd aan ${teamNameForMessage || "het team"}!`,
-      type: "success",
+      message: teamId ? `Speler "${playerName.value}" is toegevoegd aan ${teamNameForMessage || "het team"}!` : `Speler "${playerName.value}" is toegevoegd aan de ongewijze spelerpool!`,
     });
   }
 
@@ -836,6 +1068,18 @@ function editPlayer(playerId) {
     selectedTeamForPlayer.value = player.team_id;
   }
 }
+
+// Assign an unassigned player to a team (or unassign by passing empty string/null)
+function assignPlayerToTeam(playerId, teamId) {
+  const playerIndex = sessionPlayers.value.findIndex((p) => p.id === playerId);
+  if (playerIndex === -1) return;
+  sessionPlayers.value[playerIndex].team_id = teamId === '' ? null : teamId;
+  saveToLocalStorage();
+  ElNotification({ title: 'Succes', message: `Speler ${sessionPlayers.value[playerIndex].name} is toegewezen`, type: 'success' });
+}
+
+// Standalone add was removed; players mode reuses the teams-with-players UI and addPlayerToTeam to handle players (possibly unassigned)
+ 
 
 // Delete player function
 function deletePlayer(playerId) {
@@ -866,6 +1110,28 @@ function deletePlayer(playerId) {
   }
 }
 </script>
+
+<style scoped>
+.unassigned-players {
+  margin-top: var(--space-4);
+}
+.unassigned-players h5 {
+  margin-bottom: var(--space-3);
+}
+.players-pool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.player-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: var(--space-3);
+  border: 1px solid var(--black-20);
+  border-radius: var(--radius-M);
+}
+</style>
 
 <template>
   <div class="app-container">
@@ -964,9 +1230,9 @@ function deletePlayer(playerId) {
             <div>
               <h3><span>Deelnemers</span> toevoegen</h3>
 
-              <!-- Toggle to choose participant mode -->
+              <!-- Toggle to choose participant mode (compact: Teams / Players) -->
               <div class="participant-mode-toggle">
-                <GenericToggle v-model="participantMode" />
+                <GenericToggle v-model="participantMode" :compact="true" />
               </div>
 
               <!-- Form for Teams mode -->
@@ -993,28 +1259,27 @@ function deletePlayer(playerId) {
                 </div>
               </div>
 
-              <!-- Form for Teams & Players mode -->
+              <!-- Form for Players mode: show teams with players and an unassigned players pool -->
               <div
-                v-else-if="participantMode === 'teams&spelers'"
+                v-else-if="participantMode === 'players'"
                 class="participant-form"
               >
                 <div v-if="existingTeams.length === 0" class="info-message">
                   <p>
-                    ⚠️ Voeg eerst een team toe voordat je spelers kunt toevoegen
+                    ℹ️ Er zijn nog geen teams, je kunt spelers toevoegen zonder team
+                    (ze verschijnen in de onbewerkte spelerpool)
                   </p>
                 </div>
                 <div class="form-input-group">
                   <GenericDropdown
                     v-model="selectedTeamForPlayer"
-                    label="Selecteer team"
-                    :placeholder="
-                      existingTeams.length > 0
-                        ? 'Kies een team'
-                        : 'Er zijn nog geen teams'
+                    label="Selecteer team (laat leeg = geen team)"
+                    :placeholder="existingTeams.length > 0 ? 'Kies een team of laat leeg voor onbepaald' : 'Geen teams beschikbaar'
                     "
-                    :options="
-                      existingTeams.map((t) => ({ value: t.id, label: t.name }))
-                    "
+                    :options="[
+                      { value: '', label: 'Geen team (onbepaald)' },
+                      ...existingTeams.map((t) => ({ value: t.id, label: t.name }))
+                    ]"
                     :error="selectedTeamError"
                     @update:modelValue="selectedTeamError = ''"
                   />
@@ -1051,6 +1316,25 @@ function deletePlayer(playerId) {
 
                 <!-- Unified layout for both modes -->
                 <div class="teams-with-players-layout">
+
+                  <!-- Available global teams to add with one click -->
+                  <div v-if="availableTeams.length > 0" class="available-teams">
+                    <h5>Beschikbare teams</h5>
+                    <div class="available-list">
+                      <div
+                        v-for="t in availableTeams"
+                        :key="t.id"
+                        class="available-team"
+                        @click="addAvailableTeamToSession(t)"
+                        role="button"
+                        tabindex="0"
+                      >
+                        <span class="available-team-name">{{ t.name }} {{ t.icon }}</span>
+                        <span class="available-team-count">{{ (t.players || []).length }} spelers</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div v-if="sessionTeams.length > 0" class="teams-container">
                     <div
                       v-for="team in sessionTeams"
@@ -1063,20 +1347,22 @@ function deletePlayer(playerId) {
                       }"
                     >
                       <div class="activity-item-with-actions team-item-fixed">
-                        <span
-                          >{{ truncateTeamName(team.name) }}
-                          {{ team.icon }}</span
-                        >
+                        <div class="left-unlink">
+                          <button @click.stop="unassignTeamFromSession(team.id)" title="Ontkoppelen" class="action-button action-button--danger">✖</button>
+                        </div>
+                        <span class="team-name">{{ truncateTeamName(team.name) }} {{ team.icon }}</span>
                         <div class="item-actions">
                           <button
-                            @click="editTeam(team.id)"
+                            @click.stop="editTeam(team.id)"
                             class="action-button"
+                            title="Bewerken"
                           >
                             <Pencil :size="16" />
                           </button>
                           <button
-                            @click="deleteTeam(team.id)"
+                            @click.stop="deleteTeam(team.id)"
                             class="action-button action-button--delete"
+                            title="Verwijderen"
                           >
                             <Trash2 :size="16" />
                           </button>
@@ -1089,35 +1375,75 @@ function deletePlayer(playerId) {
                         "
                         class="activity-container"
                       >
-                        <div
+                            <div
                           v-for="player in sessionPlayers.filter(
                             (p) => p.team_id === team.id,
                           )"
                           :key="player.id"
-                          class="activity-container-item-with-actions"
+                          class="activity-container-item-with-actions player-row"
                         >
-                          <span>{{ player.name }} {{ player.position }}</span>
-                          <div class="item-actions">
-                            <button
-                              @click="editPlayer(player.id)"
-                              class="action-button"
-                            >
-                              <Pencil :size="14" />
-                            </button>
-                            <button
-                              @click="deletePlayer(player.id)"
-                              class="action-button action-button--delete"
-                            >
-                              <Trash2 :size="16" />
-                            </button>
+                          <div class="player-info">
+                            <span>{{ player.name }} {{ player.position }}</span>
+                          </div>
+                          <div class="player-actions">
+                            <div class="player-assign">
+                              <GenericDropdown
+                                :options="[
+                                  { value: '', label: 'Geen team' },
+                                  ...sessionTeams.map(t => ({ value: t.id, label: t.name }))
+                                ]"
+                                :modelValue="player.team_id || ''"
+                                :placeholder="'Verplaats'"
+                                @update:modelValue="(val) => assignPlayerToTeam(player.id, val)"
+                              />
+                            </div>
+                            <div class="item-actions">
+                              <button
+                                @click="editPlayer(player.id)"
+                                class="action-button"
+                              >
+                                <Pencil :size="14" />
+                              </button>
+                              <button
+                                @click="deletePlayer(player.id)"
+                                class="action-button action-button--delete"
+                              >
+                                <Trash2 :size="16" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div v-else class="empty-message">
-                    <p>Nog geen teams toegevoegd</p>
+                  <div class="unassigned-players">
+                    <h5>Ongeplaatste spelers</h5>
+                    <div v-if="sessionPlayers.filter(p => !p.team_id).length > 0" class="players-pool">
+                      <div v-for="p in sessionPlayers.filter(p => !p.team_id)" :key="p.id" class="player-row">
+                        <div class="player-info">
+                          <span>{{ p.name }} {{ p.position }}</span>
+                        </div>
+                        <div class="player-actions">
+                          <div class="player-assign">
+                            <GenericDropdown
+                              :options="[
+                                { value: '', label: 'Geen team' },
+                                ...sessionTeams.map(t => ({ value: t.id, label: t.name }))
+                              ]"
+                              :modelValue="p.team_id || ''"
+                              :placeholder="'Wijs toe aan team'"
+                              @update:modelValue="(val) => assignPlayerToTeam(p.id, val)"
+                            />
+                          </div>
+                          <div class="item-actions">
+                            <button @click="editPlayer(p.id)" class="action-button"><Pencil :size="14"/></button>
+                            <button @click="deletePlayer(p.id)" class="action-button action-button--delete"><Trash2 :size="16"/></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else class="empty-message"><p>Geen ongeplaatste spelers</p></div>
                   </div>
                 </div>
               </div>
@@ -1213,6 +1539,15 @@ function deletePlayer(playerId) {
                 :disabled="sessionLoading"
               >
                 {{ sessionLoading ? "Bezig..." : "Opslaan" }}
+              </GenericButton>
+
+              <!-- Start immediately without saving as template -->
+              <GenericButton
+                @click="startSessionNow"
+                variant="secondary"
+                :disabled="sessionLoading || !sessionName"
+              >
+                Start zonder opslaan
               </GenericButton>
               <GenericModel
                 ref="successModalRef"
@@ -1419,19 +1754,37 @@ h4 {
     width: 200px;
     min-width: 200px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  & .team-item-fixed .left-unlink {
+    margin-right: var(--space-2);
+  }
+
+  & .team-item-fixed .team-name {
+    font-weight: 600;
+    color: var(--black-90);
+  }
+
+  /* Small danger action */
+  .action-button--danger {
+    color: var(--red-100);
   }
 
   & .activity-container {
+    /* Show players in a vertical list to avoid wrapping/overflow */
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
+    flex-direction: column;
+    gap: var(--space-2);
     flex: 1;
+  }
 
-    & > * {
-      flex: 1 1 calc(45%);
-      min-width: 120px;
-      box-sizing: border-box;
-    }
+  /* Ensure each direct child occupies full width */
+  & .activity-container > * {
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 
@@ -1496,18 +1849,21 @@ h4 {
   padding: var(--space-4);
   border: 1px solid var(--black-40);
   border-radius: var(--radius-M);
-  width: fit-content;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
 }
 
 .activity-container-item-with-actions {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--black-40);
   border-radius: var(--radius-M);
-  width: fit-content;
+  width: 100%; /* make each player take full width */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.2s ease;
+  transition: all 0.12s ease;
+  box-sizing: border-box;
 }
 
 .activity-item-with-actions {
@@ -1525,6 +1881,96 @@ h4 {
   display: flex;
   gap: var(--space-2);
   align-items: center;
+}
+
+/* Available teams styling */
+.available-teams {
+  border: 1px dashed var(--black-20);
+  padding: var(--space-4);
+  border-radius: var(--radius-M);
+  background: var(--black-5);
+}
+.available-teams h5 {
+  margin: 0 0 var(--space-3) 0;
+  font-weight: 500; /* toned down */
+  color: var(--black-80);
+  font-size: 1rem;
+}
+.available-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 180px; /* keep the list compact */
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+.available-list::-webkit-scrollbar { width: 0.5rem; }
+.available-list::-webkit-scrollbar-thumb { background: var(--black-10); border-radius: var(--radius-S); }
+.available-team {
+  padding: calc(var(--space-2) + 2px) var(--space-3);
+  border-radius: var(--radius-S);
+  background: var(--white);
+  border: 1px solid var(--black-10);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.available-team:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+}
+.available-team-name {
+  font-weight: 500; /* less emphasis */
+  font-size: 0.95rem;
+  color: var(--black-90);
+}
+.available-team-count {
+  color: var(--black-50);
+  font-size: 0.85rem;
+}
+
+/* Player assign compact control */
+.player-assign {
+  width: 160px;
+  min-width: 120px;
+}
+.player-assign :deep(.generic-dropdown__wrapper) {
+  width: 160px !important;
+}
+
+/* Player actions layout */
+.player-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Unassigned players styling: subtler and lighter */
+.unassigned-players h5 {
+  font-weight: 500;
+  color: var(--black-70);
+}
+.players-pool .player-row {
+  padding: calc(var(--space-2) + 1px) var(--space-3);
+  background: var(--white);
+  border: 1px solid var(--black-10);
+  border-radius: var(--radius-S);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font-weight: 400;
+  color: var(--black-80);
+}
+.player-row .player-info { flex: 1; }
+.player-row + .player-row { margin-top: var(--space-2); }
+.empty-message p {
+  margin: 0;
+  color: var(--black-50);
+  font-weight: 400;
 }
 
 .action-button {

@@ -5,8 +5,16 @@
       label="Teams"
       @click="selectButton('teams')"
     />
-    <!-- Spelers mode verwijderd - backend ondersteunt geen standalone spelers -->
+
     <GenericButton
+      :variant="activeButton === 'players' ? 'primary' : 'tertiary'"
+      label="Spelers"
+      @click="selectButton('players')"
+    />
+
+    <!-- Optional third mode (Teams & spelers) shown unless compact=true -->
+    <GenericButton
+      v-if="!compact"
       :variant="activeButton === 'teams&spelers' ? 'primary' : 'tertiary'"
       label="Teams & spelers"
       @click="selectButton('teams&spelers')"
@@ -23,11 +31,16 @@ const props = defineProps({
     type: String,
     default: "teams",
   },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["toggle", "update:modelValue"]);
 
 const activeButton = computed(() => props.modelValue);
+const compact = props.compact;
 
 function selectButton(button) {
   emit("update:modelValue", button);

@@ -8,7 +8,15 @@
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+import { onMounted } from 'vue';
+// Initialize the BigScreen flow when this view mounts so it can react to socket events
+onMounted(() => {
+  import('@/composables/useBigscreenFlow')
+    .then(({ initBigscreenFlow }) => initBigscreenFlow())
+    .catch((e) => console.warn('Failed to init bigscreen flow:', e));
+});
+</script>
 
 <style scoped>
 .loading-screen {

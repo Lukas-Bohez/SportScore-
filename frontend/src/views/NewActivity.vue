@@ -6,6 +6,7 @@ import GenericInput from "@/components/Generic/GenericInput.vue";
 import GenericToggle from "@/components/Generic/GenericToggle.vue";
 import GenericDropdown from "@/components/Generic/GenericDropdown.vue";
 import GenericStepBar from "@/components/Generic/GenericStepBar.vue";
+import GenericCheckbox from "@/components/Generic/GenericCheckbox.vue";
 import { ref, onMounted } from "vue";
 import { useActivities } from "@/composables";
 import { ElNotification } from "element-plus";
@@ -27,6 +28,9 @@ const selectedGameType = ref("");
 const selectedSportStyle = ref("");
 const numberOfRounds = ref("");
 const timeLimit = ref("");
+// Team vs Time settings
+const timeWinner = ref("lower"); // 'lower' or 'higher'
+const aggregatePlayerTimes = ref(false);
 
 // Validation errors
 const activityNameError = ref("");
@@ -51,6 +55,9 @@ onMounted(async () => {
       timeLimit.value = activity.time_limit_per_round
         ? Math.floor(activity.time_limit_per_round / 60)
         : ""; // Convert seconds to minutes
+      // Team-vs-time specific options
+      timeWinner.value = activity.time_winner || "lower";
+      aggregatePlayerTimes.value = !!activity.aggregate_player_times;
     } catch (e) {
       ElNotification({
         title: "Fout",
@@ -121,6 +128,9 @@ async function saveActivity() {
     sport_type: selectedSportStyle.value,
     total_rounds: numberOfRounds.value ? parseInt(numberOfRounds.value) : 1, // Default to 1 if empty
     time_limit_per_round: timeLimit.value ? parseInt(timeLimit.value) * 60 : 0, // Default to 0 (no limit) if empty, convert minutes to seconds
+    // Team-vs-time options
+    time_winner: timeWinner.value,
+    aggregate_player_times: aggregatePlayerTimes.value,
   };
 
   try {
@@ -235,6 +245,25 @@ async function saveActivity() {
             label="Tijdlimiet (min):"
             placeholder="Bijv. 30"
             type="number"
+          />
+        </div>
+
+        <!-- Team vs Time settings -->
+        <div v-if="selectedGameType === 'team_vs_time'" class="form-group">
+          <GenericDropdown
+            label="Tijd winnaar"
+            v-model="timeWinner"
+            :options="[
+              { label: '⬇️ Laagste tijd wint', value: 'lower' },
+              { label: '⬆️ Hoogste tijd wint', value: 'higher' },
+            ]"
+            placeholder="Selecteer winnaar"
+          />
+
+          <GenericCheckbox
+            id="aggregatePlayerTimes"
+            v-model="aggregatePlayerTimes"
+            label="⌚ Aggregereer speler tijden"
           />
         </div>
       </div>

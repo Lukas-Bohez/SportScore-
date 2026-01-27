@@ -1,5 +1,29 @@
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useApi } from "./useApi";
+import { useSocket } from "./useSocket";
+
+// Attach socket listeners once to keep active session in sync across the app
+let socketListenersAttached = false;
+function attachSessionSocketListeners(fetchActiveSessions) {
+  if (socketListenersAttached) return;
+  const { connect, on } = useSocket();
+  try {
+    connect();
+  } catch (e) {
+    /* ignore connect errors - we'll still attempt to listen if socket connects later */
+  }
+
+  const refreshHandler = () => {
+    console.log("🔁 Session socket event received, refreshing active sessions");
+    fetchActiveSessions().catch((err) => console.warn("Failed to refresh active sessions after socket event:", err));
+  };
+
+  on("session_created", refreshHandler);
+  on("session_update", refreshHandler);
+  on("session_status_update", refreshHandler);
+  on("session_deleted", refreshHandler); // may or may not be emitted by backend
+  socketListenersAttached = true;
+}
 
 /**
  * Composable voor Session gerelateerde API calls
@@ -30,13 +54,27 @@ export function useSessions() {
   async function fetchActiveSessions() {
     try {
       const data = await get("/api/v1/sessions/active");
-      activeSessions.value = data;
-      return data;
+      // Backend returns either a single session object or null (not an array).
+      // Normalize to an array so consumers can consistently use `activeSessions`.
+      if (!data) {
+        activeSessions.value = [];
+      } else if (Array.isArray(data)) {
+        activeSessions.value = data;
+      } else {
+        activeSessions.value = [data];
+      }
+      return activeSessions.value;
     } catch (e) {
       console.error("Failed to fetch active sessions:", e);
       throw e;
     }
   }
+
+  // Expose single active session for convenience
+  const activeSession = computed(() => (activeSessions.value && activeSessions.value.length ? activeSessions.value[0] : null));
+
+  // Ensure socket listeners are attached so active session stays in sync
+  attachSessionSocketListeners(fetchActiveSessions);
 
   /**
    * Haal specifieke sessie op
@@ -182,6 +220,7 @@ export function useSessions() {
     sessions,
     currentSession,
     activeSessions,
+    activeSession,
     loading,
     error,
     fetchSessions,
