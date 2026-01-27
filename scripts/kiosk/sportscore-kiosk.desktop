@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=SportScore Kiosk
-Exec=/home/USERNAME/.local/bin/start-kiosk.sh http://localhost
+Exec=/home/USERNAME/.local/bin/start-kiosk.sh http://sportscore.local/#/bigscreen/qrscreen
 X-GNOME-Autostart-enabled=true
 Comment=Start SportScore in kiosk mode at session login

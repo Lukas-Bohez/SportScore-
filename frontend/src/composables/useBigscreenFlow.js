@@ -102,6 +102,26 @@ export function initBigscreenFlow() {
     evaluateAndNavigate();
   });
 
+  // Allow server to request direct navigation e.g. via /api/v1/bigscreen/navigate
+  // Payload expected: { screen: '<name-or-path>', session_id: <id>, data: {...} }
+  on('bigscreen:navigate', (payload) => {
+    try {
+      const p = payload || {};
+      const screen = (typeof p === 'string' ? p : (p.screen || null));
+      const sessionId = p.session_id || p.session || null;
+      if (!screen) return;
+
+      // Normalize to a path: allow either 'scorescreen' or full '/bigscreen/scorescreen'
+      const path = screen.startsWith('/') ? screen : `/bigscreen/${String(screen).replace(/^\/+/, '')}`;
+      const query = sessionId ? { session: sessionId } : undefined;
+
+      console.log('BigScreenFlow: server requested navigate ->', path, query);
+      safeReplace(path + (query ? `?session=${sessionId}` : ''));
+    } catch (e) {
+      console.warn('BigScreenFlow: failed handling bigscreen:navigate', e);
+    }
+  });
+
   // Re-evaluate on connect (useful after reconnect)
   on('connect', () => {
     console.log('BigScreenFlow: socket connected -> evaluate');

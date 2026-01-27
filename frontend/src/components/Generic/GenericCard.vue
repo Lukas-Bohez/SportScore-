@@ -6,7 +6,7 @@
     </div>
     <div class="card-meta" v-if="(teams && teams.length) || (activities && activities.length)">
       <span v-if="teams && teams.length" class="meta-item">{{ teams.length }} teams</span>
-      <span v-if="activities && activities.length" class="meta-item">{{ activities.length }} activiteiten</span>
+      <span v-if="activities && activities.length" class="meta-item">{{ activities.length }} {{ activities.length === 1 ? 'activiteit' : 'activiteiten' }}</span>
     </div>
 
     <div v-if="activities && activities.length > 0" class="card-activities">

@@ -7,7 +7,7 @@
     <div class="activity-status-indicator"></div>
     <div class="activity-card-content">
       <h4 class="activity-card-title">{{ truncatedTitle }}</h4>
-      <p class="activity-card-info">{{ activitiesCount }} Activiteiten</p>
+      <p class="activity-card-info">{{ activitiesCount }} {{ activitiesCount === 1 ? 'activiteit' : 'activiteiten' }}</p>
       <p class="activity-card-info">{{ teamsCount }} teams</p>
     </div>
   </div>

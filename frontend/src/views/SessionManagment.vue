@@ -28,12 +28,6 @@
               @confirm="confirmEndSession"
               @cancel="cancelEnd"
             />
-            <GenericButton
-              variant="quaternary"
-              style="background-color: transparent"
-            >
-              <Settings style="color: var(--black-100)" />
-            </GenericButton>
           </div>
         </div>
 
@@ -116,7 +110,7 @@
         <div v-if="selectedActivity" class="score-section">
           <!-- Points Input (for non team_vs_time) -->
           <div v-if="!isTeamVsTime" class="score-section-add-score">
-            <FeatureCounter v-model="scoreValue" />
+            <FeatureCounter v-model="scoreValue" :min="-9999" />
             <GenericButton
               label="Score toevoegen"
               variant="primary"
@@ -172,21 +166,45 @@
             <h4>Snelle Acties</h4>
             <div class="score-section-fast-action-buttons">
               <GenericButton
+                v-for="action in quickActions"
+                :key="action.id"
                 v-if="!isTeamVsTime"
                 class="score-section-button"
                 variant="primary"
-                label="+5 Bonus"
-                @click="addQuickScore(5)"
+                :label="action.label"
+                @click="addQuickScore(action)"
                 :disabled="!selectedTeamId"
               />
+
               <GenericButton
-                v-if="!isTeamVsTime"
                 class="score-section-button"
-                variant="primary"
-                label="+10 Bonus"
-                @click="addQuickScore(10)"
-                :disabled="!selectedTeamId"
-              ></GenericButton>
+                variant="quaternary"
+                label="Beheer acties"
+                @click="toggleQuickActionsModal"
+              />
+            </div>
+
+            <!-- Quick actions modal -->
+            <div v-if="quickActionsModalOpen" class="quick-actions-modal-overlay" @click.self="toggleQuickActionsModal">
+              <div class="quick-actions-modal">
+                <h3>Beheer Snelle Acties</h3>
+                <div class="quick-actions-list">
+                  <div v-for="q in quickActions" :key="q.id" class="quick-action-row">
+                    <input class="qa-label" v-model="q.label" />
+                    <input class="qa-points" type="number" v-model.number="q.points" />
+                    <button class="qa-save" @click="editQuickAction(q.id, q.label, q.points)">Opslaan</button>
+                    <button class="qa-delete" @click="removeQuickAction(q.id)">Verwijder</button>
+                  </div>
+                </div>
+                <div class="quick-action-add">
+                  <input placeholder="Label (bijv. Penalty -2)" v-model="newQuickLabel" />
+                  <input type="number" placeholder="Punten (bv -2)" v-model.number="newQuickPoints" />
+                  <button class="qa-add" @click="addQuickAction">Voeg toe</button>
+                </div>
+                <div class="quick-actions-modal-actions">
+                  <button class="qa-close" @click="toggleQuickActionsModal">Sluit</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -251,7 +269,6 @@ import GenericButton from "../components/Generic/GenericButton.vue";
 import GenericNav from "../components/Generic/GenericNav.vue";
 import GenericActivityCard from "../components/Generic/GenericActivityCard.vue";
 import GenericModel from "@/components/Generic/GenericModel.vue";
-import { Settings } from "lucide-vue-next";
 import { useApi } from "@/composables/useApi";
 import { useSessions } from "@/composables/useSessions";
 import { ElNotification } from "element-plus";
@@ -269,6 +286,68 @@ const selectedActivity = ref(null);
 const selectedTeamId = ref(null);
 const selectedPlayerId = ref(null);
 const scoreValue = ref(0);
+const lastQuickReason = ref(null);
+
+// Quick actions (configurable), persist in localStorage
+const QUICK_ACTIONS_KEY = 'quickActions';
+const quickActions = ref([]);
+const quickActionsModalOpen = ref(false);
+const newQuickLabel = ref('');
+const newQuickPoints = ref(0);
+
+const loadQuickActions = () => {
+  try {
+    const raw = localStorage.getItem(QUICK_ACTIONS_KEY);
+    if (raw) {
+      quickActions.value = JSON.parse(raw);
+    } else {
+      // sensible defaults
+      quickActions.value = [
+        { id: Date.now() + 1, label: '+5 Bonus', points: 5 },
+        { id: Date.now() + 2, label: '+10 Bonus', points: 10 },
+      ];
+      localStorage.setItem(QUICK_ACTIONS_KEY, JSON.stringify(quickActions.value));
+    }
+  } catch (e) {
+    console.warn('Failed to load quick actions, using defaults', e);
+    quickActions.value = [ { id: 1, label: '+5 Bonus', points: 5 }, { id: 2, label: '+10 Bonus', points: 10 }];
+  }
+};
+
+const saveQuickActions = () => {
+  try {
+    localStorage.setItem(QUICK_ACTIONS_KEY, JSON.stringify(quickActions.value));
+  } catch (e) {
+    console.warn('Failed to save quick actions', e);
+  }
+};
+
+const addQuickAction = () => {
+  const label = (newQuickLabel.value || '').trim();
+  const pts = Number(newQuickPoints.value);
+  if (!label) return;
+  quickActions.value.push({ id: Date.now(), label, points: pts });
+  newQuickLabel.value = '';
+  newQuickPoints.value = 0;
+  saveQuickActions();
+};
+
+const removeQuickAction = (id) => {
+  quickActions.value = quickActions.value.filter((q) => q.id !== id);
+  saveQuickActions();
+};
+
+const editQuickAction = (id, label, points) => {
+  const i = quickActions.value.findIndex((q) => q.id === id);
+  if (i === -1) return;
+  quickActions.value[i] = { id, label, points: Number(points) };
+  saveQuickActions();
+};
+
+const toggleQuickActionsModal = () => {
+  quickActionsModalOpen.value = !quickActionsModalOpen.value;
+};
+
 const scores = ref([]);
 const currentRound = ref(1);
 const timeRemaining = ref(0);
@@ -487,7 +566,15 @@ const addScore = async () => {
       round_number: currentRound.value,
     };
 
+    // If a quick-action provided a label/reason (e.g., "Penalty -2"), include it
+    if (lastQuickReason.value) {
+      scoreData.reason = lastQuickReason.value;
+    }
+
     const result = await post(`/api/v1/activities/${selectedActivity.value.id}/scores`, scoreData);
+
+    // Clear quick reason after posting
+    lastQuickReason.value = null;
     console.log("✅ Score added successfully:", result);
 
     ElNotification({
@@ -505,6 +592,8 @@ const addScore = async () => {
     // Reset form
     scoreValue.value = 0;
     selectedPlayerId.value = null;
+    // Close quick-actions modal if open (optional UX)
+    // leave quickActionsModalOpen as-is so user can continue editing
   } catch (error) {
     console.error("❌ Failed to add score:", error);
     ElNotification({
@@ -575,12 +664,21 @@ const addTimeScore = async () => {
 };
 
 // Add quick score
-const addQuickScore = async (points) => {
+// Accept either a numeric points value or a quick-action object ({label, points})
+const addQuickScore = async (action) => {
   if (!selectedTeamId.value) return;
 
-  scoreValue.value = points;
+  if (typeof action === 'number') {
+    scoreValue.value = action;
+    lastQuickReason.value = null;
+  } else if (action && typeof action === 'object') {
+    scoreValue.value = Number(action.points || 0);
+    lastQuickReason.value = action.label || null;
+  }
+
   await addScore();
 };
+
 
 // ... rest of functions remain the same ...
 
@@ -760,6 +858,7 @@ const cancelEnd = () => {
 
 onMounted(() => {
   loadActiveSession();
+  loadQuickActions();
 });
 
 onUnmounted(() => {
@@ -1020,4 +1119,30 @@ h3 {
   width: 100%;
   padding: var(--space-5) var(--space-6);
 }
+
+.quick-actions-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.quick-actions-modal {
+  width: 560px;
+  max-width: 92vw;
+  background: var(--white);
+  padding: var(--space-6);
+  border-radius: var(--radius-M);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+.quick-actions-list { max-height: 240px; overflow: auto; margin-bottom: var(--space-4); }
+.quick-action-row { display:flex; gap:8px; align-items:center; margin-bottom:8px }
+.quick-action-row .qa-label { flex:1; padding:8px; border:1px solid var(--black-10); border-radius:4px }
+.quick-action-row .qa-points { width:100px; padding:8px; border:1px solid var(--black-10); border-radius:4px }
+.quick-action-row .qa-save, .quick-action-row .qa-delete, .quick-action-add .qa-add, .quick-actions-modal-actions .qa-close { margin-left:6px }
+.quick-action-add { display:flex; gap:8px; align-items:center }
+.quick-action-add input { padding:8px; border:1px solid var(--black-10); border-radius:4px }
+.quick-actions-modal-actions { display:flex; justify-content:flex-end; margin-top: var(--space-4) }
 </style>

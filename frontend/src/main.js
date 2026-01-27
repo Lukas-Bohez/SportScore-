@@ -18,4 +18,19 @@ const app = createApp(App);
 app.use(router);
 app.use(ElementPlus);
 
+// Handle hash-based deep links gracefully when the server does not support history-mode
+// (e.g. kiosk using http://sportscore.local/#/bigscreen/...). When the app boots, translate
+// the hash path into a proper history navigation so the router loads the requested view.
+router.isReady().then(() => {
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#/')) {
+      const path = hash.replace(/^#/, '');
+      if (router.currentRoute.value.path !== path) {
+        router.replace(path).catch(() => {});
+      }
+    }
+  }
+}).catch(() => {});
+
 app.mount("#app");
