@@ -36,10 +36,19 @@ export async function notifyBigScreen(screen, sessionId = null, data = null, opt
         }
 
         const base = (typeof window !== 'undefined' && window.SCOREBOARD_UI_BASE) ? window.SCOREBOARD_UI_BASE.replace(/\/$/, '') : window.location.origin;
-        const url = `${base}/#/bigscreen/scorescreen${sessionId ? `?session=${sessionId}` : ''}`;
-        window.open(url, '_blank');
-        console.log('🔁 Opened BigScreen UI as fallback:', url);
-        return { success: true, method: 'ui-fallback', url };
+        // Prefer history-mode URL (requires server SPA fallback) but fall back to hash url for environments
+        const historyUrl = `${base}/bigscreen/scorescreen${sessionId ? `?session=${sessionId}` : ''}`;
+        const hashUrl = `${base}/#/bigscreen/scorescreen${sessionId ? `?session=${sessionId}` : ''}`;
+        // Try opening history URL first
+        try {
+          window.open(historyUrl, '_blank');
+          console.log('🔁 Opened BigScreen UI (history) as fallback:', historyUrl);
+          return { success: true, method: 'ui-fallback-history', url: historyUrl };
+        } catch (e) {
+          window.open(hashUrl, '_blank');
+          console.log('🔁 Opened BigScreen UI (hash) as fallback:', hashUrl);
+          return { success: true, method: 'ui-fallback-hash', url: hashUrl };
+        }
       } catch (openErr) {
         console.error('❌ Fallback open failed:', openErr);
         return { success: false, method: 'none' };

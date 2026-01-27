@@ -110,6 +110,80 @@ async def update_session(session_id: int, session_update: SessionUpdate):
     return SessionResponse(**updated_session)
 
 
+# -------------------------------------------------------------------------
+# Helper endpoints: Start/Stop a session via dedicated endpoints so clients
+# can call a simple POST to control session lifecycle. These mirror the
+# behavior expected by the frontend (POST /api/v1/sessions/{id}/start).
+# -------------------------------------------------------------------------
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/start", response_model=SessionResponse, tags=["Sessions"], summary="Start a session")
+async def start_session_endpoint(session_id: int):
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # End any currently active session (keep only one active at a time)
+    active_session = SessionRepository.get_active_session()
+    if active_session and active_session.get('id') != session_id and active_session.get('status') == 'active':
+        SessionRepository.update_session(active_session['id'], status='completed')
+        if sio:
+            await sio.emit('session_status_update', _jsonable({
+                'session_id': active_session['id'],
+                'status': 'completed',
+                'timestamp': datetime.now(CET).isoformat()
+            }))
+
+    # Set requested session to active
+    ok = SessionRepository.update_session(session_id, status='active')
+    if not ok:
+        raise HTTPException(status_code=400, detail='Failed to set session active')
+
+    updated_session = SessionRepository.get_session_by_id(session_id)
+
+    # Emit events
+    if sio:
+        await sio.emit('session_status_update', _jsonable({
+            'session_id': session_id,
+            'status': 'active',
+            'session': updated_session,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+        await sio.emit('session_update', _jsonable({
+            'session_id': session_id,
+            'session': updated_session,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+
+    return SessionResponse(**updated_session)
+
+
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/stop", response_model=SessionResponse, tags=["Sessions"], summary="Stop (complete) a session")
+async def stop_session_endpoint(session_id: int):
+    session = SessionRepository.get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    ok = SessionRepository.update_session(session_id, status='completed')
+    if not ok:
+        raise HTTPException(status_code=400, detail='Failed to set session completed')
+
+    updated_session = SessionRepository.get_session_by_id(session_id)
+
+    if sio:
+        await sio.emit('session_status_update', _jsonable({
+            'session_id': session_id,
+            'status': 'completed',
+            'session': updated_session,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+        await sio.emit('session_update', _jsonable({
+            'session_id': session_id,
+            'session': updated_session,
+            'timestamp': datetime.now(CET).isoformat()
+        }))
+
+    return SessionResponse(**updated_session)
+
+
 @router.delete(f"{ENDPOINT}/sessions/{{session_id}}", tags=["Sessions"], summary="Delete a session")
 async def delete_session(session_id: int):
     success = SessionRepository.delete_session(session_id)
