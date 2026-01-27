@@ -17,18 +17,34 @@ export function useSocket() {
       return socket;
     }
 
-    // Allow using a relative origin when VITE_API_URL is not set so dev proxy can handle socket.io
-    const envBase = import.meta.env.VITE_API_URL || '';
-    const socketUrl = envBase || undefined; // undefined => connect to current origin
+    // Build a reliable socket URL: prefer explicit env/runtime settings; otherwise default to backend host on :8000 like the example frontend
+    let socketUrl;
+    const envBase = import.meta.env.VITE_API_URL;
+    if (envBase) {
+      socketUrl = envBase.replace(/\/$/, '');
+    } else if (typeof window !== 'undefined' && window.SCOREBOARD_SOCKET_BASE) {
+      socketUrl = String(window.SCOREBOARD_SOCKET_BASE).replace(/\/$/, '');
+    } else if (typeof window !== 'undefined' && window.SCOREBOARD_API_BASE) {
+      socketUrl = String(window.SCOREBOARD_API_BASE).replace(/\/$/, '');
+    } else if (typeof window !== 'undefined') {
+      const hostname = (window.location && window.location.hostname) || 'localhost';
+      socketUrl = `http://${hostname || 'localhost'}:8000`;
+    } else {
+      socketUrl = undefined; // current origin
+    }
+
     console.log("🔌 Creating new socket connection to:", socketUrl || 'current origin');
 
+    // Prefer polling-first transport to be robust behind proxies; allow websocket if available
     socket = io(socketUrl, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      timeout: 30000,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      autoConnect: true,
     });
 
     socket.on("connect", () => {
@@ -44,7 +60,14 @@ export function useSocket() {
     socket.on("connect_error", (error) => {
       console.error("❌ Socket.io connection error:", error);
       isConnected.value = false;
+      // client will continue retrying based on reconnection settings; no extra aggressive fallback needed
     });
+
+    // Log all incoming events (single listener sufficient)
+    socket.onAny((eventName, ...args) => {
+      console.log(`📨 Socket received event: ${eventName}`, args);
+    });
+
 
     // Log all incoming events
     socket.onAny((eventName, ...args) => {

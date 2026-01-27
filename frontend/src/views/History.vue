@@ -79,7 +79,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ChevronLeft } from "lucide-vue-next";
 defineOptions({ name: "History" });
@@ -257,7 +257,9 @@ function parseScore(raw, isTimeMode = false) {
   return Math.abs(num);
 }
 
-const highscores = computed(() => {
+const highscores = ref([]);
+
+async function computeHighscores() {
   const groups = new Map();
   for (const s of completedSessions.value || []) {
     for (const a of s.activities || []) {
@@ -268,26 +270,68 @@ const highscores = computed(() => {
   }
 
   const out = [];
+
   for (const [name, instances] of groups.entries()) {
     const rep = instances[0].activity;
-    // Determine if any instance is a time-based game (group-level detection)
     const isTime = instances.some(inst => String(inst.activity.game_type) === 'team_vs_time');
     const scoringMode = (rep.scoring_mode || '').toLowerCase();
     const lowerIsBetter = isTime || rep.lower_is_better === true || rep.lower_is_better === 'true' || scoringMode.includes('golf');
+
     let best = null;
 
     for (const inst of instances) {
-      const scores = inst.activity.scores || [];
-      const isTimeInst = String(inst.activity.game_type) === 'team_vs_time';
-      // collect numeric values from scores (respect per-instance time flag when parsing)
-      for (const sc of scores) {
-        const raw = sc.points ?? sc.score ?? sc.total_score;
-        const parsed = parseScore(raw, isTimeInst);
-        if (parsed === null) continue;
+      const act = inst.activity;
+      const isTimeInst = String(act.game_type) === 'team_vs_time';
+
+      // collect per-instance candidate scores, prefer leaderboard
+      let instanceCandidates = [];
+      try {
+        const lb = await api.get(`/api/v1/activities/${act.id}/leaderboard`);
+        const leaderboard = lb.leaderboard || [];
+        if (leaderboard.length > 0) {
+          for (const entry of leaderboard) {
+            const rawScore = entry.total_score ?? entry.score ?? entry.points;
+            if (rawScore === undefined || rawScore === null) continue;
+            const score = parseScore(rawScore, isTimeInst);
+            if (score === null) continue;
+            instanceCandidates.push(score);
+          }
+        }
+      } catch (e) {
+        // ignore and fall back to detailed scores
+      }
+
+      if (instanceCandidates.length === 0) {
+        const scores = act.scores || [];
+        for (const sc of scores) {
+          const raw = sc.points ?? sc.score ?? sc.total_score;
+          const parsed = parseScore(raw, isTimeInst);
+          if (parsed === null) continue;
+          instanceCandidates.push(parsed);
+        }
+      }
+
+      // choose a sensible instance best from candidates
+      if (instanceCandidates.length > 0) {
+        let instanceBest = null;
         if (lowerIsBetter) {
-          if (best === null || parsed < best) best = parsed;
+          // For time-like activities prefer candidates >= 1s (1000ms) to avoid tiny outliers
+          const sensible = isTimeInst ? instanceCandidates.filter(c => c >= 1000) : instanceCandidates;
+          const source = sensible.length ? sensible : instanceCandidates.filter(c => c > 0);
+          if (source.length) instanceBest = Math.min(...source);
         } else {
-          if (best === null || parsed > best) best = parsed;
+          instanceBest = Math.max(...instanceCandidates);
+        }
+
+        if (instanceBest !== null && instanceBest !== undefined) {
+          if (best === null) best = instanceBest;
+          else {
+            if (lowerIsBetter) {
+              if (instanceBest > 0 && instanceBest < best) best = instanceBest;
+            } else {
+              if (instanceBest > best) best = instanceBest;
+            }
+          }
         }
       }
     }
@@ -310,7 +354,16 @@ const highscores = computed(() => {
     if (a.lower_is_better) return la - lb; // smaller better
     return lb - la; // larger better
   });
-  return out;
+
+  highscores.value = out;
+}
+
+// recompute when sessions change
+watch(completedSessions, () => computeHighscores(), { deep: true });
+// initial compute
+onMounted(() => {
+  loadCompletedSessions();
+  computeHighscores();
 });
 
 onMounted(() => {

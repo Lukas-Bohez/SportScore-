@@ -53,6 +53,14 @@
 import FeatureClock from "../../components/features/FeatureClock.vue";
 import FeaturePodium from "../../components/features/FeaturePodium.vue";
 import GenericResult from "../../components/Generic/GenericResult.vue";
+import { onMounted } from 'vue';
+
+// Initialize bigscreen flow when this view mounts
+onMounted(() => {
+  import('@/composables/useBigscreenFlow')
+    .then(({ initBigscreenFlow }) => initBigscreenFlow())
+    .catch((e) => console.warn('Failed to init bigscreen flow:', e));
+});
 
 // Generate random confetti styles
 const getConfettiStyle = (index) => {

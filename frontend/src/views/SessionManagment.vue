@@ -17,6 +17,17 @@
               style="background-color: var(--red-100)"
               @click="endSession"
             ></GenericButton>
+            <GenericModel
+              ref="endModal"
+              :message="`Weet je zeker dat je de sessie '${activeSession?.name || 'deze sessie'}' wilt beëindigen?`"
+              icon="triangle-alert"
+              iconColor="var(--red-100)"
+              confirmText="Ja"
+              cancelText="Nee"
+              :showCancel="true"
+              @confirm="confirmEndSession"
+              @cancel="cancelEnd"
+            />
             <GenericButton
               variant="quaternary"
               style="background-color: transparent"
@@ -180,7 +191,7 @@
           </div>
         </div>
 
-        <!-- Score Overview - Only show when activity is selected -->
+        <!-- Score Overview - Aggregated view (players or teams) -->
         <div
           v-if="selectedActivity && scores.length > 0"
           class="score-section-overview"
@@ -190,31 +201,35 @@
             <div class="score-section-overview-list-items">
               <div class="score-header">
                 <p>Team</p>
-                <p
-                  v-if="
-                    selectedActivity.scoring_mode === 'team_player' ||
-                    selectedActivity.scoring_mode === 'player' ||
-                    selectedActivity.scoring_mode === 'team_with_players'
-                  "
-                >
-                  Speler
-                </p>
+                <p v-if="activityHasPlayers">Speler</p>
                 <p>Score</p>
                 <p>Ronde</p>
               </div>
-              <div v-for="score in scores" :key="score.id" class="score-item">
-                <p>{{ getTeamName(score.team_id) }}</p>
-                <p
-                  v-if="
-                    selectedActivity.scoring_mode === 'team_player' ||
-                    selectedActivity.scoring_mode === 'player' ||
-                    selectedActivity.scoring_mode === 'team_with_players'
-                  "
-                >
-                  {{ getPlayerName(score.player_id) }}
-                </p>
-                <p>{{ formatScoreDisplay(score.points) }}</p>
-                <p>{{ score.round_number }}</p>
+
+              <!-- Player-based aggregation -->
+              <div
+                v-if="activityHasPlayers"
+                v-for="player in playerScores"
+                :key="`player-${player.player_id}`"
+                class="score-item"
+              >
+                <p>{{ player.team_name }}</p>
+                <p>{{ player.player_name }}</p>
+                <p>{{ formatScoreDisplay(player.total_points) }}</p>
+                <p>{{ player.latest_round }}</p>
+              </div>
+
+              <!-- Team-based aggregation (for activities without players) -->
+              <div
+                v-else
+                v-for="team in teamScores"
+                :key="`team-${team.team_id}`"
+                class="score-item"
+              >
+                <p>{{ team.team_name }}</p>
+                <p v-if="activityHasPlayers">{{ team.player_name }}</p>
+                <p>{{ formatScoreDisplay(team.total_points) }}</p>
+                <p>{{ team.latest_round }}</p>
               </div>
             </div>
           </div>
@@ -235,13 +250,16 @@ import GenericDropdown from "../components/Generic/GenericDropdown.vue";
 import GenericButton from "../components/Generic/GenericButton.vue";
 import GenericNav from "../components/Generic/GenericNav.vue";
 import GenericActivityCard from "../components/Generic/GenericActivityCard.vue";
+import GenericModel from "@/components/Generic/GenericModel.vue";
 import { Settings } from "lucide-vue-next";
 import { useApi } from "@/composables/useApi";
+import { useSessions } from "@/composables/useSessions";
 import { ElNotification } from "element-plus";
 import { Plus } from "lucide-vue-next";
 
 const router = useRouter();
 const { get, post } = useApi();
+const { updateSession } = useSessions();
 
 const loading = ref(true);
 const activeSession = ref(null);
@@ -267,14 +285,16 @@ const isTeamVsTime = computed(() => {
   return selectedActivity.value?.game_type === "team_vs_time";
 });
 
+// Helper to determine if an activity supports players (teams, teams with players, or players only)
+const activityHasPlayers = computed(() => {
+  if (!selectedActivity.value) return false;
+  const mode = String(selectedActivity.value.scoring_mode || "").toLowerCase();
+  return mode === "player" || mode === "team_with_players" || mode === "team_player";
+});
+
 // Should show player dropdown
 const shouldShowPlayerDropdown = computed(() => {
-  if (!selectedActivity.value) return false;
-  return (
-    selectedActivity.value.scoring_mode === "team_player" ||
-    selectedActivity.value.scoring_mode === "player" ||
-    selectedActivity.value.scoring_mode === "team_with_players"
-  );
+  return activityHasPlayers.value;
 });
 
 // Load active session and its data
@@ -652,13 +672,60 @@ const formatScoreDisplay = (value) => {
   return value.toString();
 };
 
-// End session and set status to completed in API
+// Aggregated player scores (sum of points per player) and latest round
+const playerScores = computed(() => {
+  if (!scores.value || scores.value.length === 0) return [];
+
+  const map = new Map();
+
+  for (const s of scores.value) {
+    const pid = s.player_id;
+    if (!pid) continue; // skip scores without player association
+
+    const existing = map.get(pid) || { player_id: pid, player_name: getPlayerName(pid), team_id: s.team_id, team_name: getTeamName(s.team_id), total_points: 0, latest_round: 0 };
+    existing.total_points += Number(s.points || 0);
+    if (s.round_number && s.round_number > existing.latest_round) existing.latest_round = s.round_number;
+    map.set(pid, existing);
+  }
+
+  // Convert to array and sort (higher scores first unless time mode where lower is better)
+  const arr = Array.from(map.values());
+  arr.sort((a, b) => (isTeamVsTime.value ? a.total_points - b.total_points : b.total_points - a.total_points));
+  return arr;
+});
+
+// Aggregated team scores (when activity has no players)
+const teamScores = computed(() => {
+  if (!scores.value || scores.value.length === 0) return [];
+
+  const map = new Map();
+
+  for (const s of scores.value) {
+    const tid = s.team_id;
+    const existing = map.get(tid) || { team_id: tid, team_name: getTeamName(tid), total_points: 0, latest_round: 0 };
+    existing.total_points += Number(s.points || 0);
+    if (s.round_number && s.round_number > existing.latest_round) existing.latest_round = s.round_number;
+    map.set(tid, existing);
+  }
+
+  const arr = Array.from(map.values());
+  arr.sort((a, b) => (isTeamVsTime.value ? a.total_points - b.total_points : b.total_points - a.total_points));
+  return arr;
+});
+
+// End session - open confirmation modal
 const endSession = async () => {
   if (!activeSession.value) return;
+  endModal.value?.open();
+};
 
+// Confirmed end session - actually call API
+const endModal = ref(null);
+const confirmEndSession = async () => {
+  if (!activeSession.value) return;
   try {
-    // Update session status to 'completed' in API
-    await put(`/api/v1/sessions/${activeSession.value.id}`, { status: 'completed' });
+    // Use composable updateSession for abstraction and to avoid direct put usage
+    await updateSession(activeSession.value.id, { status: 'completed' });
 
     console.log('✅ Session status updated to completed');
 
@@ -680,10 +747,15 @@ const endSession = async () => {
     console.error("Failed to end session:", error);
     ElNotification({
       title: "Fout",
-      message: "Kon sessie niet beëindigen",
+      message: "Kon sessie niet beëindigen: " + (error.message || ""),
       type: "error",
     });
   }
+};
+
+const cancelEnd = () => {
+  console.log('Sessie beëindigen geannuleerd');
+  endModal.value?.close();
 };
 
 onMounted(() => {

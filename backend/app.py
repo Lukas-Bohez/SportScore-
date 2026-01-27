@@ -336,8 +336,10 @@ async def startup_event():
 # Teams and Players routes moved to `backend/routes/teams.py` and `backend/routes/players.py` for improved modularity.
 from backend.routes.teams import router as teams_router
 from backend.routes.players import router as players_router
+from backend.routes.bigscreen import router as bigscreen_router
 app.include_router(teams_router)
 app.include_router(players_router)
+app.include_router(bigscreen_router)
 
 async def delete_player(player_id: int):
     success = PlayerRepository.delete_player(player_id)

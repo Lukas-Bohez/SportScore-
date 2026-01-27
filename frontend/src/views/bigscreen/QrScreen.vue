@@ -45,6 +45,13 @@
 </template>
 <script setup>
 import FeatureDevider from "../../components/features/FeatureDevider.vue";
+import { onMounted } from 'vue';
+
+onMounted(() => {
+  import('@/composables/useBigscreenFlow')
+    .then(({ initBigscreenFlow }) => initBigscreenFlow())
+    .catch((e) => console.warn('Failed to init bigscreen flow:', e));
+});
 </script>
 
 <style scoped>

@@ -24,6 +24,17 @@
     <div v-if="!currentActivity" class="scorescreen-no-activity">
       <p>Geen activiteit geselecteerd</p>
       <p class="subtitle">Selecteer een activiteit in Sessie Beheren</p>
+      <div class="manual-load">
+        <p>Je kunt ook handmatig een sessie laden:</p>
+        <div class="manual-load-controls">
+          <input v-model="manualSessionId" placeholder="Sessie ID" />
+          <button class="generic-button generic-button--primary" @click="loadManualSession">Laad sessie</button>
+        </div>
+        <div style="margin-top: var(--space-4); text-align:center;">
+          <p>Of maak direct een nieuwe sessie in de hoofdbediening:</p>
+          <button class="generic-button generic-button--primary" @click="openNewSessionUI">Nieuwe sessie maken</button>
+        </div>
+      </div>
     </div>
     <div v-else class="scorescreen-content">
       <div class="scorescreen-content-header">
@@ -56,9 +67,11 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRoute } from 'vue-router';
 import GenericResult from "../../components/Generic/GenericResult.vue";
 import { useApi } from "@/composables/useApi";
 const { get } = useApi();
+const route = useRoute();
 
 const currentActivity = ref(null);
 const scores = ref([]);
@@ -68,27 +81,50 @@ const activeSession = ref(null);
 const lastUpdateCheck = ref(0);
 const currentRound = ref(1);
 const timeRemaining = ref(0);
+const manualSessionId = ref('');
 
 let pollingInterval = null;
 let timerInterval = null;
+let pollingIntervalBusy = false;
 
 // Poll for active session and activity
 const pollActiveSession = async () => {
+  // Guard: avoid overlapping polls
+  if (pollingIntervalBusy) return;
+  pollingIntervalBusy = true;
   try {
-    // Get active session
-    const sessionData = await get('/api/v1/sessions');
-    const activeSessions = (sessionData.sessions || sessionData || []).filter(
-      (s) => s.status === 'active',
-    );
+    // If a session id is provided in the URL (fallback open), prefer loading that session directly
+    const requestedSessionId = route?.query?.session || route?.params?.session || null;
+    let session = null;
 
-    if (activeSessions.length === 0) {
-      console.log("No active session found");
-      currentActivity.value = null;
-      activeSession.value = null;
-      return;
+    if (requestedSessionId) {
+      try {
+        const sid = String(requestedSessionId).replace(/[^0-9]/g, '');
+        session = await get(`/api/v1/sessions/${sid}`);
+        // normalize object: API might return session or { session }
+        session = session.session || session;
+      } catch (e) {
+        console.warn('Failed to load requested session id:', requestedSessionId, e);
+        session = null;
+      }
     }
 
-    const session = activeSessions[0];
+    // Fallback to active session discovery if no requested session found
+    if (!session) {
+      const sessionData = await get('/api/v1/sessions');
+      const activeSessions = (sessionData.sessions || sessionData || []).filter(
+        (s) => s.status === 'active',
+      );
+
+      if (activeSessions.length === 0) {
+        console.log("No active session found");
+        currentActivity.value = null;
+        activeSession.value = null;
+        return;
+      }
+
+      session = activeSessions[0];
+    }
 
     // Check if session changed
     if (!activeSession.value || activeSession.value.id !== session.id) {
@@ -99,6 +135,11 @@ const pollActiveSession = async () => {
     // Load activities for this session
     const activitiesData = await get(`/api/v1/sessions/${session.id}/activities`);
     const activities = activitiesData.activities || activitiesData || [];
+
+    // If requested session id was present but session is inactive, still allow viewing
+    if (route?.query?.session) {
+      console.log('Viewing scorescreen for specific session id from URL:', route.query.session);
+    }
 
     if (activities.length === 0) {
       console.log("No activities found");
@@ -136,7 +177,9 @@ const pollActiveSession = async () => {
         name: activityToShow.name,
         game_type: activityToShow.game_type,
         scoring_mode: activityToShow.scoring_mode,
-        time_winner: activityToShow.time_winner,
+        time_winner: (activityToShow.time_winner || 'lower').toLowerCase(),
+        aggregate_player_times: !!activityToShow.aggregate_player_times,
+        lower_is_better: activityToShow.lower_is_better === true || String(activityToShow.lower_is_better) === 'true',
         session_id: session.id,
         total_rounds: activityToShow.total_rounds || 1,
         time_limit_per_round: activityToShow.time_limit_per_round || null,
@@ -180,6 +223,8 @@ const pollActiveSession = async () => {
     }
   } catch (error) {
     console.error("❌ Failed to poll active session:", error);
+  } finally {
+    pollingIntervalBusy = false;
   }
 };
 
@@ -281,14 +326,23 @@ const rankedScores = computed(() => {
   return buildFlatGrouping(scoringMode);
 });
 
+// Helper: determine lower-is-better for current activity
+const lowerIsBetter = computed(() => {
+  if (!currentActivity.value) return false;
+  return currentActivity.value.lower_is_better || (currentActivity.value.game_type === 'team_vs_time');
+});
+
 // Build hierarchical structure for team_player mode
 const buildTeamPlayerHierarchy = () => {
   const teamScores = {};
+  const aggregatePlayerTimes = !!currentActivity.value?.aggregate_player_times;
+  const timeWinner = currentActivity.value?.time_winner || 'lower';
 
   // Group scores by team and player
   for (const score of scores.value) {
     const teamId = score.team_id;
     const playerId = score.player_id;
+    if (!teamId) continue;
 
     // Initialize team if not exists
     if (!teamScores[teamId]) {
@@ -298,40 +352,50 @@ const buildTeamPlayerHierarchy = () => {
         teamId: teamId,
         teamName: team?.name || `Team ${teamId}`,
         teamIcon: team?.icon || "",
-        totalPoints: 0,
+        scoreSum: 0,
+        best: (timeWinner === 'lower' ? Infinity : -Infinity),
         players: {},
       };
     }
 
-    // Add to team total
-    teamScores[teamId].totalPoints += score.points;
+    const pts = Number(score.points || 0);
 
-    // Group by player within team
+    // Track per-player values
     if (playerId) {
       if (!teamScores[teamId].players[playerId]) {
-        const player = players.value.find((p) => p.id === playerId);
-        teamScores[teamId].players[playerId] = {
-          id: `player_${playerId}_team_${teamId}`,
-          playerId: playerId,
-          playerName: player?.name || `Speler ${playerId}`,
-          playerIcon: player?.icon || player?.position || "",
-          points: 0,
-        };
+        teamScores[teamId].players[playerId] = pts;
+      } else {
+        teamScores[teamId].players[playerId] = aggregatePlayerTimes
+          ? teamScores[teamId].players[playerId] + pts
+          : (timeWinner === 'lower' ? Math.min(teamScores[teamId].players[playerId], pts) : Math.max(teamScores[teamId].players[playerId], pts));
       }
-      teamScores[teamId].players[playerId].points += score.points;
+    }
+
+    // Track team aggregate according to rules
+    if (isTeamVsTime.value && !aggregatePlayerTimes) {
+      teamScores[teamId].best = timeWinner === 'lower' ? Math.min(teamScores[teamId].best, pts) : Math.max(teamScores[teamId].best, pts);
+    } else {
+      teamScores[teamId].scoreSum += pts;
     }
   }
 
-  // Convert to array and sort teams
-  const teamsArray = Object.values(teamScores);
+  // Compute final team totals
+  const teamsArray = Object.keys(teamScores).map((tid) => {
+    const t = teamScores[tid];
+    // If time activity and not aggregating player times, prefer best (min/max) if it exists, else fallback to sum
+    let totalPoints;
+    if (isTeamVsTime.value && !aggregatePlayerTimes) {
+      totalPoints = (t.scoreSum && t.scoreSum > 0) ? t.scoreSum : (t.best === (timeWinner === 'lower' ? Infinity : -Infinity) ? 0 : t.best);
+    } else {
+      const playersSum = Object.values(t.players || []).reduce((s, v) => s + (v || 0), 0);
+      totalPoints = t.scoreSum + playersSum;
+    }
+    return { ...t, totalPoints };
+  });
 
+  // Sort teams
   if (isTeamVsTime.value) {
-    const timeWinner = currentActivity.value?.time_winner || "lower";
-    teamsArray.sort((a, b) =>
-      timeWinner === "lower"
-        ? a.totalPoints - b.totalPoints
-        : b.totalPoints - a.totalPoints,
-    );
+    teamsArray.sort((a, b) => (timeWinner === 'lower' ? a.totalPoints - b.totalPoints : b.totalPoints - a.totalPoints));
   } else {
     teamsArray.sort((a, b) => b.totalPoints - a.totalPoints);
   }
@@ -352,13 +416,20 @@ const buildTeamPlayerHierarchy = () => {
       isSubItem: false,
     });
 
-    // Sort and add player rows
-    const playersArray = Object.values(team.players);
+    // Prepare player rows
+    const playersArray = Object.keys(team.players || {}).map(pid => {
+      const player = players.value.find((p) => p.id == pid);
+      return {
+        id: `player_${pid}_team_${team.teamId}`,
+        playerId: pid,
+        playerName: player ? player.name : `Speler ${pid}`,
+        playerIcon: player ? (player.icon || player.position || '') : '',
+        points: team.players[pid]
+      };
+    });
+
     if (isTeamVsTime.value) {
-      const timeWinner = currentActivity.value?.time_winner || "lower";
-      playersArray.sort((a, b) =>
-        timeWinner === "lower" ? a.points - b.points : b.points - a.points,
-      );
+      playersArray.sort((a, b) => (timeWinner === 'lower' ? a.points - b.points : b.points - a.points));
     } else {
       playersArray.sort((a, b) => b.points - a.points);
     }
@@ -374,14 +445,9 @@ const buildTeamPlayerHierarchy = () => {
         isTeam: false,
         isSubItem: true,
       });
-      console.log(`   → Player: ${player.playerName}, Team: ${team.teamName}`);
     }
   }
 
-  console.log(
-    "🏆 Hierarchical team_player results:",
-    JSON.stringify(result, null, 2),
-  );
   return result;
 };
 
@@ -457,17 +523,25 @@ const buildFlatGrouping = (scoringMode) => {
         displayName: displayName,
         emoji: emoji,
         teamName: teamName,
-        points: 0,
-        count: 0,
+        points: (scoringMode === 'player') ? score.points : 0,
+        count: 1,
         isSubItem: false,
       };
       console.log(`🆕 Created new group: key=${key}, name=${displayName}`);
     } else {
       console.log(`➕ Adding to existing group: key=${key}`);
+      // Update points depending on scoring mode
+      if (scoringMode === 'player') {
+        // For player mode prefer best per-player (min for time/lower, max otherwise)
+        const isLower = lowerIsBetter.value;
+        if (isLower) grouped[key].points = Math.min(grouped[key].points, score.points);
+        else grouped[key].points = Math.max(grouped[key].points, score.points);
+      } else {
+        // Default: sum points
+        grouped[key].points += score.points;
+      }
+      grouped[key].count++;
     }
-
-    grouped[key].points += score.points;
-    grouped[key].count++;
     console.log(
       `   → Total now: ${grouped[key].points} (from ${grouped[key].count} scores)`,
     );
@@ -533,9 +607,79 @@ const stopTimer = () => {
   }
 };
 
+// Manual session loader (when opening scorescreen directly)
+import { useRouter } from 'vue-router';
+const _router = useRouter();
+
+const loadManualSession = () => {
+  if (!manualSessionId.value) return;
+  console.log('📥 Manual session load requested:', manualSessionId.value);
+  _router.replace({ path: '/bigscreen/scorescreen', query: { session: manualSessionId.value } });
+};
+
+// Open New Session UI: prefer in-SPA navigation, fallback to opening external UI if configured
+const openNewSessionUI = () => {
+  try {
+    // If the app is running on the same origin, navigate in-place using the router
+    const base = (typeof window !== 'undefined' && window.SCOREBOARD_UI_BASE) ? window.SCOREBOARD_UI_BASE.replace(/\/$/, '') : window.location.origin;
+    const currentOrigin = window.location.origin;
+
+    if (!window.SCOREBOARD_UI_BASE || String(window.SCOREBOARD_UI_BASE).replace(/\/$/, '') === currentOrigin) {
+      // Same-origin: do a full location replace so we get a clean UI load without leftover state
+      try {
+        // Force full navigation to the clean path (no hash) to avoid being reinterpreted by any hash-based code
+        const url = `${currentOrigin}/nieuwesessie`;
+        console.log('🔁 Forcing navigation to NewSession (no-hash):', url);
+        window.location.href = url;
+        return;
+      } catch (e) {
+        console.warn('Full href navigation failed, falling back to router:', e);
+        _router.replace({ path: '/nieuwesessie' }).catch((err) => console.warn('Router replace failed:', err));
+        return;
+      }
+    }
+
+    // Different origin: open in new tab/window
+    const url = `${base}/#/nieuwesessie`;
+    console.log('🔁 Opening NewSession UI in separate window:', url);
+    const newWin = window.open(url, '_blank');
+    if (!newWin) {
+      // Popup blocked — notify the user and provide URL
+      const message = `Popup geblokkeerd. Open deze link handmatig: ${url}`;
+      console.warn(message);
+      // Show a notification if Element-plus is available on this view
+      try {
+        // Use global ElNotification if available
+        if (typeof ElNotification !== 'undefined') {
+          ElNotification({ title: 'Opmerking', message, type: 'warning' });
+        }
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.error('Failed to open NewSession UI:', e);
+  }
+};
+
 onMounted(() => {
+  // Initialize BigScreen flow which will handle automatic navigation between
+  // QR / Loading / Score / Podium screens based on socket + API state.
+  import('@/composables/useBigscreenFlow')
+    .then(({ initBigscreenFlow }) => initBigscreenFlow())
+    .catch((e) => console.warn('Failed to init bigscreen flow:', e));
+
   // Initial load
   pollActiveSession();
+
+  // Re-run when a session query param is supplied (fallback open)
+  watch(
+    () => route.query.session,
+    (newVal, oldVal) => {
+      if (newVal !== oldVal) {
+        console.log('Route session param changed, reloading scorescreen for session:', newVal);
+        pollActiveSession();
+      }
+    },
+  );
 
   // Poll every 2 seconds for updates
   pollingInterval = setInterval(() => {
@@ -587,6 +731,9 @@ onUnmounted(() => {
   font-size: var(--font-size-L);
   color: var(--black-60);
 }
+.manual-load { margin-top: var(--space-4); }
+.manual-load-controls { display:flex; gap: var(--space-3); align-items:center; justify-content:center; margin-top: var(--space-2); }
+.manual-load-controls input { padding: .6rem .8rem; border-radius: var(--radius-S); border: 1px solid var(--black-20); min-width: 160px; }
 
 .scorescreen-content {
   padding: var(--space-6);
