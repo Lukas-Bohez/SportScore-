@@ -1,5 +1,12 @@
 <template>
   <div class="qr-screen">
+    <div class="qr-screen-logo">
+      <img
+        src="/sport_en_innovatie_logo.png"
+        alt="Sport en Innovatie Logo"
+        class="sport-logo"
+      />
+    </div>
     <h2><strong>SportScore!</strong></h2>
     <h4>Laat de wedstrijd <strong>beginnen!</strong></h4>
 
@@ -49,8 +56,23 @@ import FeatureDevider from "../../components/features/FeatureDevider.vue";
 
 <style scoped>
 .qr-screen {
+  position: relative;
   text-align: center;
   width: 100%;
+
+  .qr-screen-logo {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    padding: var(--space-6) 0;
+  }
+
+  .sport-logo {
+    height: 4rem;
+    width: auto;
+    object-fit: contain;
+  }
+
   h2 {
     margin-top: var(--space-7);
   }
