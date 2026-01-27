@@ -5,14 +5,18 @@
         <p>Sessie laden...</p>
       </div>
       <div v-else-if="session" class="step-content">
-        <GenericButton class="generic-button--quaternary" @click="back">
-          <ChevronLeft class="icon--quaternary" />Terug
-        </GenericButton>
+        <div class="button-back-container">
+          <GenericButton class="generic-button--quaternary" @click="back">
+            <ChevronLeft class="icon--quaternary" />Terug
+          </GenericButton>
+        </div>
+        
         <h2><span>Game</span> overzicht</h2>
+        
         <div class="session-overview-head">
           <div class="session-overview-head-content">
             <h4 class="stap4-subtitle">Sessie naam:</h4>
-            <P class="text">{{ session.name }}</P>
+            <p class="text">{{ session.name }}</p>
           </div>
         </div>
 
@@ -274,20 +278,29 @@ const loadSessionData = async () => {
     console.log("📡 Loading session data for GameOverview:", sessionId);
 
     // Load session
-      // If the route provided a preloaded session (from History) use it to avoid additional fetches
+    // If the route provided a preloaded session (from History) use it to avoid additional fetches
     const preloaded = route?.state && route.state.preloadedSession;
     if (preloaded && String(preloaded.id) === String(sessionId)) {
-      console.log('📥 Using preloaded session from history route state');
+      console.log("📥 Using preloaded session from history route state");
       session.value = preloaded;
-      teams.value = (preloaded.teams && preloaded.teams.length) ? preloaded.teams : [];
+      teams.value =
+        preloaded.teams && preloaded.teams.length ? preloaded.teams : [];
 
       // ensure each team has players array
-      teams.value.forEach(t => { t.players = t.players || []; });
+      teams.value.forEach((t) => {
+        t.players = t.players || [];
+      });
 
-      activities.value = (preloaded.activities && preloaded.activities.length) ? preloaded.activities : [];
+      activities.value =
+        preloaded.activities && preloaded.activities.length
+          ? preloaded.activities
+          : [];
 
       // If activities exist but don't have scores, try to assemble scores from activities or leave lazy-loading
-      activities.value = activities.value.map(a => ({ ...a, scores: a.scores || [] }));
+      activities.value = activities.value.map((a) => ({
+        ...a,
+        scores: a.scores || [],
+      }));
 
       // default select first activity if none selected
       if (!selectedDropdownValue.value && activities.value.length > 0) {
@@ -310,7 +323,9 @@ const loadSessionData = async () => {
     // Load players for each team
     for (const team of teams.value) {
       try {
-        const playersData = await get(`/api/v1/sessions/${sessionId}/teams/${team.id}/players`);
+        const playersData = await get(
+          `/api/v1/sessions/${sessionId}/teams/${team.id}/players`,
+        );
         team.players = playersData.players || playersData || [];
       } catch (error) {
         console.error(`Failed to load players for team ${team.id}:`, error);
@@ -321,7 +336,9 @@ const loadSessionData = async () => {
     console.log("✅ Teams with players loaded:", teams.value);
 
     // Load activities
-    const activitiesData = await get(`/api/v1/sessions/${sessionId}/activities`);
+    const activitiesData = await get(
+      `/api/v1/sessions/${sessionId}/activities`,
+    );
     const activitiesList = activitiesData.activities || activitiesData || [];
 
     // Load all scores for the session
@@ -330,9 +347,9 @@ const loadSessionData = async () => {
       try {
         const scoresData = await get(`/api/v1/sessions/${sessionId}/scores`);
         allScores = scoresData.scores || scoresData || [];
-        console.log('✅ All scores loaded:', allScores);
+        console.log("✅ All scores loaded:", allScores);
       } catch (error) {
-        console.error('Failed to load scores:', error);
+        console.error("Failed to load scores:", error);
         allScores = [];
       }
     } catch (error) {
@@ -341,29 +358,38 @@ const loadSessionData = async () => {
     }
 
     // Associate scores with activities
-    const activitiesWithScores = await Promise.all(activitiesList.map(async (activity) => {
-      // Filter scores that belong to this activity (try multiple potential keys)
-      let activityScores = allScores.filter((score) => {
-        const sid = String(activity.id);
-        return String(score.game_id) === sid || String(score.activity_id) === sid || (score.activity && String(score.activity.id) === sid) || (score.game && String(score.game.id) === sid);
-      });
+    const activitiesWithScores = await Promise.all(
+      activitiesList.map(async (activity) => {
+        // Filter scores that belong to this activity (try multiple potential keys)
+        let activityScores = allScores.filter((score) => {
+          const sid = String(activity.id);
+          return (
+            String(score.game_id) === sid ||
+            String(score.activity_id) === sid ||
+            (score.activity && String(score.activity.id) === sid) ||
+            (score.game && String(score.game.id) === sid)
+          );
+        });
 
-      // Fallback: fetch activity-specific scores if none found in session-level scores
-      if ((!activityScores || activityScores.length === 0)) {
-        try {
-          const scoresResp = await get(`/api/v1/activities/${activity.id}/scores`);
-          activityScores = scoresResp.scores || scoresResp || [];
-        } catch (e) {
-          // ignore and leave activityScores empty
-          activityScores = activityScores || [];
+        // Fallback: fetch activity-specific scores if none found in session-level scores
+        if (!activityScores || activityScores.length === 0) {
+          try {
+            const scoresResp = await get(
+              `/api/v1/activities/${activity.id}/scores`,
+            );
+            activityScores = scoresResp.scores || scoresResp || [];
+          } catch (e) {
+            // ignore and leave activityScores empty
+            activityScores = activityScores || [];
+          }
         }
-      }
 
-      return {
-        ...activity,
-        scores: activityScores,
-      };
-    }));
+        return {
+          ...activity,
+          scores: activityScores,
+        };
+      }),
+    );
 
     activities.value = activitiesWithScores;
     console.log("✅ Activities with scores loaded:", activities.value);

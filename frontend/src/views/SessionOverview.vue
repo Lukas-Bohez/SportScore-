@@ -4,7 +4,7 @@
       <div v-if="loading">
         <p>Sessie laden...</p>
       </div>
-      <div v-else-if="session" class="session-overview-head-conten">
+      <div v-else-if="session" class="session-overview-head-content">
         <GenericButton class="generic-button--quaternary" @click="back">
           <ChevronLeft class="icon--quaternary" />Terug
         </GenericButton>
@@ -253,15 +253,15 @@ const startSession = async () => {
       console.log("📦 Creating session in API from template...");
 
       // 1. Create session in API with 'active' status
-      const createdSession = await post('/api/v1/sessions', {
+      const createdSession = await post("/api/v1/sessions", {
         name: session.value.name,
         total_rounds: session.value.total_rounds,
         time_limit: session.value.time_limit,
         scoring_mode: session.value.scoring_mode,
-        status: 'active', // Set as active immediately
+        status: "active", // Set as active immediately
       });
 
-      console.log('✅ Session created in API:', createdSession);
+      console.log("✅ Session created in API:", createdSession);
 
       // 2. Create teams and get ID mapping
       const teamIdMapping = {}; // Map localStorage IDs to API IDs
@@ -272,19 +272,24 @@ const startSession = async () => {
           let apiTeam;
           try {
             try {
-              apiTeam = await post('/api/v1/teams', {
+              apiTeam = await post("/api/v1/teams", {
                 name: team.name,
-                color: team.color || '#ffffff',
-                icon: team.icon || '👥',
-                description: '',
+                color: team.color || "#ffffff",
+                icon: team.icon || "👥",
+                description: "",
               });
             } catch (err) {
-              if (err && String(err.message || '').toLowerCase().includes('already exists')) {
-                const allTeamsResp = await get('/api/v1/teams');
+              if (
+                err &&
+                String(err.message || "")
+                  .toLowerCase()
+                  .includes("already exists")
+              ) {
+                const allTeamsResp = await get("/api/v1/teams");
                 const allTeams = allTeamsResp.teams || allTeamsResp || [];
                 apiTeam = allTeams.find((t) => t.name === team.name);
               } else {
-                console.error('Failed to create team:', err);
+                console.error("Failed to create team:", err);
                 throw err;
               }
             }
@@ -296,17 +301,22 @@ const startSession = async () => {
           teamIdMapping[team.id] = apiTeam.id;
 
           // Link team to session
-          await post(`/api/v1/sessions/${createdSession.id}/add-team`, { team_id: apiTeam.id });
+          await post(`/api/v1/sessions/${createdSession.id}/add-team`, {
+            team_id: apiTeam.id,
+          });
 
           console.log(`✅ Team ${apiTeam.name} linked to session`);
 
           // 3. Create players for this team
           for (const player of team.players || []) {
-            await post(`/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`, {
-              name: player.name,
-              team_id: apiTeam.id,
-              position: player.icon || '',
-            });
+            await post(
+              `/api/v1/sessions/${createdSession.id}/teams/${apiTeam.id}/players`,
+              {
+                name: player.name,
+                team_id: apiTeam.id,
+                position: player.icon || "",
+              },
+            );
             console.log(`✅ Player ${player.name} created`);
           }
         } catch (error) {
@@ -320,10 +330,10 @@ const startSession = async () => {
         await post(`/api/v1/sessions/${createdSession.id}/activities`, {
           session_id: createdSession.id,
           name: activity.name,
-          sport_type: activity.sport_type || 'custom',
-          game_type: activity.game_type || 'custom',
-          scoring_mode: activity.scoring_mode || 'team',
-          time_winner: activity.time_winner || 'lower',
+          sport_type: activity.sport_type || "custom",
+          game_type: activity.game_type || "custom",
+          scoring_mode: activity.scoring_mode || "team",
+          time_winner: activity.time_winner || "lower",
           total_rounds: activity.total_rounds || 1,
           time_limit_per_round: activity.time_limit_per_round || null,
           description: activity.description || null,
@@ -334,9 +344,9 @@ const startSession = async () => {
       console.log("✅ Session fully created and started!");
     } else {
       // This is an existing API session - just update status
-      await put(`/api/v1/sessions/${session.value.id}`, { status: 'active' });
+      await put(`/api/v1/sessions/${session.value.id}`, { status: "active" });
 
-      console.log('✅ Session status updated to active');
+      console.log("✅ Session status updated to active");
     }
 
     // Show success notification
@@ -498,11 +508,11 @@ onMounted(() => {
   margin-bottom: var(--space-6);
 }
 .session-overview-head-content {
-  display: flex;
+  /* display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2); */
   width: 100%;
   strong {
     color: var(--black-100);

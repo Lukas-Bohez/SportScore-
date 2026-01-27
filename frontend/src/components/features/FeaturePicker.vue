@@ -92,7 +92,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 2.8125rem;
-  padding: 0 3rem 0 0.4rem;
+  padding: 0 2.2rem 0 0.4rem;
   border: 1px solid var(--black-40);
   border-radius: var(--radius-L);
   font-size: 1rem;

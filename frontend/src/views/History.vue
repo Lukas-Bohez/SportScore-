@@ -3,32 +3,57 @@
     <div class="layout-app-pages">
       <div class="history-page">
         <div class="history-header">
-          <div class="history-title-actions">
-            <GenericButton class="generic-button--quaternary" @click="goBack">
-              <ChevronLeft class="icon--quaternary" />Terug
-            </GenericButton>
-            <h3><strong>Geschiedenis</strong></h3>
+          <div class="history-title-row">
+            <div>
+              <div class="history-title-actions">
+                <GenericButton
+                  class="generic-button--quaternary"
+                  @click="goBack"
+                >
+                  <ChevronLeft class="icon--quaternary" />Terug
+                </GenericButton>
+              </div>
+              <h3><strong>Geschiedenis</strong></h3>
+            </div>
+            <GenericButton
+              class="generic-button--primary"
+              @click="exportAllXlsx"
+              variant="primary"
+              >Exporteer alle sessies</GenericButton
+            >
           </div>
 
           <div class="history-tabs">
-            <button :class="['tab', { active: selectedTab === 'history' }]" @click="selectedTab = 'history'">Geschiedenis</button>
-            <button :class="['tab', { active: selectedTab === 'highscores' }]" @click="selectedTab = 'highscores'">Highscores</button>
+            <button
+              :class="['tab', { active: selectedTab === 'history' }]"
+              @click="selectedTab = 'history'"
+            >
+              Geschiedenis
+            </button>
+            <button
+              :class="['tab', { active: selectedTab === 'highscores' }]"
+              @click="selectedTab = 'highscores'"
+            >
+              Highscores
+            </button>
           </div>
 
-          <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display: flex; gap: 8px; align-items: center">
             <GenericInput
               label="Datum"
               placeholder="01/01/2025"
               v-model="searchQuery"
             />
-            <GenericButton class="generic-button--secondary" @click="exportAllXlsx">Exporteer alle sessies</GenericButton>
           </div>
         </div>
 
         <div v-if="errorMessage" class="error-banner">
           <strong>Fout:</strong> {{ errorMessage }}
         </div>
-        <div v-if="selectedTab === 'history'" class="history-page-content history-list">
+        <div
+          v-if="selectedTab === 'history'"
+          class="history-page-content history-list"
+        >
           <div
             v-for="(card, index) in filteredCards"
             :key="card.id || index"
@@ -39,13 +64,23 @@
             @keyup.enter="openModal(card.session)"
           >
             <div class="history-card">
-              <GenericCard :title="card.title" :date="card.date" :activities="card.activities" :teams="card.teams" />
+              <GenericCard
+                :title="card.title"
+                :date="card.date"
+                :activities="card.activities"
+                :teams="card.teams"
+              />
             </div>
           </div>
         </div>
 
-        <div v-if="selectedTab === 'highscores'" class="history-page-content highscores-list">
-          <div v-if="highscores.length === 0" class="no-results">Geen highscores gevonden</div>
+        <div
+          v-if="selectedTab === 'highscores'"
+          class="history-page-content highscores-list"
+        >
+          <div v-if="highscores.length === 0" class="no-results">
+            Geen highscores gevonden
+          </div>
           <div v-else class="grid">
             <div
               v-for="(h, i) in highscores"
@@ -57,13 +92,23 @@
               @keyup.enter="openHighscore(h)"
             >
               <div class="history-card">
-                <GenericCard :title="h.name" :date="h.isTime && h.highest_score ? formatMs(h.highest_score) : (h.highest_score ?? 'Geen scores')" />
+                <GenericCard
+                  :title="h.name"
+                  :date="
+                    h.isTime && h.highest_score
+                      ? formatMs(h.highest_score)
+                      : (h.highest_score ?? 'Geen scores')
+                  "
+                />
               </div>
             </div>
           </div>
         </div>
 
-        <HighscoresModal v-model="highscoresOpen" :activity="highscoresActivity" />
+        <HighscoresModal
+          v-model="highscoresOpen"
+          :activity="highscoresActivity"
+        />
         <HistoryModal v-model="modalOpen" :session="modalSession" />
 
         <p v-if="filteredCards.length === 0" class="no-results">
@@ -72,7 +117,6 @@
       </div>
     </div>
   </div>
-
 
   <div class="nav-container">
     <GenericNav />
@@ -103,7 +147,7 @@ const goBack = () => {
 const searchQuery = ref("");
 const loading = ref(false);
 const completedSessions = ref([]);
-const selectedTab = ref('history');
+const selectedTab = ref("history");
 
 // Highscores modal state
 const highscoresOpen = ref(false);
@@ -134,26 +178,30 @@ const loadCompletedSessions = async () => {
     errorMessage.value = null;
 
     // Use shared API composable which centralizes base URL + error handling
-    const data = await api.get('/api/v1/sessions');
+    const data = await api.get("/api/v1/sessions");
     const allSessions = data.sessions || data || [];
 
     // Filter only completed sessions
-    const completed = allSessions.filter((s) => s.status === 'completed');
+    const completed = allSessions.filter((s) => s.status === "completed");
 
-    console.log('✅ Completed sessions from API:', completed.length);
+    console.log("✅ Completed sessions from API:", completed.length);
 
     // For each completed session, load teams, players, activities, and scores
     const sessionsWithData = await Promise.all(
       completed.map(async (session) => {
         try {
           // Load teams
-          const teamsData = await api.get(`/api/v1/sessions/${session.id}/teams`);
+          const teamsData = await api.get(
+            `/api/v1/sessions/${session.id}/teams`,
+          );
           const teams = teamsData.teams || teamsData || [];
 
           // Load players for each team
           for (const team of teams) {
             try {
-              const playersData = await api.get(`/api/v1/sessions/${session.id}/teams/${team.id}/players`);
+              const playersData = await api.get(
+                `/api/v1/sessions/${session.id}/teams/${team.id}/players`,
+              );
               team.players = playersData.players || playersData || [];
             } catch (e) {
               console.warn(`Failed to load players for team ${team.id}:`, e);
@@ -162,20 +210,27 @@ const loadCompletedSessions = async () => {
           }
 
           // Load activities
-          const activitiesData = await api.get(`/api/v1/sessions/${session.id}/activities`);
+          const activitiesData = await api.get(
+            `/api/v1/sessions/${session.id}/activities`,
+          );
           const activities = activitiesData.activities || activitiesData || [];
 
           // Load scores for each activity
           const activitiesWithScores = await Promise.all(
             activities.map(async (activity) => {
               try {
-                const scoresData = await api.get(`/api/v1/activities/${activity.id}/scores`);
+                const scoresData = await api.get(
+                  `/api/v1/activities/${activity.id}/scores`,
+                );
                 return {
                   ...activity,
                   scores: scoresData.scores || scoresData || [],
                 };
               } catch (error) {
-                console.warn(`Failed to load scores for activity ${activity.id}:`, error);
+                console.warn(
+                  `Failed to load scores for activity ${activity.id}:`,
+                  error,
+                );
                 return { ...activity, scores: [] };
               }
             }),
@@ -198,11 +253,12 @@ const loadCompletedSessions = async () => {
     );
 
     completedSessions.value = sessionsWithData;
-    console.log('✅ Loaded completed sessions with data:', sessionsWithData);
+    console.log("✅ Loaded completed sessions with data:", sessionsWithData);
   } catch (error) {
-    console.error('❌ Failed to load completed sessions:', error);
+    console.error("❌ Failed to load completed sessions:", error);
     completedSessions.value = [];
-    errorMessage.value = 'Fout bij verbinden met de backend. Controleer of de server draait en of de API-base URL correct is.';
+    errorMessage.value =
+      "Fout bij verbinden met de backend. Controleer of de server draait en of de API-base URL correct is.";
   }
 };
 
@@ -238,13 +294,15 @@ const filteredCards = computed(() => {
 // Compute highscores by grouping activities by name and taking best score across instances
 function parseScore(raw, isTimeMode = false) {
   if (raw === undefined || raw === null) return null;
-  if (typeof raw === 'string') {
-    const parts = raw.split(':');
+  if (typeof raw === "string") {
+    const parts = raw.split(":");
     if (parts.length > 1) {
       const minutes = parseInt(parts[0], 10) || 0;
-      const secondsParts = parts[1].split('.');
+      const secondsParts = parts[1].split(".");
       const seconds = parseInt(secondsParts[0], 10) || 0;
-      const ms = secondsParts[1] ? Math.round(Number('0.' + secondsParts[1]) * 1000) : 0;
+      const ms = secondsParts[1]
+        ? Math.round(Number("0." + secondsParts[1]) * 1000)
+        : 0;
       return Math.abs(minutes * 60 * 1000 + seconds * 1000 + ms);
     }
     const n = Number(raw);
@@ -253,7 +311,8 @@ function parseScore(raw, isTimeMode = false) {
   }
   const num = Number(raw);
   if (!Number.isFinite(num)) return null;
-  if (isTimeMode && !Number.isInteger(num)) return Math.abs(Math.round(num * 1000));
+  if (isTimeMode && !Number.isInteger(num))
+    return Math.abs(Math.round(num * 1000));
   return Math.abs(num);
 }
 
@@ -263,7 +322,7 @@ async function computeHighscores() {
   const groups = new Map();
   for (const s of completedSessions.value || []) {
     for (const a of s.activities || []) {
-      const key = String(a.name || a.id || '');
+      const key = String(a.name || a.id || "");
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push({ activity: a, session: s });
     }
@@ -339,11 +398,11 @@ async function computeHighscores() {
     out.push({
       id: rep.id,
       name: rep.name || name,
-      sport_type: rep.sport_type || '',
-      game_type: rep.game_type || '',
+      sport_type: rep.sport_type || "",
+      game_type: rep.game_type || "",
       highest_score: best,
       lower_is_better: lowerIsBetter,
-      isTime
+      isTime,
     });
   }
 
@@ -372,10 +431,10 @@ onMounted(() => {
 
 async function exportAllXlsx() {
   try {
-    const mod = await import('@/utils/exporter');
+    const mod = await import("@/utils/exporter");
     await mod.exportSessionsToXlsx(completedSessions.value);
   } catch (e) {
-    console.error('Failed to export all sessions', e);
+    console.error("Failed to export all sessions", e);
   }
 }
 
@@ -385,24 +444,28 @@ function openHighscore(activity) {
 }
 
 function formatMs(ms) {
-  if (ms == null) return '0:00.000';
-  const sign = ms < 0 ? '-' : '';
+  if (ms == null) return "0:00.000";
+  const sign = ms < 0 ? "-" : "";
   ms = Math.abs(ms);
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
   const remainder = ms % 1000;
-  const pad = (n, z = 2) => String(n).padStart(z, '0');
+  const pad = (n, z = 2) => String(n).padStart(z, "0");
   return `${sign}${minutes}:${pad(seconds)}.${pad(remainder, 3)}`;
 }
-
-
 </script>
 <style scoped>
 h3 {
-  margin: var(--space-5) 0;
+  margin: var(--space-3) 0;
   & span {
     color: var(--blue-100);
   }
+}
+
+.history-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .history-page {
@@ -433,8 +496,9 @@ h3 {
   display: block;
   transition: box-shadow 0.12s ease;
 }
-.history-card-link:hover .generic-card, .history-card-link:focus .generic-card {
-  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+.history-card-link:hover .generic-card,
+.history-card-link:focus .generic-card {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 .back-button {
   display: flex;
@@ -464,12 +528,37 @@ h3 {
   border-radius: 8px;
   margin-top: var(--space-4);
 }
-.history-header { display:flex; flex-direction:column; gap:8px; margin-bottom: var(--space-4); }
-.history-title-actions { display:flex; gap:12px; align-items:center; }
-.history-tabs { display:flex; gap:8px; }
-.tab { background: transparent; border: 1px solid var(--border-color); padding:6px 10px; border-radius:6px; cursor:pointer; color:var(--black-80); }
-.tab.active { background: var(--blue-10); border-color: var(--blue-100); color: var(--blue-100); }
-.highscores-list .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
-
-
+.history-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: var(--space-4);
+}
+.history-title-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.history-tabs {
+  display: flex;
+  gap: 8px;
+}
+.tab {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--black-80);
+}
+.tab.active {
+  background: var(--blue-10);
+  border-color: var(--blue-100);
+  color: var(--blue-100);
+}
+.highscores-list .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
 </style>
