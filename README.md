@@ -79,6 +79,36 @@ If you want the kiosk to start automatically after a full reboot (no manual logi
 - install a templated systemd service `/etc/systemd/system/sportscore-kiosk@.service` which you enable for the user (e.g. `sportscore-kiosk@pi.service`)
 - detect your display manager and configure autologin automatically when possible (supports LightDM, GDM (gdm3), SDDM and LXDM). If your DM isn't detected the installer will print guidance to set up autologin manually.
 
+Note: the installer script may not be executable by default after cloning — if `sudo ./scripts/kiosk/install-kiosk-pi.sh` returns "command not found", make it executable first:
+```bash
+chmod +x scripts/kiosk/install-kiosk-pi.sh
+sudo ./scripts/kiosk/install-kiosk-pi.sh pi
+```
+Alternatively, run it via bash without changing permissions:
+```bash
+sudo bash scripts/kiosk/install-kiosk-pi.sh pi
+```
+
+Quick tip: to ensure the kiosk opens the BigScreen QR view on boot, set the kiosk URL to your working host (replace the example IP below):
+
+- Preferred: add a systemd override for your installed instance (recommended):
+```bash
+sudo systemctl edit --full --no-pager sportscore-kiosk@<user>
+# then edit the ExecStart line to:
+# ExecStart=/home/<user>/.local/bin/start-kiosk.sh http://192.168.123.241/#/bigscreen/qrscreen
+sudo systemctl daemon-reload
+sudo systemctl restart sportscore-kiosk@<user>
+```
+
+- Alternative: set `KIOSK_URL` in the installed template or the user unit (environment variable):
+```ini
+# /etc/systemd/system/sportscore-kiosk@.service
+[Service]
+Environment=KIOSK_URL=http://192.168.123.241
+ExecStart=/home/%i/.local/bin/start-kiosk.sh
+```
+
+This ensures Chromium opens the SPA root and navigates immediately to the BigScreen QR screen even if the server doesn't support history-mode deep links.
 Quick install (run as root):
 ```bash
 sudo ./scripts/kiosk/install-kiosk-pi.sh pi

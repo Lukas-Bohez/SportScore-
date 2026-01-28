@@ -299,10 +299,30 @@ const loadActivityData = async (activityId, sessionId) => {
 // Load scores only
 const loadScores = async (activityId) => {
   try {
+    // Prefer leaderboard totals if available
+    try {
+      const lb = await get(`/api/v1/activities/${activityId}/leaderboard`);
+      const leaderboard = lb.leaderboard || lb || [];
+      if (leaderboard && leaderboard.length > 0) {
+        // Normalize leaderboard into scores-like array for existing aggregation logic
+        scores.value = leaderboard.map((t) => ({
+          team_id: t.team_id || t.id || null,
+          player_id: null,
+          points: t.score ?? t.total_score ?? t.points ?? 0,
+        }));
+        console.log('✅ Loaded leaderboard totals for activity', activityId, scores.value);
+        return;
+      }
+    } catch (e) {
+      console.warn('Leaderboard endpoint not available or empty, falling back to raw scores:', e);
+    }
+
     const scoresData = await get(`/api/v1/activities/${activityId}/scores`);
     scores.value = scoresData.scores || scoresData || [];
+    console.log('✅ Scores loaded for activity', activityId, ':', scores.value);
   } catch (error) {
     console.error("❌ Failed to load scores:", error);
+    scores.value = [];
   }
 };
 
@@ -562,7 +582,7 @@ const buildFlatGrouping = (scoringMode) => {
         displayName: displayName,
         emoji: emoji,
         teamName: teamName,
-        points: (scoringMode === 'player') ? score.points : 0,
+        points: Number(score.points || 0),
         count: 1,
         isSubItem: false,
       };
@@ -719,6 +739,44 @@ onMounted(() => {
       }
     },
   );
+
+  // Listen for server-driven active activity changes so the scoreboard updates in real-time
+  try {
+    import('@/composables/useSocket').then(({ useSocket }) => {
+      const { connect, on } = useSocket();
+      try { connect(); } catch (_) {}
+
+      on('set_active_activity', (payload) => {
+        try {
+          const p = payload || {};
+          const activityId = p.activity_id || p.activityId || (p.data && p.data.activity_id) || null;
+          const sessionId = p.session_id || p.sessionId || (p.data && p.data.session_id) || null;
+          if (activityId) {
+            localStorage.setItem('selectedActivityId', String(activityId));
+            localStorage.setItem('lastActivityUpdate', String(Date.now()));
+            console.log('ScoreScreen: set_active_activity -> updating selected activity:', activityId);
+            pollActiveSession();
+          } else if (sessionId) {
+            console.log('ScoreScreen: set_active_activity with sessionId -> reloading', sessionId);
+            pollActiveSession();
+          }
+        } catch (e) {
+          console.warn('ScoreScreen: failed handling set_active_activity', e);
+        }
+      });
+
+      on('session_score_update', (payload) => {
+        console.log('ScoreScreen: session_score_update -> polling', payload);
+        pollActiveSession();
+      });
+
+      on('activity_completed', (payload) => {
+        console.log('ScoreScreen: activity_completed -> polling and may switch to podium', payload);
+        pollActiveSession();
+      });
+    }).catch((e) => console.warn('Failed to init socket listeners for ScoreScreen:', e));
+  } catch (e) {}
+
 
   // Poll every 2 seconds for updates
   pollingInterval = setInterval(() => {

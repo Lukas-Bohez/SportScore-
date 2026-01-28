@@ -38,15 +38,18 @@
             <p>Geen activiteiten gevonden voor deze sessie.</p>
           </div>
           <div v-else class="activity-cards-container">
-            <GenericActivityCard
-              v-for="activity in activities"
-              :key="activity.id"
-              :title="activity.name"
-              :activitiesCount="activity.total_rounds || 1"
-              :teamsCount="teams.length"
-              :isActive="selectedActivity?.id === activity.id"
-              @select="selectActivity(activity)"
-            />
+            <div v-for="activity in activities" :key="activity.id" class="activity-card-with-controls">
+              <GenericActivityCard
+                :title="activity.name"
+                :activitiesCount="activity.total_rounds || 1"
+                :teamsCount="teams.length"
+                :isActive="selectedActivity?.id === activity.id"
+                @select="selectActivity(activity)"
+              />
+              <div class="activity-card-controls">
+                <!-- vote info intentionally hidden for implicit voting UX -->
+              </div>
+            </div>
           </div>
         </div>
 
@@ -163,7 +166,16 @@
           </div>
 
           <div v-if="!isTeamVsTime" class="score-section-fast-action">
-            <h4>Snelle Acties</h4>
+            <div class="score-section-fast-action-header">
+              <h4>Snelle Acties</h4>
+              <GenericButton
+                class="manage-actions-button"
+                variant="quaternary"
+                label="Beheer acties"
+                @click="toggleQuickActionsModal"
+              />
+            </div>
+
             <div class="score-section-fast-action-buttons">
               <GenericButton
                 v-for="action in quickActions"
@@ -175,13 +187,6 @@
                 @click="addQuickScore(action)"
                 :disabled="!selectedTeamId"
               />
-
-              <GenericButton
-                class="score-section-button"
-                variant="quaternary"
-                label="Beheer acties"
-                @click="toggleQuickActionsModal"
-              />
             </div>
 
             <!-- Quick actions modal -->
@@ -192,17 +197,17 @@
                   <div v-for="q in quickActions" :key="q.id" class="quick-action-row">
                     <input class="qa-label" v-model="q.label" />
                     <input class="qa-points" type="number" v-model.number="q.points" />
-                    <button class="qa-save" @click="editQuickAction(q.id, q.label, q.points)">Opslaan</button>
-                    <button class="qa-delete" @click="removeQuickAction(q.id)">Verwijder</button>
+                    <GenericButton class="qa-save" variant="primary" @click="editQuickAction(q.id, q.label, q.points)" label="Opslaan" />
+                    <GenericButton class="qa-delete" variant="danger" @click="removeQuickAction(q.id)" label="Verwijder" />
                   </div>
                 </div>
                 <div class="quick-action-add">
                   <input placeholder="Label (bijv. Penalty -2)" v-model="newQuickLabel" />
                   <input type="number" placeholder="Punten (bv -2)" v-model.number="newQuickPoints" />
-                  <button class="qa-add" @click="addQuickAction">Voeg toe</button>
+                  <GenericButton class="qa-add" variant="primary" @click="addQuickAction" label="Voeg toe" />
                 </div>
                 <div class="quick-actions-modal-actions">
-                  <button class="qa-close" @click="toggleQuickActionsModal">Sluit</button>
+                  <GenericButton class="qa-close" variant="quaternary" @click="toggleQuickActionsModal" label="Sluit" />
                 </div>
               </div>
             </div>
@@ -348,6 +353,48 @@ const toggleQuickActionsModal = () => {
   quickActionsModalOpen.value = !quickActionsModalOpen.value;
 };
 
+// Voting: handle cast vote from player/admin clients
+import { voteActivity } from '@/composables/usePlayerActions';
+import { useSocket } from '@/composables/useSocket';
+
+let socket = null;
+const initVoteListeners = () => {
+  try {
+    const s = useSocket();
+    try { s.connect(); } catch (_) {}
+    socket = s;
+    s.on('activity_vote_update', (payload) => {
+      try {
+        const p = payload || {};
+        if (!p || !p.session_id) return;
+        if (!activeSession.value || String(activeSession.value.id) !== String(p.session_id)) return;
+        voteCounts.value = p.counts || {};
+        leaderActivityId.value = p.leader || null;
+        console.log('SessionManagment: received activity_vote_update', p);
+      } catch (e) {
+        console.warn('activity_vote_update handler failed:', e);
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to init vote listeners:', e);
+  }
+};
+
+const voteForActivity = async (activity) => {
+  if (!activeSession.value) return;
+  try {
+    const res = await voteActivity(activeSession.value.id, activity.id);
+    if (res && res.success) {
+      ElNotification({ title: 'Stem bekend', message: `Je stem voor ${activity.name} is ontvangen`, type: 'success' });
+    } else {
+      ElNotification({ title: 'Stem mislukt', message: `Kon niet stemmen: ${res && res.error ? res.error : 'Onbekende fout'}`, type: 'warning' });
+    }
+  } catch (e) {
+    console.warn('voteForActivity failed:', e);
+    ElNotification({ title: 'Stem mislukt', message: 'Kon niet stemmen', type: 'warning' });
+  }
+};
+
 const scores = ref([]);
 const currentRound = ref(1);
 const timeRemaining = ref(0);
@@ -377,6 +424,20 @@ const shouldShowPlayerDropdown = computed(() => {
 });
 
 // Load active session and its data
+const voteCounts = ref({});
+const leaderActivityId = ref(null);
+
+const loadVotes = async () => {
+  try {
+    if (!activeSession.value) return;
+    const v = await get(`/api/v1/sessions/${activeSession.value.id}/votes`);
+    voteCounts.value = v.counts || {};
+    leaderActivityId.value = v.leader || null;
+  } catch (e) {
+    console.warn('Failed to load votes:', e);
+  }
+};
+
 const loadActiveSession = async () => {
   try {
     loading.value = true;
@@ -401,6 +462,7 @@ const loadActiveSession = async () => {
     );
     activities.value = activitiesData.activities || activitiesData;
     console.log("✅ Activities loaded:", activities.value);
+    await loadVotes();
 
     // Load teams for this session
     const teamsData = await get(
@@ -418,19 +480,15 @@ const loadActiveSession = async () => {
         team.players = playersData.players || playersData;
 
         // Ensure players have the icon property (API might return it as icon, not emoji)
-        if (team.players) {
-          team.players = team.players.map((player) => ({
-            ...player,
-            icon: player.icon || player.emoji || "",
-          }));
-        }
-
-        console.log(`✅ Players loaded for team ${team.name}:`, team.players);
-      } catch (error) {
-        console.error(`Failed to load players for team ${team.id}:`, error);
-        team.players = [];
+      } catch (e) {
+        console.warn('Failed to load players for team', team.id, e);
       }
     }
+
+    // Init vote listeners once we have session context
+    initVoteListeners();
+
+    loading.value = false;
 
     // Auto-select first activity if available and none selected yet
     const storedActivityId = localStorage.getItem("selectedActivityId");
@@ -494,6 +552,13 @@ const selectActivity = (activity) => {
     "Round:",
     currentRound.value,
   );
+
+  // Cast a vote automatically when an activity is selected (implicit voting UX)
+  try {
+    voteForActivity(activity);
+  } catch (e) {
+    console.warn('Auto-vote on select failed:', e);
+  }
 };
 
 // Load scores for activity
@@ -1023,14 +1088,29 @@ onUnmounted(() => {
   gap: var(--space-5);
 }
 
+.score-section-fast-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .score-section-fast-action h4 {
-  height: 2.8125rem;
-  text-align: end;
+  margin: 0;
+  font-size: var(--font-size-M);
+  font-weight: 700;
+}
+
+.manage-actions-button {
+  min-width: 120px;
+  padding: 0.35rem 0.6rem;
+  font-size: var(--font-size-S);
 }
 
 .score-section-fast-action-buttons {
   display: flex;
   gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .score-section-button :deep(button) {
@@ -1141,8 +1221,42 @@ h3 {
 .quick-action-row { display:flex; gap:8px; align-items:center; margin-bottom:8px }
 .quick-action-row .qa-label { flex:1; padding:8px; border:1px solid var(--black-10); border-radius:4px }
 .quick-action-row .qa-points { width:100px; padding:8px; border:1px solid var(--black-10); border-radius:4px }
-.quick-action-row .qa-save, .quick-action-row .qa-delete, .quick-action-add .qa-add, .quick-actions-modal-actions .qa-close { margin-left:6px }
+.quick-action-row .generic-button, .quick-action-add .generic-button, .quick-actions-modal-actions .generic-button { margin-left:6px; padding: 0.35rem 0.6rem; font-size: var(--font-size-S); min-width: 84px; } /* use GenericButton styles to keep visual consistency */
 .quick-action-add { display:flex; gap:8px; align-items:center }
 .quick-action-add input { padding:8px; border:1px solid var(--black-10); border-radius:4px }
 .quick-actions-modal-actions { display:flex; justify-content:flex-end; margin-top: var(--space-4) }
+
+.activity-card-with-controls {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+.activity-card-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.vote-info {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.vote-count {
+  display: none !important; /* hidden: implicit voting UX */
+  background: var(--blue-10);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-S);
+  font-weight: 600;
+}
+.leader-badge {
+  background: var(--green-100);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-S);
+  color: white;
+  font-size: 0.8rem;
+}
+.vote-button {
+  width: 6rem;
+}
 </style>

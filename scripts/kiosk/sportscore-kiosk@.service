@@ -8,9 +8,12 @@ Type=simple
 User=%i
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/%i/.Xauthority
+# Allow administrators to override the kiosk URL via KIOSK_URL; default to a known-working Pi IP
+Environment=KIOSK_URL=http://192.168.123.241
 # Set any extra chromium flags via EXTRA_CHROMIUM_FLAGS
 Environment=EXTRA_CHROMIUM_FLAGS=
-ExecStart=/home/%i/.local/bin/start-kiosk.sh http://sportscore.local/#/bigscreen/qrscreen
+# Exec without explicit URL: the wrapper will probe KIOSK_URL and sensible defaults
+ExecStart=/home/%i/.local/bin/start-kiosk.sh
 Restart=on-failure
 RestartSec=5
 

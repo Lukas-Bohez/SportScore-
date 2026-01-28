@@ -6,7 +6,9 @@ After=network-online.target graphical.target
 [Service]
 Type=simple
 # Edit ExecStart to point to the installed wrapper if you move it.
-ExecStart=%h/.local/bin/start-kiosk.sh http://sportscore.local/#/bigscreen/qrscreen
+# Prefer to use KIOSK_URL environment var so we can override in different installs
+Environment=KIOSK_URL=http://192.168.123.241
+ExecStart=%h/.local/bin/start-kiosk.sh
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
 # Example: set EXTRA_CHROMIUM_FLAGS='--disable-gpu --use-gl=egl' when needed

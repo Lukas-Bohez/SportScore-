@@ -475,3 +475,122 @@ async def get_activity_leaderboard(activity_id: int):
     else:
         leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
         return {"leaderboard": leaderboard, "session": session}
+
+
+# --------------------------
+# HTTP fallback: Vote endpoint
+# --------------------------
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/activities/{{activity_id}}/vote", tags=["Votes"], summary="Cast a vote for an activity (HTTP fallback)")
+async def vote_activity_http(session_id: int, activity_id: int, request: Request):
+    """HTTP fallback for voting (used by clients that cannot emit socket events). Uses the client's IP as a voting identity."""
+    # Validate session and activity
+    session_obj = SessionRepository.get_session_by_id(session_id)
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    # Derive a stable identifier for the voter from the request (use client IP as surrogate)
+    client_ip = None
+    try:
+        client_ip = request.client.host
+    except Exception:
+        client_ip = None
+    voter_id = f"http:{client_ip or 'anonymous'}"
+
+    # Update in-memory votes
+    try:
+        from backend.app import votes_by_session, votes_lock
+        from backend.utils.socketio_manager import get_sio
+
+        with votes_lock:
+            sess = votes_by_session.setdefault(str(session_id), {})
+            sess[voter_id] = int(activity_id)
+
+            counts = {}
+            for v in sess.values():
+                counts[v] = counts.get(v, 0) + 1
+
+        leader = None
+        leader_count = 0
+        for aid, cnt in counts.items():
+            if cnt > leader_count or (cnt == leader_count and (leader is None or aid < leader)):
+                leader = aid
+                leader_count = cnt
+
+        total_votes = sum(counts.values())
+
+        payload = {
+            'session_id': session_id,
+            'counts': counts,
+            'leader': leader,
+            'leader_count': leader_count,
+            'total_votes': total_votes,
+            'timestamp': datetime.now(CET).isoformat()
+        }
+
+        sio = get_sio()
+        if sio:
+            await sio.emit('activity_vote_update', _jsonable(payload))
+            # Auto set active if majority
+            if leader and total_votes > 0 and (leader_count / total_votes) > 0.5:
+                await sio.emit('set_active_activity', {'activity_id': leader, 'session_id': session_id})
+
+        return {'success': True, 'method': 'http', 'payload': payload}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record vote: {e}")
+    activity = ActivityRepository.get_activity_by_id(activity_id)
+    session = None
+    if activity and activity.get('session_id'):
+        session = SessionRepository.get_session_by_id(activity['session_id'])
+        scores = ActivityScoreRepository.get_scores_by_activity(activity_id) or []
+        team_level_totals = {}
+        player_totals = {}
+        for s in scores:
+            tid = s.get('team_id')
+            pid = s.get('player_id')
+            pts = s.get('points') or 0
+            if pid is None or pid == 0:
+                if tid is not None:
+                    team_level_totals[tid] = team_level_totals.get(tid, 0) + pts
+            else:
+                entry = player_totals.get(pid, {'team_id': tid, 'total': 0})
+                entry['total'] = entry.get('total', 0) + pts
+                entry['team_id'] = tid
+                player_totals[pid] = entry
+        teams = SessionTeamRepository.get_teams_by_session(activity['session_id'])
+        team_player_values = {}
+        for pid, info in player_totals.items():
+            t = info.get('team_id')
+            if t is None:
+                continue
+            team_player_values.setdefault(t, []).append({'player_id': pid, 'total': info.get('total', 0)})
+        leaderboard = []
+        is_time = (activity and activity.get('game_type') == 'team_vs_time')
+        aggregate_player_times = bool(activity.get('aggregate_player_times'))
+        time_winner = (activity.get('time_winner') or 'lower').lower()
+        for team in teams:
+            tid = team['id']
+            name = team['name']
+            icon = team.get('icon')
+            if is_time:
+                pvals = [p['total'] for p in team_player_values.get(tid, [])]
+                if pvals and len(pvals) > 0:
+                    if aggregate_player_times:
+                        score_val = sum(pvals)
+                    else:
+                        if time_winner == 'higher':
+                            score_val = max(pvals)
+                        else:
+                            score_val = min(pvals)
+                else:
+                    score_val = team_level_totals.get(tid, 0)
+            else:
+                score_val = team_level_totals.get(tid, 0)
+                score_val += sum([p['total'] for p in team_player_values.get(tid, [])])
+            leaderboard.append({'team_id': tid, 'name': name, 'icon': icon, 'score': score_val, 'team_color': team.get('color'), 'players': [], 'playerScores': { str(p['player_id']): p['total'] for p in team_player_values.get(tid, []) }})
+        return {"leaderboard": leaderboard, "session": session}
+    else:
+        leaderboard = ActivityScoreRepository.get_leaderboard(activity_id)
+        return {"leaderboard": leaderboard, "session": session}

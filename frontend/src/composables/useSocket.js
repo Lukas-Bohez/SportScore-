@@ -9,11 +9,15 @@ export function useSocket() {
   const connect = () => {
     if (socket && socket.connected) {
       console.log("♻️ Socket already connected:", socket.id);
+      try { isConnected.value = true; } catch (_) {}
+      try { if (typeof window !== 'undefined') window.SCOREBOARD_API_BASE = socket.io?.uri || socket.io?.opts?.path || socket.io?.opts?.hostname || undefined; } catch (_) {}
       return socket;
     }
 
     if (socket) {
       console.log("♻️ Socket exists but not connected, reusing...");
+      try { isConnected.value = !!socket.connected; } catch (_) {}
+      // Note: we'll still reuse the existing socket instance and event handlers
       return socket;
     }
 
@@ -46,6 +50,9 @@ export function useSocket() {
       reconnectionAttempts: 10,
       autoConnect: true,
     });
+
+    // Expose the API base URL so HTTP fallback can reach the same backend as the socket
+    try { if (typeof window !== 'undefined' && socketUrl) window.SCOREBOARD_API_BASE = socketUrl; } catch (_) {}
 
     socket.on("connect", () => {
       console.log("✅ Socket.io connected:", socket.id);

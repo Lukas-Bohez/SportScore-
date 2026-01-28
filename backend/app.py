@@ -115,6 +115,10 @@ sio = socketio.AsyncServer(
 from backend.utils.socketio_manager import set_sio, add_client, remove_client, set_client_type, is_admin, get_connected_count, get_admin_count, get_sio
 set_sio(sio)
 
+# Global QR state (helps new connections learn current state)
+current_qr_state = True  # default to showing QR until an admin connects
+
+
 ENDPOINT = "/api/v1"  # API base endpoint
 
 
@@ -139,6 +143,13 @@ async def connect(sid, environ):
         'timestamp': datetime.now(CET).isoformat()
     }, room=sid)
 
+    # Inform the newly connected client about the current QR state
+    try:
+        await sio.emit('set-qr', current_qr_state, room=sid)
+        print(f"Sent initial set-qr={current_qr_state} to {sid}")
+    except Exception as e:
+        print('Error sending initial QR state to client:', e)
+
 @sio.event
 async def disconnect(sid, reason=None):
     # Check admin state before removal
@@ -150,25 +161,30 @@ async def disconnect(sid, reason=None):
         print(f"Admin {sid} removed - Remaining admins: {get_admin_count()}")
         # If no more admins, show QR code
         if get_admin_count() == 0:
+            current_qr_state = True
             print("No admins connected - showing QR code")
             sio = get_sio()
             if sio:
                 await sio.emit('set-qr', True)
 
 @sio.event
-async def admin_connected(sid):
-    print(f"Admin connected: {sid}")
+async def admin_connected(sid, data=None):
+    global current_qr_state
+    print(f"Admin connected: {sid} (data: {data})")
     set_client_type(sid, 'admin')
     print(f"Total admins: {get_admin_count()}")
     
     # Hide QR code when admin connects
     sio = get_sio()
     if sio:
+        current_qr_state = False
+        print('Emitting set-qr: False (admin connected)')
         await sio.emit('set-qr', False)
 
 @sio.event
-async def admin_disconnected(sid):
-    print(f"Admin disconnected: {sid}")
+async def admin_disconnected(sid, data=None):
+    global current_qr_state
+    print(f"Admin disconnected: {sid} (data: {data})")
     was_admin = is_admin(sid)
     remove_client(sid)
     if was_admin:
@@ -176,14 +192,18 @@ async def admin_disconnected(sid):
         
         # If no more admins, show QR code
         if get_admin_count() == 0:
+            current_qr_state = True
             print("No admins connected - showing QR code")
             sio = get_sio()
             if sio:
+                print('Emitting set-qr: True (no admins)')
                 await sio.emit('set-qr', True)
 
 @sio.on('set-qr')
 async def set_qr(sid, data=None):
+    global current_qr_state
     print(f"Set QR requested: {data}")
+    current_qr_state = bool(data)
     sio = get_sio()
     if sio:
         await sio.emit('set-qr', data)
@@ -195,6 +215,15 @@ async def qr_state(sid, data=None):
     if sio:
         await sio.emit('qr-state', data)
 
+# Simple in-memory vote tracking for activity selection per session.
+# Structure:
+# votes_by_session: { session_id: { sid: activity_id, ... }, ... }
+# Protected by votes_lock for thread safety.
+votes_by_session = {}
+from threading import Lock
+votes_lock = Lock()
+
+
 @sio.on('set_active_activity')
 async def set_active_activity(sid, data=None):
     print(f"Admin set active activity: {data}")
@@ -202,6 +231,183 @@ async def set_active_activity(sid, data=None):
     sio = get_sio()
     if sio:
         await sio.emit('set_active_activity', data)
+
+
+@sio.on('vote_activity')
+async def vote_activity(sid, data=None):
+    """Handle a player's vote for an activity. Data expected: { session_id, activity_id }
+    We store the vote per-socket (sid) and emit aggregated counts to all clients.
+    If a clear leader emerges we also emit set_active_activity so BigScreen updates.
+    """
+    if not data:
+        return
+    session_id = data.get('session_id') if isinstance(data, dict) else None
+    activity_id = data.get('activity_id') if isinstance(data, dict) else None
+    if not session_id or not activity_id:
+        print(f"Invalid vote_activity payload from {sid}: {data}")
+        return
+
+    with votes_lock:
+        sess = votes_by_session.setdefault(str(session_id), {})
+        previous = sess.get(sid)
+        sess[sid] = int(activity_id)
+
+        # Compute counts
+        counts = {}
+        for v in sess.values():
+            counts[v] = counts.get(v, 0) + 1
+
+    # Determine leader (highest votes). On tie, prefer the activity with lowest id (stable).
+    leader = None
+    leader_count = 0
+    for aid, cnt in counts.items():
+        if cnt > leader_count or (cnt == leader_count and (leader is None or aid < leader)):
+            leader = aid
+            leader_count = cnt
+
+    total_votes = sum(counts.values())
+
+    payload = {
+        'session_id': session_id,
+        'counts': counts,
+        'leader': leader,
+        'leader_count': leader_count,
+        'total_votes': total_votes,
+        'timestamp': datetime.now(CET).isoformat()
+    }
+
+    sio = get_sio()
+    if sio:
+        # Broadcast vote update to all clients
+        await sio.emit('activity_vote_update', payload)
+
+        # If leader has majority (>50%) of votes, set active activity automatically
+        try:
+            if leader and total_votes > 0 and (leader_count / total_votes) > 0.5:
+                print(f"Leader {leader} has majority ({leader_count}/{total_votes}), setting active activity")
+                await sio.emit('set_active_activity', {'activity_id': leader, 'session_id': session_id})
+        except Exception as e:
+            print('Error while possibly setting active activity from votes:', e)
+
+
+# Clean up votes when a client disconnects
+@sio.event
+async def disconnect(sid, reason=None):
+    # Check admin state before removal
+    was_admin = is_admin(sid)
+    remove_client(sid)
+    print(f"Client {sid} disconnected - Total clients: {get_connected_count()}")
+
+    # Remove votes associated with this sid
+    changed_sessions = []
+    with votes_lock:
+        for sess_id, votes in list(votes_by_session.items()):
+            if sid in votes:
+                del votes[sid]
+                changed_sessions.append(sess_id)
+            # if session has no votes left, remove the key
+            if not votes:
+                del votes_by_session[sess_id]
+
+    # Emit updated counts for affected sessions
+    sio = get_sio()
+    for sess_id in changed_sessions:
+        sess_votes = votes_by_session.get(sess_id, {})
+        counts = {}
+        for v in sess_votes.values():
+            counts[v] = counts.get(v, 0) + 1
+        leader = None
+        leader_count = 0
+        for aid, cnt in counts.items():
+            if cnt > leader_count or (cnt == leader_count and (leader is None or aid < leader)):
+                leader = aid
+                leader_count = cnt
+        payload = {
+            'session_id': sess_id,
+            'counts': counts,
+            'leader': leader,
+            'leader_count': leader_count,
+            'total_votes': sum(counts.values()),
+            'timestamp': datetime.now(CET).isoformat()
+        }
+        try:
+            if sio:
+                await sio.emit('activity_vote_update', payload)
+        except Exception:
+            pass
+
+
+@sio.on('session_deleted')
+async def handle_session_deleted(sid, data=None):
+    # When a session is deleted/ended, clear votes for that session
+    if not data:
+        return
+    session_id = data.get('session_id') or data.get('id')
+    if not session_id:
+        return
+    with votes_lock:
+        if str(session_id) in votes_by_session:
+            del votes_by_session[str(session_id)]
+    sio = get_sio()
+    if sio:
+        await sio.emit('activity_vote_update', {
+            'session_id': session_id,
+            'counts': {},
+            'leader': None,
+            'leader_count': 0,
+            'total_votes': 0,
+            'timestamp': datetime.now(CET).isoformat()
+        })
+
+
+@sio.on('session_created')
+async def handle_session_created(sid, data=None):
+    # When a new session is created, clear any stale votes for that session id
+    if not data:
+        return
+    session_id = data.get('session_id') or data.get('id')
+    if not session_id:
+        return
+    with votes_lock:
+        if str(session_id) in votes_by_session:
+            del votes_by_session[str(session_id)]
+    sio = get_sio()
+    if sio:
+        await sio.emit('activity_vote_update', {
+            'session_id': session_id,
+            'counts': {},
+            'leader': None,
+            'leader_count': 0,
+            'total_votes': 0,
+            'timestamp': datetime.now(CET).isoformat()
+        })
+
+# ----------------------------------------------------
+# Votes API
+# ----------------------------------------------------
+
+@app.get(f"{ENDPOINT}/sessions/{{session_id}}/votes")
+async def get_session_votes(session_id: int):
+    """Return current vote counts and leader for a session."""
+    with votes_lock:
+        sess_votes = votes_by_session.get(str(session_id), {})
+        counts = {}
+        for v in sess_votes.values():
+            counts[v] = counts.get(v, 0) + 1
+    leader = None
+    leader_count = 0
+    for aid, cnt in counts.items():
+        if cnt > leader_count or (cnt == leader_count and (leader is None or aid < leader)):
+            leader = aid
+            leader_count = cnt
+    payload = {
+        'session_id': session_id,
+        'counts': counts,
+        'leader': leader,
+        'leader_count': leader_count,
+        'total_votes': sum(counts.values())
+    }
+    return payload
 
 # ----------------------------------------------------
 # Background Task: Round Timer Monitor

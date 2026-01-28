@@ -38,13 +38,13 @@
           <div v-if="activities.length > 0">
             <h4 class="stap4-subtitle">Activiteiten:</h4>
             <div class="activity-container">
-              <p
+              <div
                 v-for="activity in activities"
                 :key="activity.id"
                 class="activity-container-item"
               >
-                {{ activity.name }}
-              </p>
+                <span @click="voteForActivity(activity)" style="cursor: pointer; text-decoration: underline;">{{ activity.name }}</span>
+              </div>
             </div>
           </div>
           <div v-if="teams.length > 0">
@@ -105,6 +105,22 @@
     <GenericNav />
   </div>
 
+<style scoped>
+.activity-vote-controls{
+  display:flex;
+  align-items:center;
+  gap:var(--space-3);
+}
+.vote-count{
+  display:none !important; /* hidden: implicit voting UX */
+  background:var(--blue-10);
+  padding:0.25rem 0.5rem;
+  border-radius:var(--radius-S);
+  font-weight:600;
+}
+.vote-button{width:5.5rem}
+</style>
+
   <!-- Delete Confirmation Modal -->
   <GenericModel
     ref="deleteModal"
@@ -151,6 +167,47 @@ const activities = ref([]);
 const loading = ref(true);
 const deleteModal = ref(null);
 const errorModal = ref(null);
+
+// Voting helpers
+import { voteActivity } from '@/composables/usePlayerActions';
+import { useSocket } from '@/composables/useSocket';
+const voteCounts = ref({});
+let socket = null;
+
+const initVoteListeners = () => {
+  try {
+    const s = useSocket();
+    try { s.connect(); } catch (_) {}
+    socket = s;
+    s.on('activity_vote_update', (payload) => {
+      try {
+        const p = payload || {};
+        if (!p || !p.session_id || !session.value) return;
+        if (String(p.session_id) !== String(session.value.id)) return;
+        voteCounts.value = p.counts || {};
+      } catch (e) {
+        console.warn('session overview activity_vote_update handler failed:', e);
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to init session overview vote listeners:', e);
+  }
+};
+
+const voteForActivity = async (activity) => {
+  if (!session.value) return;
+  try {
+    const res = await voteActivity(session.value.id, activity.id);
+    if (res && res.success) {
+      ElNotification({ title: 'Stem bekend', message: `Je stem voor ${activity.name} is ontvangen`, type: 'success' });
+    } else {
+      ElNotification({ title: 'Stem mislukt', message: `Kon niet stemmen: ${res && res.error ? res.error : 'Onbekende fout'}`, type: 'warning' });
+    }
+  } catch (e) {
+    console.warn('voteForActivity failed:', e);
+    ElNotification({ title: 'Stem mislukt', message: 'Kon niet stemmen', type: 'warning' });
+  }
+};
 
 const back = () => {
   router.back();
@@ -435,6 +492,15 @@ const loadSessionData = async () => {
         );
         activities.value = activitiesData.activities || activitiesData;
         console.log("✅ Activities loaded:", activities.value.length);
+
+        // Init vote listeners and fetch current votes
+        initVoteListeners();
+        try {
+          const v = await get(`/api/v1/sessions/${sessionId}/votes`);
+          voteCounts.value = v.counts || {};
+        } catch (e) {
+          console.warn('Failed to load initial votes for session overview', e);
+        }
       } catch (error) {
         console.error("❌ Failed to load activities:", error);
         activities.value = [];

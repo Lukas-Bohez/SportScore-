@@ -49,7 +49,8 @@ export default {
   },
   data() {
     return {
-      count: this.modelValue || this.initialValue,
+      // Use nullish coalescing so an explicit 0 is respected by the component
+      count: this.modelValue ?? this.initialValue,
     };
   },
   watch: {

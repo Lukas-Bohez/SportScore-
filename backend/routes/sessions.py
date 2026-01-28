@@ -16,6 +16,7 @@ from backend.models.models import (
 )
 from backend.utils.api_helpers import _jsonable, CET
 from backend.utils.socketio_manager import get_sio
+from uuid import uuid4
 
 router = APIRouter()
 
@@ -190,6 +191,66 @@ async def delete_session(session_id: int):
     if not success:
         raise HTTPException(status_code=400, detail="Failed to delete session")
     return {"message": "Session deleted successfully"}
+
+
+# Voting endpoint (HTTP fallback for clients that can't emit socket events)
+@router.post(f"{ENDPOINT}/sessions/{{session_id}}/activities/{{activity_id}}/vote", tags=["Sessions"], summary="Cast a vote for an activity via HTTP")
+async def vote_activity_http(session_id: int, activity_id: int, request: Request):
+    """Accepts an optional JSON body { voter_id?: str } and records a vote for the specified activity.
+    Emits `activity_vote_update` and `set_active_activity` if a leader emerges.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        try:
+            raw = await request.body()
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode('utf-8', errors='ignore')
+            payload = json.loads(raw or '{}')
+        except Exception:
+            payload = {}
+
+    voter_id = payload.get('voter_id') or str(uuid4())
+
+    # Inline replication of in-memory vote tracking used by socket handler
+    from backend.app import votes_by_session, votes_lock
+    with votes_lock:
+        sess = votes_by_session.setdefault(str(session_id), {})
+        previous = sess.get(voter_id)
+        sess[voter_id] = int(activity_id)
+
+        # compute counts
+        counts = {}
+        for v in sess.values():
+            counts[v] = counts.get(v, 0) + 1
+
+    # determine leader
+    leader = None
+    leader_count = 0
+    for aid, cnt in counts.items():
+        if cnt > leader_count or (cnt == leader_count and (leader is None or aid < leader)):
+            leader = aid
+            leader_count = cnt
+    total_votes = sum(counts.values())
+
+    sio = get_sio()
+    payload_out = {
+        'session_id': session_id,
+        'counts': counts,
+        'leader': leader,
+        'leader_count': leader_count,
+        'total_votes': total_votes,
+    }
+
+    if sio:
+        await sio.emit('activity_vote_update', _jsonable(payload_out))
+        try:
+            if leader and total_votes > 0 and (leader_count / total_votes) > 0.5:
+                await sio.emit('set_active_activity', {'activity_id': leader, 'session_id': session_id})
+        except Exception:
+            pass
+
+    return { 'success': True, 'method': 'http', 'payload': payload_out }
 
 
 # Session Teams Endpoints

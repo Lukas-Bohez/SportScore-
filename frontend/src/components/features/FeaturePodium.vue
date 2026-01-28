@@ -2,23 +2,23 @@
   <div class="feature-podium-content">
     <FeaturePodiumItem
       :position="2"
-      title="Lukas"
-      :emoji="selectedEmoji"
-      :score="18"
+      :title="winners[1]?.title || winners[1]?.name || '---'"
+      :emoji="winners[1]?.emoji || winners[1]?.icon || '🏆'"
+      :score="winners[1]?.score ?? 0"
       class="podium-second podium-item"
     />
     <FeaturePodiumItem
       :position="1"
-      title="Abdullah"
-      :emoji="selectedEmoji"
-      :score="20"
+      :title="winners[0]?.title || winners[0]?.name || '---'"
+      :emoji="winners[0]?.emoji || winners[0]?.icon || '🏆'"
+      :score="winners[0]?.score ?? 0"
       class="podium-first podium-item"
     />
     <FeaturePodiumItem
       :position="3"
-      title="Maarten"
-      :emoji="selectedEmoji"
-      :score="17"
+      :title="winners[2]?.title || winners[2]?.name || '---'"
+      :emoji="winners[2]?.emoji || winners[2]?.icon || '🏆'"
+      :score="winners[2]?.score ?? 0"
       class="podium-third podium-item"
     />
   </div>
@@ -28,10 +28,11 @@ import FeaturePodiumItem from "./FeaturePodiumItem.vue";
 defineOptions({
   name: "FeaturePodium",
 });
+
 defineProps({
-  selectedEmoji: {
-    type: String,
-    required: true,
+  winners: {
+    type: Array,
+    default: () => [],
   },
 });
 </script>
